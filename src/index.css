@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+html {
+  font-family: "Cairo", sans-serif;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: "Cairo", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #020617;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+
+
+@keyframes loaderLogo {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.06);
+  }
+}
