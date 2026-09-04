@@ -44,6 +44,8 @@ interface OrderItem {
   product_name: string
   price: number
   quantity: number
+  sale_type?: "piece" | "weight"
+  weight?: number | null
 }
 
 // =====================================================
@@ -298,73 +300,127 @@ const loadOrders = async () => {
   try {
     setOrdersLoading(true)
 
-    // الطلبات موجودة في Supabase، وحسابات الدليفري في Laravel.
-    // لذلك نربط delivery_id مع بيانات الدليفري القادمة من Laravel.
-    const [
-      { data, error },
-      deliveryResponse,
-      { data: bankAccountsData, error: bankAccountsError },
-    ] = await Promise.all([
-      supabase
-        .from("orders")
-        .select(`
-          *,
-          order_items (
-            id,
-            order_id,
-            product_id,
-            product_name,
-            price,
-            quantity
-          )
-        `)
-        .order("created_at", {
-          ascending: false,
-        }),
-      apiFetch("/admin/deliveries"),
-      supabase
-        .from("bank_accounts")
+    // =========================
+    // 1. Get Orders
+    // =========================
+    const { data: ordersData, error: ordersError } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (ordersError) throw ordersError
+
+    const ordersList = ordersData ?? []
+
+    // =========================
+    // 2. Get Order Items
+    // =========================
+    let orderItemsList: OrderItem[] = []
+
+    if (ordersList.length > 0) {
+      const orderIds = ordersList.map((order) => order.id)
+
+      const { data: itemsData, error: itemsError } = await supabase
+        .from("order_items")
         .select(`
           id,
-          bank_name,
-          account_name,
-          account_number,
-          account_type,
-          is_active
-        `),
-    ])
+          order_id,
+          product_id,
+          product_name,
+          price,
+          quantity,
+          sale_type,
+          weight,
+          created_at,
+          updated_at
+        `)
+        .in("order_id", orderIds)
+        .order("id", { ascending: true })
 
-    if (error) throw error
-    if (bankAccountsError) throw bankAccountsError
+      if (itemsError) throw itemsError
 
-    const deliveryList = Array.isArray(deliveryResponse)
+      orderItemsList = (itemsData ?? []).map((item) => ({
+        ...item,
+        id: Number(item.id),
+        order_id: Number(item.order_id),
+        product_id: Number(item.product_id),
+        product_name: String(item.product_name ?? ""),
+        price: Number(item.price ?? 0),
+        quantity: Number(item.quantity ?? 0),
+        sale_type: item.sale_type === "weight" ? "weight" : "piece",
+        weight:
+          item.weight !== null && item.weight !== undefined
+            ? Number(item.weight)
+            : null,
+      })) as OrderItem[]
+    }
+
+    // =========================
+    // 3. Get Deliveries
+    // =========================
+    const deliveryResponse = await apiFetch("/admin/deliveries")
+
+    const deliveryList: Delivery[] = Array.isArray(deliveryResponse)
       ? deliveryResponse
       : Array.isArray(deliveryResponse?.deliveries)
         ? deliveryResponse.deliveries
         : []
 
-    const bankAccountList: BankAccount[] = bankAccountsData ?? []
+    // =========================
+    // 4. Get Bank Accounts
+    // =========================
+    const { data: bankAccountsData, error: bankAccountsError } = await supabase
+      .from("bank_accounts")
+      .select(`
+        id,
+        bank_name,
+        account_name,
+        account_number,
+        account_type,
+        is_active
+      `)
 
-    const mergedOrders: Order[] = (data ?? []).map((order) => ({
-      ...order,
-      // Normalize legacy backend status to the only pending status used by the UI.
-      status: order.status === ["pending", "approval"].join("_") ? "pending" : order.status,
-      delivery:
-        deliveryList.find(
-          (delivery: Delivery) =>
-            Number(delivery.id) === Number(order.delivery_id)
-        ) ?? null,
-      bank_account:
-        bankAccountList.find(
-          (account) =>
-            Number(account.id) === Number(order.bank_account_id)
-        ) ?? null,
+    if (bankAccountsError) throw bankAccountsError
+
+    const bankAccountList: BankAccount[] = (bankAccountsData ?? []).map((account) => ({
+      ...account,
+      id: Number(account.id),
     }))
+
+    // =========================
+    // 5. Merge Orders + Items
+    // =========================
+    const mergedOrders: Order[] = ordersList.map((order) => {
+      const items = orderItemsList.filter(
+        (item) => Number(item.order_id) === Number(order.id)
+      )
+
+      return {
+        ...order,
+        id: Number(order.id),
+        total: Number(order.total ?? 0),
+        status:
+          order.status === "pending_approval"
+            ? "pending"
+            : order.status,
+        order_items: items,
+        delivery:
+          deliveryList.find(
+            (delivery) => Number(delivery.id) === Number(order.delivery_id)
+          ) ?? null,
+        bank_account:
+          bankAccountList.find(
+            (account) => Number(account.id) === Number(order.bank_account_id)
+          ) ?? null,
+      }
+    })
+
+    console.log("ORDERS:", mergedOrders)
+    console.log("ORDER ITEMS:", orderItemsList)
 
     setOrders(mergedOrders)
   } catch (error) {
     console.error("LOAD ORDERS ERROR:", error)
-
     toast.error(
       error instanceof Error
         ? error.message
@@ -374,6 +430,7 @@ const loadOrders = async () => {
     setOrdersLoading(false)
   }
 }
+
   // =====================================================
   // Load Deliveries
   // =====================================================
@@ -569,7 +626,11 @@ const handleAssignDelivery = async (orderId: number, deliveryId: number) => {
             product_id,
             product_name,
             price,
-            quantity
+            quantity,
+            sale_type,
+            weight,
+            created_at,
+            updated_at
           )
         `)
         .single()
@@ -1467,16 +1528,69 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                             </div>
 
                             <div>
-                              <p className="mb-2 text-sm font-black text-slate-700">المنتجات</p>
-                              <div className="space-y-2">
-                                {order.order_items?.map((item) => (
-                                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2.5 text-sm">
-                                    <span className="min-w-0 truncate text-slate-700">{item.product_name} <span className="font-black">× {item.quantity}</span></span>
-                                    <span className="shrink-0 font-bold text-slate-900">{(item.price * item.quantity).toLocaleString("ar-EG")} جنيه</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
+  <p className="mb-2 text-sm font-black text-slate-700">
+    🛒 المنتجات
+  </p>
+
+  {Array.isArray(order.order_items) &&
+  order.order_items.length > 0 ? (
+    <div className="space-y-2">
+      {order.order_items.map((item) => {
+        const price = Number(item.price ?? 0)
+        const quantity = Number(item.quantity ?? 0)
+        const weight = Number(item.weight ?? 0)
+
+        const itemTotal =
+          item.sale_type === "weight"
+            ? price * weight
+            : price * quantity
+
+        return (
+          <div
+            key={item.id}
+            className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-black text-slate-900">
+                  {item.product_name}
+                </p>
+
+                <div className="mt-1 text-xs font-bold text-slate-500">
+                  {item.sale_type === "weight" ? (
+                    <>
+                      بالكيلو • الوزن: {weight} كجم • سعر الكيلو:{" "}
+                      {price.toLocaleString("ar-EG")} جنيه
+                    </>
+                  ) : (
+                    <>
+                      بالقطعة • الكمية: {quantity} • سعر القطعة:{" "}
+                      {price.toLocaleString("ar-EG")} جنيه
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="shrink-0 text-left">
+                <p className="text-[11px] font-bold text-slate-400">
+                  الإجمالي
+                </p>
+
+                <p className="font-black text-indigo-600">
+                  {itemTotal.toLocaleString("ar-EG")} جنيه
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  ) : (
+    <div className="rounded-xl bg-slate-50 p-4 text-center text-sm font-bold text-slate-400">
+      لا توجد منتجات لهذا الطلب
+    </div>
+  )}
+</div>
 
                             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                               <p className="text-xs font-semibold text-slate-400">💳 الدفع</p>

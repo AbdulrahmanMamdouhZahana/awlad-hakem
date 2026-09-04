@@ -36,7 +36,7 @@ interface Order {
   delivered_at?: string | null
   delivery_id?: number | null
   order_items?: OrderItem[]
-  delivery_image?: string | null
+  delivery_proof_image?: string | null
 }
 
 const statusLabel = (status: string) => {
@@ -266,7 +266,7 @@ export default function DeliveryDashboard() {
       const updateData = {
         status: "delivered",
         delivered_at: new Date().toISOString(),
-        delivery_image: imageUrl,
+        delivery_proof_image: imageUrl,
       }
 
       console.log("📝 Updating order with:", updateData)
@@ -765,11 +765,11 @@ const deleteOrder = async (orderId: number) => {
               )}
 
               {/* Delivery Image if exists */}
-              {order.delivery_image && (
+              {order.delivery_proof_image && (
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                   <p className="text-xs font-bold text-emerald-700">📸 صورة التأكيد</p>
                   <img
-                    src={order.delivery_image}
+                    src={order.delivery_proof_image}
                     alt="تأكيد التوصيل"
                     className="mt-2 max-h-48 w-full rounded-lg object-cover"
                     onError={(e) => {
@@ -805,7 +805,7 @@ const deleteOrder = async (orderId: number) => {
                   <div className="w-full space-y-2">
                     <div className="rounded-2xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">
                       ✅ تم توصيل الطلب{order.delivered_at ? ` في ${new Date(order.delivered_at).toLocaleString("ar-EG")}` : ""}
-                      {order.delivery_image && " 📸 مع صورة تأكيد"}
+                      {order.delivery_proof_image && " 📸 مع صورة تأكيد"}
                     </div>
                     {/* ✅ زر حذف الطلب بعد التوصيل */}
                     <button
