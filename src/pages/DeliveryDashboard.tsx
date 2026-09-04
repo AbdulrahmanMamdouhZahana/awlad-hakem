@@ -975,8 +975,9 @@ const ConfirmDeliveryModal = ({
   deliveryImage: File | null
   deliveryImagePreview: string | null
   confirming: boolean
-  fileInputRef: React.RefObject<HTMLInputElement>
-  onImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+
+    fileInputRef: React.RefObject<HTMLInputElement | null>
+    onImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
   onConfirm: () => void
   onClose: () => void
 }) => (
