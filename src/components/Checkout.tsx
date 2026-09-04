@@ -83,17 +83,17 @@ const Checkout = ({
       try {
         setLoadingAccounts(true)
         
-        console.log("🔍 Loading bank accounts from Laravel API...")
+        // console.log("🔍 Loading bank accounts from Laravel API...")
 
         // ✅ استخدام apiFetch لجلب البيانات من Laravel
         const response = await apiFetch("/bank-accounts")
 
-        console.log("📦 API Response:", response)
+        // console.log("📦 API Response:", response)
 
         if (response && response.data && response.data.length > 0) {
           setBankAccounts(response.data)
           setSelectedBankId(response.data[0].id)
-          console.log("✅ Bank accounts loaded from API:", response.data)
+          // console.log("✅ Bank accounts loaded from API:", response.data)
         } else {
           console.warn("⚠️ No bank accounts found in API")
           toast.error("لا توجد حسابات بنكية متاحة حالياً")

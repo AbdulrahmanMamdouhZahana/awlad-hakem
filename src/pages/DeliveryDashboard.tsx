@@ -206,9 +206,9 @@ export default function DeliveryDashboard() {
 
       const token = localStorage.getItem("staff_token")
 
-      console.log("📤 UPLOADING IMAGE...")
-      console.log("Order ID:", orderId)
-      console.log("File:", file.name, file.size, "bytes")
+      // console.log("📤 UPLOADING IMAGE...")
+      // console.log("Order ID:", orderId)
+      // console.log("File:", file.name, file.size, "bytes")
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/delivery/upload-delivery-image`, {
         method: "POST",
@@ -221,7 +221,7 @@ export default function DeliveryDashboard() {
 
       const data = await response.json()
 
-      console.log("📥 UPLOAD RESPONSE:", data)
+      // console.log("📥 UPLOAD RESPONSE:", data)
 
       if (!response.ok) {
         throw new Error(data?.message || "فشل رفع الصورة")
@@ -233,7 +233,7 @@ export default function DeliveryDashboard() {
         throw new Error("لم يتم استلام رابط الصورة من الخادم")
       }
 
-      console.log("✅ IMAGE UPLOADED:", imageUrl)
+      // console.log("✅ IMAGE UPLOADED:", imageUrl)
       return imageUrl
 
     } catch (error) {
@@ -260,7 +260,7 @@ export default function DeliveryDashboard() {
       const imageUrl = await uploadDeliveryImage(deliveryImage, orderId)
       toast.dismiss("upload-image")
 
-      console.log("✅ Image uploaded, URL:", imageUrl)
+      // console.log("✅ Image uploaded, URL:", imageUrl)
 
       // تحديث الطلب مع حفظ رابط الصورة في Supabase
       const updateData = {
@@ -269,7 +269,7 @@ export default function DeliveryDashboard() {
         delivery_proof_image: imageUrl,
       }
 
-      console.log("📝 Updating order with:", updateData)
+      // console.log("📝 Updating order with:", updateData)
 
       const { data, error } = await supabase
         .from("orders")
@@ -283,7 +283,7 @@ export default function DeliveryDashboard() {
         throw error
       }
 
-      console.log("✅ Order updated:", data)
+      // console.log("✅ Order updated:", data)
 
       setOrders((prev) =>
         prev.map((order) =>
@@ -334,7 +334,7 @@ const deleteOrder = async (orderId: number) => {
   try {
     setDeletingId(orderId)
 
-    console.log("🗑️ DELETING ORDER:", orderId)
+    // console.log("🗑️ DELETING ORDER:", orderId)
 
     // ✅ 1. حذف عناصر الطلب أولاً (order_items)
     const { error: itemsError } = await supabase
@@ -347,7 +347,7 @@ const deleteOrder = async (orderId: number) => {
       throw new Error("فشل حذف عناصر الطلب: " + itemsError.message)
     }
 
-    console.log("✅ Order items deleted")
+    // console.log("✅ Order items deleted")
 
     // ✅ 2. حذف الطلب نفسه
     const { error: orderError } = await supabase
@@ -360,12 +360,12 @@ const deleteOrder = async (orderId: number) => {
       throw new Error("فشل حذف الطلب: " + orderError.message)
     }
 
-    console.log("✅ Order deleted successfully")
+    // console.log("✅ Order deleted successfully")
 
     // ✅ 3. تحديث الـ state - إزالة الطلب
     setOrders((prev) => {
       const newOrders = prev.filter((order) => order.id !== orderId)
-      console.log("📝 Orders after deletion:", newOrders.length)
+      // console.log("📝 Orders after deletion:", newOrders.length)
       return newOrders
     })
 

@@ -80,8 +80,8 @@ export default function Login() {
 
       const role = data.user.role;
 
-      console.log("LOGIN USER:", data.user);
-      console.log("LOGIN ROLE:", role);
+      // console.log("LOGIN USER:", data.user);
+      // console.log("LOGIN ROLE:", role);
 
       // ==========================================
       // ONLY ADMIN + DELIVERY
