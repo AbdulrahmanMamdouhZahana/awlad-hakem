@@ -21,6 +21,7 @@ const AdminLayout = ({
   const location = useLocation()
   const [pageLoading, setPageLoading] = useState(false)
   const [showPageLoader, setShowPageLoader] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   const navigate = useNavigate()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -186,6 +187,28 @@ const AdminLayout = ({
   const clearNotifications = () => {
     setNotifications([])
     setUnreadNotifications(0)
+  }
+
+  const handleLogout = async () => {
+    if (loggingOut) return
+
+    setLoggingOut(true)
+
+    try {
+      await apiFetch("/logout", {
+        method: "POST",
+      })
+    } catch (error) {
+      console.warn("LOGOUT ERROR:", error)
+    } finally {
+      // Clear all client-side auth data even if the API request fails.
+      localStorage.removeItem("staff_token")
+      localStorage.removeItem("staff_user")
+      localStorage.removeItem("token")
+      localStorage.removeItem("user")
+
+      navigate("/admin/login", { replace: true })
+    }
   }
 
   const navigation = [
@@ -502,7 +525,7 @@ const AdminLayout = ({
         </nav>
 
         {/* Bottom */}
-        <div className="border-t border-slate-100 p-4">
+        <div className="border-t border-slate-100 p-4 space-y-2">
           <NavLink
             to="/"
             className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-100 hover:text-indigo-600"
@@ -525,6 +548,35 @@ const AdminLayout = ({
 
             العودة للموقع
           </NavLink>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50">
+              {loggingOut ? (
+                <span className="animate-spin text-base">⏳</span>
+              ) : (
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12H3m0 0 4-4m-4 4 4 4M21 5v14a2 2 0 0 1-2 2h-5"
+                  />
+                </svg>
+              )}
+            </span>
+
+            {loggingOut ? "جاري تسجيل الخروج..." : "تسجيل الخروج"}
+          </button>
         </div>
       </aside>
 
@@ -698,6 +750,36 @@ const AdminLayout = ({
                   </p>
                 </div>
               </NavLink>
+
+              {/* Logout */}
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="flex h-11 items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 text-sm font-black text-red-600 shadow-sm transition hover:border-red-200 hover:bg-red-100 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                title="تسجيل الخروج"
+              >
+                {loggingOut ? (
+                  <span className="animate-spin text-base">⏳</span>
+                ) : (
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12H3m0 0 4-4m-4 4 4 4M21 5v14a2 2 0 0 1-2 2h-5"
+                    />
+                  </svg>
+                )}
+                <span className="hidden sm:inline">
+                  {loggingOut ? "جاري الخروج..." : "خروج"}
+                </span>
+              </button>
             </div>
           </div>
         </header>

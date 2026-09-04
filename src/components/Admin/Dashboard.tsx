@@ -415,8 +415,8 @@ const loadOrders = async () => {
       }
     })
 
-    console.log("ORDERS:", mergedOrders)
-    console.log("ORDER ITEMS:", orderItemsList)
+    // console.log("ORDERS:", mergedOrders)
+    // console.log("ORDER ITEMS:", orderItemsList)
 
     setOrders(mergedOrders)
   } catch (error) {
@@ -778,7 +778,7 @@ const buildDeliveryWhatsAppMessage = (
       )
     }
 
-    console.log("UPDATED ORDER:", data)
+    // console.log("UPDATED ORDER:", data)
 
     const confirmedOrder: Order = {
       ...data,
@@ -1872,22 +1872,30 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
               ? "bg-amber-100 text-amber-700"
               : normalizedStatus === "confirmed"
                 ? "bg-emerald-100 text-emerald-700"
-                : normalizedStatus === "delivered"
-                  ? "bg-blue-100 text-blue-700"
-                  : normalizedStatus === "cancelled"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-slate-100 text-slate-700"
+                : normalizedStatus === "assigned"
+                  ? "bg-indigo-100 text-indigo-700"
+                  : normalizedStatus === "out_for_delivery"
+                    ? "bg-violet-100 text-violet-700"
+                    : normalizedStatus === "delivered"
+                      ? "bg-blue-100 text-blue-700"
+                      : normalizedStatus === "cancelled"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-slate-100 text-slate-700"
 
           const statusLabel =
             normalizedStatus === "pending"
               ? "🟡 قيد الانتظار"
               : normalizedStatus === "confirmed"
                 ? "🟢 مؤكد"
-                : normalizedStatus === "delivered"
-                  ? "🔵 تم التوصيل"
-                  : normalizedStatus === "cancelled"
-                    ? "🔴 ملغي"
-                    : "غير محدد"
+                : normalizedStatus === "assigned"
+                  ? "🚚 تم التعيين"
+                  : normalizedStatus === "out_for_delivery"
+                    ? "🚚 قيد التوصيل"
+                    : normalizedStatus === "delivered"
+                      ? "🔵 تم التوصيل"
+                      : normalizedStatus === "cancelled"
+                        ? "🔴 ملغي"
+                        : "غير محدد"
 
           return (
             <div
@@ -2235,15 +2243,6 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                       </div>
                     )}
 
-                    {normalizedStatus === "pending" && (
-                      <button
-                        type="button"
-                        onClick={() => openDeliverySelection(selectedOrder)}
-                        className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white transition hover:bg-indigo-500"
-                      >
-                        🚚 اختيار الدليفري وتأكيد الطلب
-                      </button>
-                    )}
                   </section>
 
                   {/* Dates */}
@@ -2298,41 +2297,98 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                   )}
                 </div>
 
-                {/* Actions */}
-                {(normalizedStatus === "pending" ||
-                  normalizedStatus === "delivered") && (
-                  <div className="mt-6 flex gap-3">
-                    <button
-                      type="button"
-                      disabled={
-                        confirmingOrder === selectedOrder.id ||
-                        cancellingOrder === selectedOrder.id
-                      }
-                      onClick={() => handleConfirmOrder(selectedOrder.id)}
-                      className="flex-1 rounded-xl bg-emerald-600 py-3.5 font-black text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {confirmingOrder === selectedOrder.id
-                        ? "جاري التأكيد..."
-                        : "✓ تأكيد الطلب"}
-                    </button>
+                {/* Actions - Same flow as the order card */}
+                <div className="mt-6 border-t border-slate-100 pt-5">
+                  {normalizedStatus === "pending" && (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        disabled={
+                          confirmingOrder === selectedOrder.id ||
+                          cancellingOrder === selectedOrder.id
+                        }
+                        onClick={() => handleConfirmOrder(selectedOrder.id)}
+                        className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {confirmingOrder === selectedOrder.id ? (
+                          <>
+                            <span className="animate-spin">⏳</span>
+                            جاري التأكيد...
+                          </>
+                        ) : (
+                          <>
+                            <span>✓</span>
+                            تأكيد الطلب
+                          </>
+                        )}
+                      </button>
 
+                      <button
+                        type="button"
+                        disabled={
+                          confirmingOrder === selectedOrder.id ||
+                          cancellingOrder === selectedOrder.id
+                        }
+                        onClick={() => handleCancelOrder(selectedOrder.id)}
+                        className="flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {cancellingOrder === selectedOrder.id ? (
+                          <>
+                            <span className="animate-spin">⏳</span>
+                            جاري الإلغاء...
+                          </>
+                        ) : (
+                          <>
+                            <span>✕</span>
+                            إلغاء الطلب
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {(normalizedStatus === "confirmed" ||
+                    normalizedStatus === "assigned" ||
+                    normalizedStatus === "out_for_delivery") && (
+                    <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4 text-center">
+                      <p className="text-sm font-black text-indigo-800">
+                        🚚 الطلب قيد التوصيل
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-indigo-600">
+                        تم تأكيد الطلب وتعيين الدليفري
+                      </p>
+                    </div>
+                  )}
+
+                  {normalizedStatus === "delivered" && (
                     <button
                       type="button"
-                      disabled={
-                        confirmingOrder === selectedOrder.id ||
-                        cancellingOrder === selectedOrder.id
-                      }
+                      disabled={cancellingOrder === selectedOrder.id}
                       onClick={() => handleCancelOrder(selectedOrder.id)}
-                      className="flex-1 rounded-xl bg-red-600 py-3.5 font-black text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-600 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {cancellingOrder === selectedOrder.id
-                        ? "جاري الحذف..."
-                        : normalizedStatus === "delivered"
-                          ? "🗑 حذف الطلب"
-                          : "✕ إلغاء الطلب"}
+                      {cancellingOrder === selectedOrder.id ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          جاري الحذف...
+                        </>
+                      ) : (
+                        <>
+                          <span>🗑</span>
+                          حذف الطلب
+                        </>
+                      )}
                     </button>
-                  </div>
-                )}
+                  )}
+
+                  {normalizedStatus === "cancelled" && (
+                    <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-center">
+                      <p className="text-sm font-black text-red-800">
+                        🔴 هذا الطلب ملغي
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )

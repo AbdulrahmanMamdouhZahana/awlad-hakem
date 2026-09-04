@@ -535,18 +535,7 @@ export default function Profile() {
 
         </div>
 
-        {/* Logout */}
-
-        <button
-          type="button"
-          onClick={() => void handleLogout()}
-          disabled={loggingOut}
-          className="w-full rounded-xl bg-red-600 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-red-100 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loggingOut
-            ? "جاري تسجيل الخروج..."
-            : "تسجيل الخروج"}
-        </button>
+       
 
       </div>
     </div>

@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState, useRef } from "react"
+import { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import toast from "react-hot-toast"
 import { supabase } from "../lib/supabase"
 import { useOutletContext } from "react-router-dom"
+import { apiFetch } from "../services/api"
+
+// =====================================================
+// Types
+// =====================================================
 
 interface DeliveryUser {
   id: number
@@ -14,9 +19,13 @@ interface DeliveryUser {
 
 interface OrderItem {
   id: number
+  order_id?: number
+  product_id?: number
   product_name: string
   price: number
   quantity: number
+  sale_type?: "piece" | "weight"
+  weight?: number | null
 }
 
 interface Order {
@@ -39,24 +48,134 @@ interface Order {
   delivery_proof_image?: string | null
 }
 
-const statusLabel = (status: string) => {
-  switch (status) {
-    case "assigned": return "جاهز للتوصيل"
-    case "out_for_delivery": return "🚚 خارج للتوصيل"
-    case "delivered": return "✅ تم التوصيل"
-    case "confirmed": return "تم التأكيد"
-    default: return status || "غير محدد"
+interface DeliveryProofImage {
+  id: number
+  order_id: number
+  delivery_id?: number | null
+  image_url: string
+  created_at?: string
+}
+
+// =====================================================
+// Constants & Helpers
+// =====================================================
+
+const ORDER_STATUSES = {
+  CONFIRMED: "confirmed",
+  ASSIGNED: "assigned",
+  OUT_FOR_DELIVERY: "out_for_delivery",
+  DELIVERED: "delivered",
+} as const
+
+type OrderStatus = typeof ORDER_STATUSES[keyof typeof ORDER_STATUSES]
+
+const STATUS_CONFIG: Record<OrderStatus, { label: string; className: string }> = {
+  assigned: { label: "جاهز للتوصيل", className: "bg-violet-100 text-violet-700" },
+  out_for_delivery: { label: "🚚 خارج للتوصيل", className: "bg-blue-100 text-blue-700" },
+  delivered: { label: "✅ تم التوصيل", className: "bg-emerald-100 text-emerald-700" },
+  confirmed: { label: "تم التأكيد", className: "bg-amber-100 text-amber-700" },
+}
+
+const DEFAULT_STATUS_CONFIG = { label: "غير محدد", className: "bg-amber-100 text-amber-700" }
+
+const getStatusConfig = (status: string) => {
+  return STATUS_CONFIG[status as OrderStatus] ?? DEFAULT_STATUS_CONFIG
+}
+
+const formatDate = (date?: string | null): string => {
+  if (!date) return "غير متوفر"
+  const parsed = new Date(date)
+  return Number.isNaN(parsed.getTime()) ? "غير متوفر" : parsed.toLocaleString("ar-EG")
+}
+
+const formatMoney = (value: number): string => {
+  return Number(value || 0).toLocaleString("ar-EG")
+}
+
+const normalizeWhatsAppPhone = (phone: string): string => {
+  const digits = phone.replace(/\D/g, "")
+  
+  if (!digits) return ""
+  
+  if (digits.startsWith("0")) {
+    return `20${digits.slice(1)}`
+  }
+  
+  if (!digits.startsWith("20")) {
+    return `20${digits}`
+  }
+  
+  return digits
+}
+
+const isValidEgyptianPhone = (phone: string): boolean => {
+  return /^201[0-9]{9}$/.test(phone)
+}
+
+// =====================================================
+// Audio Service
+// =====================================================
+
+class AudioNotificationService {
+  private context: AudioContext | null = null
+
+  private getContext(): AudioContext | null {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioContextClass) return null
+      
+      if (!this.context) {
+        this.context = new AudioContextClass()
+      }
+      
+      return this.context
+    } catch {
+      return null
+    }
+  }
+
+  playSound(): void {
+    const context = this.getContext()
+    if (!context) return
+
+    if (context.state === "suspended") {
+      void context.resume()
+    }
+
+    const now = context.currentTime
+
+    ;[0, 0.25].forEach((offset, index) => {
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+
+      oscillator.type = "sine"
+      oscillator.frequency.setValueAtTime(index === 0 ? 880 : 1175, now + offset)
+
+      gain.gain.setValueAtTime(0.0001, now + offset)
+      gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.2)
+
+      oscillator.connect(gain)
+      gain.connect(context.destination)
+
+      oscillator.start(now + offset)
+      oscillator.stop(now + offset + 0.22)
+    })
+  }
+
+  unlock(): void {
+    const context = this.getContext()
+    if (context && context.state === "suspended") {
+      void context.resume()
+    }
   }
 }
 
-const statusClass = (status: string) => {
-  switch (status) {
-    case "assigned": return "bg-violet-100 text-violet-700"
-    case "out_for_delivery": return "bg-blue-100 text-blue-700"
-    case "delivered": return "bg-emerald-100 text-emerald-700"
-    default: return "bg-amber-100 text-amber-700"
-  }
-}
+const audioService = new AudioNotificationService()
+
+// =====================================================
+// Main Component
+// =====================================================
 
 export default function DeliveryDashboard() {
   const { user } = useOutletContext<{ user: DeliveryUser }>()
@@ -82,100 +201,42 @@ export default function DeliveryDashboard() {
 
   const knownOrderIdsRef = useRef<Set<number>>(new Set())
   const firstLoadRef = useRef(true)
-  const audioContextRef = useRef<AudioContext | null>(null)
   const [newOrderCount, setNewOrderCount] = useState(0)
 
   // =====================================
-  // Play Notification Sound
+  // Stats
   // =====================================
 
-  const playNotificationSound = () => {
-    try {
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as typeof window & {
-          webkitAudioContext?: typeof AudioContext
-        }).webkitAudioContext
-
-      if (!AudioContextClass) return
-
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContextClass()
-      }
-
-      const context = audioContextRef.current
-
-      if (context.state === "suspended") {
-        void context.resume()
-      }
-
-      const now = context.currentTime
-
-      ;[0, 0.25].forEach((offset, index) => {
-        const oscillator = context.createOscillator()
-        const gain = context.createGain()
-
-        oscillator.type = "sine"
-        oscillator.frequency.setValueAtTime(
-          index === 0 ? 880 : 1175,
-          now + offset
-        )
-
-        gain.gain.setValueAtTime(0.0001, now + offset)
-        gain.gain.exponentialRampToValueAtTime(
-          0.25,
-          now + offset + 0.02
-        )
-        gain.gain.exponentialRampToValueAtTime(
-          0.0001,
-          now + offset + 0.2
-        )
-
-        oscillator.connect(gain)
-        gain.connect(context.destination)
-
-        oscillator.start(now + offset)
-        oscillator.stop(now + offset + 0.22)
-      })
-    } catch (error) {
-      console.warn("DELIVERY NOTIFICATION SOUND ERROR:", error)
-    }
-  }
+  const stats = useMemo(() => ({
+    total: orders.length,
+    waiting: orders.filter((o) => o.status === ORDER_STATUSES.ASSIGNED || o.status === ORDER_STATUSES.CONFIRMED).length,
+    out: orders.filter((o) => o.status === ORDER_STATUSES.OUT_FOR_DELIVERY).length,
+    delivered: orders.filter((o) => o.status === ORDER_STATUSES.DELIVERED).length,
+  }), [orders])
 
   // =====================================
-  // Show Notification Toast
+  // Notification Toast
   // =====================================
 
-  const showNotification = (order: Order) => {
-    playNotificationSound()
+  const showNotificationToast = useCallback((order: Order) => {
+    audioService.playSound()
 
     toast.custom(
       (toastInstance) => (
-        <div
-          className="w-[min(92vw,420px)] rounded-2xl border border-indigo-200 bg-white p-4 text-right shadow-2xl ring-1 ring-black/5 animate-slideUp"
-        >
+        <div className="w-[min(92vw,420px)] rounded-2xl border border-indigo-200 bg-white p-4 text-right shadow-2xl ring-1 ring-black/5 animate-slideUp">
           <div className="flex items-start gap-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-2xl">
               🚚
             </div>
-
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-black text-indigo-700">
-                طلب جديد مسند إليك 🎉
-              </p>
-
-              <p className="mt-1 text-sm font-black text-slate-900">
-                الطلب #{order.id}
-              </p>
-
+              <p className="text-sm font-black text-indigo-700">طلب جديد مسند إليك 🎉</p>
+              <p className="mt-1 text-sm font-black text-slate-900">الطلب #{order.id}</p>
               <p className="mt-1 truncate text-xs font-semibold text-slate-500">
                 العميل: {order.customer_name}
               </p>
-
               <p className="mt-1 text-xs font-bold text-emerald-600">
-                الإجمالي: {Number(order.total || 0).toLocaleString("ar-EG")} جنيه
+                الإجمالي: {formatMoney(order.total || 0)} جنيه
               </p>
-
               <button
                 type="button"
                 onClick={() => toast.dismiss(toastInstance.id)}
@@ -187,66 +248,43 @@ export default function DeliveryDashboard() {
           </div>
         </div>
       ),
-      {
-        duration: 10000,
-        position: "top-center",
-      }
+      { duration: 10000, position: "top-center" }
     )
-  }
+  }, [])
 
   // =====================================
-  // Upload Image to Laravel API
+  // Upload Image
   // =====================================
 
-  const uploadDeliveryImage = async (file: File, orderId: number): Promise<string> => {
+  const uploadDeliveryImage = useCallback(async (file: File, orderId: number): Promise<string> => {
+    const formData = new FormData()
+    formData.append("image", file)
+    formData.append("order_id", String(orderId))
+
     try {
-      const formData = new FormData()
-      formData.append('image', file)
-      formData.append('order_id', String(orderId))
-
-      const token = localStorage.getItem("staff_token")
-
-      // console.log("📤 UPLOADING IMAGE...")
-      // console.log("Order ID:", orderId)
-      // console.log("File:", file.name, file.size, "bytes")
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/delivery/upload-delivery-image`, {
+      const data = await apiFetch("/delivery/upload-delivery-image", {
         method: "POST",
-        headers: {
-          "Accept": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
         body: formData,
       })
 
-      const data = await response.json()
-
-      // console.log("📥 UPLOAD RESPONSE:", data)
-
-      if (!response.ok) {
-        throw new Error(data?.message || "فشل رفع الصورة")
-      }
-
-      const imageUrl = data.image_url || data.url || data.path
+      const imageUrl = data?.image_url || data?.url || data?.path
 
       if (!imageUrl) {
         throw new Error("لم يتم استلام رابط الصورة من الخادم")
       }
 
-      // console.log("✅ IMAGE UPLOADED:", imageUrl)
       return imageUrl
-
     } catch (error) {
       console.error("❌ UPLOAD IMAGE ERROR:", error)
       throw error
     }
-  }
+  }, [])
 
   // =====================================
   // Confirm Delivery with Image
   // =====================================
 
-  const confirmDeliveryWithImage = async (orderId: number) => {
+  const confirmDeliveryWithImage = useCallback(async (orderId: number) => {
     if (!deliveryImage) {
       toast.error("من فضلك اختر صورة تأكيد التوصيل")
       return
@@ -255,160 +293,128 @@ export default function DeliveryDashboard() {
     try {
       setConfirming(true)
 
-      // رفع الصورة
       toast.loading("جاري رفع صورة التأكيد...", { id: "upload-image" })
       const imageUrl = await uploadDeliveryImage(deliveryImage, orderId)
       toast.dismiss("upload-image")
 
-      // console.log("✅ Image uploaded, URL:", imageUrl)
+      const deliveredAt = new Date().toISOString()
 
-      // تحديث الطلب مع حفظ رابط الصورة في Supabase
+      const { error: statusError } = await supabase
+        .from("orders")
+        .update({
+          status: ORDER_STATUSES.DELIVERED,
+          delivered_at: deliveredAt,
+        })
+        .eq("id", orderId)
+
+      if (statusError) {
+        console.error("❌ UPDATE ORDER STATUS ERROR:", statusError)
+        throw new Error(statusError.message || "فشل تحديث حالة الطلب")
+      }
+
+      const { error: imageError } = await supabase
+        .from("orders")
+        .update({ delivery_proof_image: imageUrl })
+        .eq("id", orderId)
+
+      if (imageError) {
+        console.warn("⚠️ DELIVERY IMAGE URL SAVE ERROR:", imageError)
+      }
+
       const updateData = {
-        status: "delivered",
-        delivered_at: new Date().toISOString(),
+        status: ORDER_STATUSES.DELIVERED,
+        delivered_at: deliveredAt,
         delivery_proof_image: imageUrl,
       }
 
-      // console.log("📝 Updating order with:", updateData)
-
-      const { data, error } = await supabase
-        .from("orders")
-        .update(updateData)
-        .eq("id", orderId)
-        .select("*")
-        .single()
-
-      if (error) {
-        console.error("❌ UPDATE ORDER ERROR:", error)
-        throw error
-      }
-
-      // console.log("✅ Order updated:", data)
-
       setOrders((prev) =>
         prev.map((order) =>
-          order.id === orderId
-            ? {
-                ...order,
-                ...data,
-              }
-            : order
+          order.id === orderId ? { ...order, ...updateData } : order
         )
       )
 
-      toast.success("✅ تم تأكيد التوصيل بنجاح مع صورة التأكيد")
+      toast.success(
+        imageError
+          ? "✅ تم تأكيد التوصيل بنجاح (تعذر حفظ رابط الصورة فقط)"
+          : "✅ تم تأكيد التوصيل وحفظ صورة التأكيد بنجاح"
+      )
 
-      // Reset modal
       setShowConfirmModal(false)
       setDeliveryImage(null)
       setDeliveryImagePreview(null)
       setConfirmOrderId(null)
-
     } catch (error) {
       console.error("❌ CONFIRM DELIVERY ERROR:", error)
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "حدث خطأ أثناء تأكيد التوصيل"
-      )
+      toast.dismiss("upload-image")
+      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء تأكيد التوصيل")
     } finally {
       setConfirming(false)
     }
-  }
+  }, [deliveryImage, uploadDeliveryImage])
 
   // =====================================
-  // Delete Delivered Order
+  // Delete Order
   // =====================================
 
-  // =====================================
-// Delete Delivered Order
-// =====================================
-
-const deleteOrder = async (orderId: number) => {
-  const confirmed = window.confirm(
-    `هل أنت متأكد من حذف الطلب #${orderId}؟\nهذا الإجراء لا يمكن التراجع عنه.`
-  )
-
-  if (!confirmed) return
-
-  try {
-    setDeletingId(orderId)
-
-    // console.log("🗑️ DELETING ORDER:", orderId)
-
-    // ✅ 1. حذف عناصر الطلب أولاً (order_items)
-    const { error: itemsError } = await supabase
-      .from("order_items")
-      .delete()
-      .eq("order_id", orderId)
-
-    if (itemsError) {
-      console.error("❌ DELETE ORDER ITEMS ERROR:", itemsError)
-      throw new Error("فشل حذف عناصر الطلب: " + itemsError.message)
+  const deleteOrder = useCallback(async (orderId: number) => {
+    if (!window.confirm(`هل أنت متأكد من حذف الطلب #${orderId}؟\nهذا الإجراء لا يمكن التراجع عنه.`)) {
+      return
     }
 
-    // console.log("✅ Order items deleted")
+    try {
+      setDeletingId(orderId)
 
-    // ✅ 2. حذف الطلب نفسه
-    const { error: orderError } = await supabase
-      .from("orders")
-      .delete()
-      .eq("id", orderId)
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .delete()
+        .eq("order_id", orderId)
 
-    if (orderError) {
-      console.error("❌ DELETE ORDER ERROR:", orderError)
-      throw new Error("فشل حذف الطلب: " + orderError.message)
+      if (itemsError) throw new Error(`فشل حذف عناصر الطلب: ${itemsError.message}`)
+
+      const { error: proofError } = await supabase
+        .from("delivery_proof_images")
+        .delete()
+        .eq("order_id", orderId)
+
+      if (proofError) throw new Error(`فشل حذف صور التأكيد: ${proofError.message}`)
+
+      const { error: orderError } = await supabase
+        .from("orders")
+        .delete()
+        .eq("id", orderId)
+
+      if (orderError) throw new Error(`فشل حذف الطلب: ${orderError.message}`)
+
+      setOrders((prev) => prev.filter((order) => order.id !== orderId))
+      knownOrderIdsRef.current.delete(orderId)
+      setNewOrderCount(0)
+
+      toast.success(`✅ تم حذف الطلب #${orderId} بنجاح`)
+    } catch (error) {
+      console.error("❌ DELETE ORDER ERROR:", error)
+      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء حذف الطلب")
+      await loadOrders(false, false)
+    } finally {
+      setDeletingId(null)
     }
-
-    // console.log("✅ Order deleted successfully")
-
-    // ✅ 3. تحديث الـ state - إزالة الطلب
-    setOrders((prev) => {
-      const newOrders = prev.filter((order) => order.id !== orderId)
-      // console.log("📝 Orders after deletion:", newOrders.length)
-      return newOrders
-    })
-
-    // ✅ 4. إزالة الـ ID من الـ known IDs عشان ما يرجعش تاني
-    knownOrderIdsRef.current.delete(orderId)
-
-    // ✅ 5. تحديث العداد
-    setNewOrderCount(0)
-
-    toast.success(`✅ تم حذف الطلب #${orderId} بنجاح`)
-
-  } catch (error) {
-    console.error("❌ DELETE ORDER ERROR:", error)
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : "حدث خطأ أثناء حذف الطلب"
-    )
-    
-    // ✅ لو فشل الحذف، نعيد تحميل الطلبات عشان نتأكد من الحالة
-    await load(false, false)
-    
-  } finally {
-    setDeletingId(null)
-  }
-}
+  }, [])
 
   // =====================================
   // Open Confirm Modal
   // =====================================
 
-  const openConfirmModal = (orderId: number) => {
+  const openConfirmModal = useCallback((orderId: number) => {
     setConfirmOrderId(orderId)
     setDeliveryImage(null)
     setDeliveryImagePreview(null)
     setShowConfirmModal(true)
-  }
+  }, [])
 
   // =====================================
   // Handle Image Selection
   // =====================================
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -424,13 +430,13 @@ const deleteOrder = async (orderId: number) => {
 
     setDeliveryImage(file)
     setDeliveryImagePreview(URL.createObjectURL(file))
-  }
+  }, [])
 
   // =====================================
   // Load Orders
   // =====================================
 
-  const load = async (showLoading = false, isBackground = false) => {
+  const loadOrders = useCallback(async (showLoading = false, isBackground = false) => {
     try {
       if (showLoading) setLoading(true)
 
@@ -440,192 +446,124 @@ const deleteOrder = async (orderId: number) => {
         throw new Error("لم يتم العثور على معرف الدليفري")
       }
 
-      const { data, error } = await supabase
+      const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
-        .select(`
-          *,
-          order_items (
-            id,
-            order_id,
-            product_id,
-            product_name,
-            price,
-            quantity
-          )
-        `)
+        .select("*")
         .eq("delivery_id", deliveryId)
         .in("status", [
-          "confirmed",
-          "assigned",
-          "out_for_delivery",
-          "delivered",
+          ORDER_STATUSES.CONFIRMED,
+          ORDER_STATUSES.ASSIGNED,
+          ORDER_STATUSES.OUT_FOR_DELIVERY,
+          ORDER_STATUSES.DELIVERED,
         ])
-        .order("created_at", {
-          ascending: false,
-        })
+        .order("created_at", { ascending: false })
 
-      if (error) {
-        console.error("SUPABASE DELIVERY ORDERS ERROR:", error)
-        throw error
+      if (ordersError) throw ordersError
+
+      const baseOrders = ordersData ?? []
+      const orderIds = baseOrders.map((order) => Number(order.id))
+
+      let items: OrderItem[] = []
+
+      if (orderIds.length > 0) {
+        const { data: itemsData, error: itemsError } = await supabase
+          .from("order_items")
+          .select("id, order_id, product_id, product_name, price, quantity, sale_type, weight")
+          .in("order_id", orderIds)
+
+        if (itemsError) throw itemsError
+
+        items = (itemsData ?? []) as OrderItem[]
       }
 
-      const fetchedOrders = (data ?? []) as Order[]
+      let proofImages: DeliveryProofImage[] = []
+
+      if (orderIds.length > 0) {
+        const { data: proofData, error: proofError } = await supabase
+          .from("delivery_proof_images")
+          .select("id, order_id, delivery_id, image_url, created_at")
+          .in("order_id", orderIds)
+          .order("created_at", { ascending: false })
+
+        if (!proofError) {
+          proofImages = (proofData ?? []) as DeliveryProofImage[]
+        }
+      }
+
+      const fetchedOrders = baseOrders.map((order) => {
+        const latestProof = proofImages.find(
+          (proof) => Number(proof.order_id) === Number(order.id)
+        )
+
+        return {
+          ...order,
+          order_items: items.filter(
+            (item) => Number(item.order_id) === Number(order.id)
+          ),
+          delivery_proof_image: latestProof?.image_url ?? null,
+        }
+      }) as Order[]
 
       if (!isBackground) {
         setOrders(fetchedOrders)
-        knownOrderIdsRef.current = new Set(
-          fetchedOrders.map((order) => order.id)
-        )
+        knownOrderIdsRef.current = new Set(fetchedOrders.map((order) => order.id))
         firstLoadRef.current = false
         setNewOrderCount(0)
       } else {
-        const currentIds = new Set(fetchedOrders.map((order) => order.id))
         const knownIds = knownOrderIdsRef.current
+        const fetchedIds = new Set(fetchedOrders.map((order) => order.id))
 
-        const newOrders = fetchedOrders.filter(
-          (order) => !knownIds.has(order.id)
-        )
+        const newOrders = fetchedOrders.filter((order) => !knownIds.has(order.id))
 
-        const allKnownIds = new Set([...knownIds, ...currentIds])
-        
         if (newOrders.length > 0) {
           setNewOrderCount((prev) => prev + newOrders.length)
 
           newOrders.forEach((order) => {
-            if (order.status === "confirmed" || order.status === "assigned") {
-              showNotification(order)
+            if (order.status === ORDER_STATUSES.CONFIRMED || order.status === ORDER_STATUSES.ASSIGNED) {
+              showNotificationToast(order)
             }
           })
         }
 
-        knownOrderIdsRef.current = allKnownIds
+        knownOrderIdsRef.current = new Set([...knownIds, ...fetchedIds])
         setOrders(fetchedOrders)
       }
     } catch (error) {
       console.error("DELIVERY DASHBOARD ERROR:", error)
 
       if (showLoading) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "حدث خطأ أثناء تحميل الطلبات"
-        )
+        toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء تحميل الطلبات")
       }
     } finally {
       if (showLoading) setLoading(false)
     }
-  }
+  }, [user, showNotificationToast])
 
   // =====================================
-  // Unlock Audio on User Interaction
+  // Update Order Status
   // =====================================
 
-  useEffect(() => {
-    const unlockAudio = () => {
-      try {
-        const AudioContextClass =
-          window.AudioContext ||
-          (window as typeof window & {
-            webkitAudioContext?: typeof AudioContext
-          }).webkitAudioContext
-
-        if (!AudioContextClass) return
-
-        if (!audioContextRef.current) {
-          audioContextRef.current = new AudioContextClass()
-        }
-
-        if (audioContextRef.current.state === "suspended") {
-          void audioContextRef.current.resume()
-        }
-      } catch (error) {
-        console.warn("DELIVERY AUDIO UNLOCK ERROR:", error)
-      }
-    }
-
-    window.addEventListener("click", unlockAudio)
-    window.addEventListener("keydown", unlockAudio)
-
-    return () => {
-      window.removeEventListener("click", unlockAudio)
-      window.removeEventListener("keydown", unlockAudio)
-    }
-  }, [])
-
-  // =====================================
-  // Initial Load & Auto Refresh
-  // =====================================
-
-  useEffect(() => {
-    if (user?.id) {
-      void load(true, false)
-
-      const timer = window.setInterval(() => {
-        void load(false, true)
-      }, 5000)
-
-      return () => window.clearInterval(timer)
-    }
-  }, [user])
-
-  // =====================================
-  // Stats
-  // =====================================
-
-  const stats = useMemo(() => ({
-    total: orders.length,
-    waiting: orders.filter((o) => o.status === "assigned" || o.status === "confirmed").length,
-    out: orders.filter((o) => o.status === "out_for_delivery").length,
-    delivered: orders.filter((o) => o.status === "delivered").length,
-  }), [orders])
-
-  // =====================================
-  // Update Order Status (Out for delivery only)
-  // =====================================
-
-  const updateStatus = async (
-    orderId: number,
-    action: "out" | "delivered"
-  ) => {
+  const updateOrderStatus = useCallback(async (orderId: number, action: "out" | "delivered") => {
     try {
       setWorkingId(orderId)
 
-      const newStatus =
-        action === "out"
-          ? "out_for_delivery"
-          : "delivered"
+      const updateData = action === "out"
+        ? { status: ORDER_STATUSES.OUT_FOR_DELIVERY, picked_up_at: new Date().toISOString() }
+        : { status: ORDER_STATUSES.DELIVERED, delivered_at: new Date().toISOString() }
 
-      const updateData =
-        action === "out"
-          ? {
-              status: newStatus,
-              picked_up_at: new Date().toISOString(),
-            }
-          : {
-              status: newStatus,
-              delivered_at: new Date().toISOString(),
-            }
-
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("orders")
         .update(updateData)
         .eq("id", orderId)
-        .select("*")
-        .single()
 
       if (error) {
         console.error("UPDATE ORDER STATUS ERROR:", error)
-        throw error
+        throw new Error(error.message || "فشل تحديث حالة الطلب")
       }
 
       setOrders((prev) =>
         prev.map((order) =>
-          order.id === orderId
-            ? {
-                ...order,
-                ...data,
-              }
-            : order
+          order.id === orderId ? { ...order, ...updateData } : order
         )
       )
 
@@ -636,15 +574,205 @@ const deleteOrder = async (orderId: number) => {
       )
     } catch (error) {
       console.error("UPDATE DELIVERY STATUS ERROR:", error)
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "حدث خطأ أثناء تحديث حالة الطلب"
-      )
+      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء تحديث حالة الطلب")
     } finally {
       setWorkingId(null)
     }
-  }
+  }, [])
+
+  // =====================================
+  // WhatsApp
+  // =====================================
+
+  const openWhatsApp = useCallback((order: Order) => {
+    const rawPhone = String(order.phone || "")
+    const phone = normalizeWhatsAppPhone(rawPhone)
+
+    if (!phone) {
+      toast.error("رقم العميل غير موجود")
+      return
+    }
+
+    if (!isValidEgyptianPhone(phone)) {
+      toast.error("رقم واتساب العميل غير صحيح")
+      return
+    }
+
+    const itemsText = (order.order_items ?? [])
+      .map((item) => {
+        const price = Number(item.price || 0)
+        const quantity = Number(item.quantity || 0)
+        const weight = Number(item.weight || 0)
+
+        if (item.sale_type === "weight") {
+          return `- ${item.product_name}: ${weight} كجم × ${formatMoney(price)} = ${formatMoney(weight * price)} جنيه`
+        }
+
+        return `- ${item.product_name}: ${quantity} × ${formatMoney(price)} = ${formatMoney(quantity * price)} جنيه`
+      })
+      .join("\n")
+
+    const message = [
+      `أهلاً ${order.customer_name} 👋`,
+      `تم تحديث حالة طلبك رقم #${order.id}`,
+      "",
+      "المنتجات:",
+      itemsText || "لا توجد تفاصيل منتجات",
+      "",
+      `الإجمالي: ${formatMoney(order.total || 0)} جنيه`,
+      `العنوان: ${order.address || "-"}`,
+      "",
+      "شكراً لطلبك من أولاد حكيم ❤️",
+    ].join("\n")
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    window.open(url, "_blank", "noopener,noreferrer")
+  }, [])
+
+  // =====================================
+  // Effects
+  // =====================================
+
+  useEffect(() => {
+    const unlockAudio = () => audioService.unlock()
+    window.addEventListener("click", unlockAudio)
+    window.addEventListener("keydown", unlockAudio)
+
+    return () => {
+      window.removeEventListener("click", unlockAudio)
+      window.removeEventListener("keydown", unlockAudio)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user?.id) {
+      void loadOrders(true, false)
+
+      const timer = window.setInterval(() => {
+        void loadOrders(false, true)
+      }, 5000)
+
+      return () => window.clearInterval(timer)
+    }
+  }, [user, loadOrders])
+
+  // =====================================
+  // Render Helpers
+  // =====================================
+
+  const renderOrderItems = useCallback((items: OrderItem[]) => {
+    if (!items || items.length === 0) return null
+
+    return (
+      <div className="mt-4">
+        <p className="mb-2 text-sm font-black text-slate-700">محتويات الطلب</p>
+        <div className="space-y-2">
+          {items.map((item) => {
+            const price = Number(item.price || 0)
+            const quantity = Number(item.quantity || 0)
+            const weight = Number(item.weight || 0)
+            const total = item.sale_type === "weight" ? price * weight : price * quantity
+
+            return (
+              <div key={item.id} className="rounded-xl border border-slate-100 px-3 py-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="font-bold">{item.product_name}</span>
+                  <span className="font-black">{formatMoney(total)} ج</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {item.sale_type === "weight"
+                    ? `بالكيلو • ${weight} كجم × ${formatMoney(price)} ج`
+                    : `بالقطعة • ${quantity} × ${formatMoney(price)} ج`}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }, [])
+
+  const renderDeliveryProofImage = useCallback((imageUrl: string) => {
+    if (!imageUrl) return null
+
+    return (
+      <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+        <p className="text-xs font-bold text-emerald-700">📸 صورة التأكيد</p>
+        <img
+          src={imageUrl}
+          alt="تأكيد التوصيل"
+          className="mt-2 max-h-48 w-full rounded-lg object-cover"
+          onError={(e) => {
+            e.currentTarget.src = "/placeholder-image.png"
+            e.currentTarget.className = "mt-2 max-h-48 w-full rounded-lg object-contain p-4 bg-slate-50"
+          }}
+        />
+      </div>
+    )
+  }, [])
+
+  const renderOrderActions = useCallback((order: Order) => {
+    const isWorking = workingId === order.id
+    const isDeleting = deletingId === order.id
+    const isDelivered = order.status === ORDER_STATUSES.DELIVERED
+    const isAssignedOrConfirmed = order.status === ORDER_STATUSES.ASSIGNED || order.status === ORDER_STATUSES.CONFIRMED
+    const isOutForDelivery = order.status === ORDER_STATUSES.OUT_FOR_DELIVERY
+
+    return (
+      <div className="mt-5 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => openWhatsApp(order)}
+          className="w-full rounded-2xl bg-[#25D366] px-5 py-3 font-bold text-white transition hover:brightness-95"
+        >
+          💬 إرسال تفاصيل الطلب على واتساب
+        </button>
+
+        {isAssignedOrConfirmed && (
+          <button
+            onClick={() => void updateOrderStatus(order.id, "out")}
+            disabled={isWorking}
+            className="flex-1 rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-500 disabled:opacity-50"
+          >
+            {isWorking ? "جاري التحديث..." : "🚚 أنا خارج للتوصيل"}
+          </button>
+        )}
+
+        {isOutForDelivery && (
+          <button
+            onClick={() => openConfirmModal(order.id)}
+            disabled={isWorking}
+            className="flex-1 rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            📸 تأكيد التوصيل بالصورة
+          </button>
+        )}
+
+        {isDelivered && (
+          <div className="w-full space-y-2">
+            <div className="rounded-2xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">
+              ✅ تم توصيل الطلب
+              {order.delivered_at && ` في ${formatDate(order.delivered_at)}`}
+              {order.delivery_proof_image && " 📸 مع صورة تأكيد"}
+            </div>
+            <button
+              onClick={() => deleteOrder(order.id)}
+              disabled={isDeleting}
+              className="w-full rounded-2xl border-2 border-red-200 bg-red-50 px-5 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isDeleting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <SpinnerIcon /> جاري الحذف...
+                </span>
+              ) : (
+                "🗑 حذف الطلب"
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }, [workingId, deletingId, openWhatsApp, updateOrderStatus, openConfirmModal, deleteOrder])
 
   // =====================================
   // Render
@@ -654,43 +782,20 @@ const deleteOrder = async (orderId: number) => {
     <div>
       {/* New Orders Alert */}
       {newOrderCount > 0 && (
-        <div className="mb-4 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 animate-pulse">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🔔</span>
-              <div>
-                <p className="font-black text-indigo-700">
-                  لديك {newOrderCount} طلب{newOrderCount > 1 ? "ات" : ""} جديد{newOrderCount > 1 ? "ة" : ""}
-                </p>
-                <p className="text-sm text-indigo-600">
-                  تم إسناد {newOrderCount > 1 ? "ها" : "ه"} إليك
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                setNewOrderCount(0)
-                      }}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500"
-            >
-              تم المشاهدة
-            </button>
-          </div>
-        </div>
+        <NewOrdersAlert count={newOrderCount} onDismiss={() => setNewOrderCount(0)} />
       )}
 
+      {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm font-bold text-indigo-600">لوحة الدليفري</p>
           <h1 className="mt-1 text-2xl font-black text-slate-900">
             أهلاً يا {user?.name || "دليفري"} 👋
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            الطلبات المسندة إليك
-          </p>
+          <p className="mt-1 text-sm text-slate-500">الطلبات المسندة إليك</p>
         </div>
         <button
-          onClick={() => void load(true, false)}
+          onClick={() => void loadOrders(true, false)}
           disabled={loading}
           className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
         >
@@ -699,278 +804,276 @@ const deleteOrder = async (orderId: number) => {
       </div>
 
       {/* Stats */}
-      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {[
-          ["كل الطلبات", stats.total, "text-slate-900"],
-          ["لسه مستلمها", stats.waiting, "text-violet-600"],
-          ["خارج للتوصيل", stats.out, "text-blue-600"],
-          ["وصلت", stats.delivered, "text-emerald-600"],
-        ].map(([label, value, color]) => (
-          <div key={String(label)} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-bold text-slate-400">{label}</p>
-            <p className={`mt-2 text-3xl font-black ${color}`}>{value}</p>
-          </div>
-        ))}
-      </div>
+      <StatsCards stats={stats} />
 
-      {/* Orders */}
+      {/* Orders List */}
       {loading ? (
-        <div className="rounded-3xl bg-white py-20 text-center shadow-sm">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-indigo-600" />
-          <p className="mt-4 font-semibold text-slate-500">جاري تحميل طلباتك...</p>
-        </div>
+        <LoadingState />
       ) : orders.length === 0 ? (
-        <div className="rounded-3xl bg-white py-20 text-center shadow-sm">
-          <div className="text-6xl">📦</div>
-          <h2 className="mt-5 text-xl font-black text-slate-800">مفيش طلبات مسندة ليك</h2>
-          <p className="mt-2 text-sm text-slate-400">لما الأدمن يعين لك طلب هيظهر هنا.</p>
-        </div>
+        <EmptyState />
       ) : (
         <div className="grid gap-5 lg:grid-cols-2">
           {orders.map((order) => (
-            <article key={order.id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold text-slate-400">رقم الطلب</p>
-                  <h2 className="text-xl font-black text-slate-900">#{order.id}</h2>
-                </div>
-                <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${statusClass(order.status)}`}>
-                  {statusLabel(order.status)}
-                </span>
-              </div>
-
-              <div className="mt-5 space-y-3 rounded-2xl bg-slate-50 p-4">
-                <p className="font-bold text-slate-800">👤 {order.customer_name}</p>
-                <p className="text-sm text-slate-600">📞 {order.phone}</p>
-                <p className="text-sm leading-6 text-slate-600">📍 {order.address}</p>
-                {order.notes && <p className="text-sm text-slate-500">📝 {order.notes}</p>}
-                <div className="flex items-center justify-between border-t border-slate-200 pt-3">
-                  <span className="text-sm font-bold text-slate-500">الإجمالي</span>
-                  <span className="text-lg font-black text-indigo-600">{Number(order.total).toFixed(2)} جنيه</span>
-                </div>
-              </div>
-
-              {order.order_items && order.order_items.length > 0 && (
-                <div className="mt-4">
-                  <p className="mb-2 text-sm font-black text-slate-700">محتويات الطلب</p>
-                  <div className="space-y-2">
-                    {order.order_items.map((item) => (
-                      <div key={item.id} className="flex justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm">
-                        <span>{item.product_name} × {item.quantity}</span>
-                        <span className="font-bold">{Number(item.price) * item.quantity} ج</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Delivery Image if exists */}
-              {order.delivery_proof_image && (
-                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                  <p className="text-xs font-bold text-emerald-700">📸 صورة التأكيد</p>
-                  <img
-                    src={order.delivery_proof_image}
-                    alt="تأكيد التوصيل"
-                    className="mt-2 max-h-48 w-full rounded-lg object-cover"
-                    onError={(e) => {
-                      e.currentTarget.src = "/placeholder-image.png"
-                      e.currentTarget.className = "mt-2 max-h-48 w-full rounded-lg object-contain p-4 bg-slate-50"
-                    }}
-                  />
-                </div>
-              )}
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                {(order.status === "assigned" || order.status === "confirmed") && (
-                  <button
-                    onClick={() => void updateStatus(order.id, "out")}
-                    disabled={workingId === order.id}
-                    className="flex-1 rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-500 disabled:opacity-50"
-                  >
-                    {workingId === order.id ? "جاري التحديث..." : "🚚 أنا خارج للتوصيل"}
-                  </button>
-                )}
-
-                {order.status === "out_for_delivery" && (
-                  <button
-                    onClick={() => openConfirmModal(order.id)}
-                    disabled={workingId === order.id}
-                    className="flex-1 rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
-                  >
-                    📸 تأكيد التوصيل بالصورة
-                  </button>
-                )}
-
-                {order.status === "delivered" && (
-                  <div className="w-full space-y-2">
-                    <div className="rounded-2xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">
-                      ✅ تم توصيل الطلب{order.delivered_at ? ` في ${new Date(order.delivered_at).toLocaleString("ar-EG")}` : ""}
-                      {order.delivery_proof_image && " 📸 مع صورة تأكيد"}
-                    </div>
-                    {/* ✅ زر حذف الطلب بعد التوصيل */}
-                    <button
-                      onClick={() => deleteOrder(order.id)}
-                      disabled={deletingId === order.id}
-                      className="w-full rounded-2xl border-2 border-red-200 bg-red-50 px-5 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {deletingId === order.id ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          جاري الحذف...
-                        </span>
-                      ) : (
-                        "🗑 حذف الطلب"
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </article>
+            <OrderCard
+              key={order.id}
+              order={order}
+              renderOrderItems={renderOrderItems}
+              renderDeliveryProofImage={renderDeliveryProofImage}
+              renderOrderActions={renderOrderActions}
+            />
           ))}
         </div>
       )}
 
-      {/* =====================================
-          Delivery Confirmation Modal
-      ===================================== */}
+      {/* Confirmation Modal */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md transform overflow-hidden rounded-3xl bg-white shadow-2xl transition-all duration-300 animate-slideUp">
-            {/* Modal Header */}
-            <div className="relative bg-gradient-to-br from-emerald-600 to-emerald-700 px-6 py-6 text-center text-white">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,_white_1px,_transparent_1px)] bg-[length:20px_20px] opacity-10" />
-              <div className="relative z-10">
-                <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
-                  <span className="text-3xl">📸</span>
-                </div>
-                <h2 className="text-xl font-black">تأكيد التوصيل</h2>
-                <p className="mt-1 text-sm text-white/80">
-                  ارفع صورة تأكيد وصول الطلب #{confirmOrderId}
-                </p>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6">
-              <p className="mb-4 text-center text-sm text-slate-600">
-                يرجى رفع صورة توضح وصول الطلب للعميل
-              </p>
-
-              {/* Image Upload */}
-              <div className="mb-4">
-                <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 transition hover:border-emerald-400 hover:bg-emerald-50">
-                  {deliveryImagePreview ? (
-                    <div className="w-full">
-                      <img
-                        src={deliveryImagePreview}
-                        alt="معاينة الصورة"
-                        className="mx-auto max-h-48 rounded-lg object-cover"
-                      />
-                      <p className="mt-2 text-sm font-bold text-emerald-600">✓ تم اختيار الصورة</p>
-                    </div>
-                  ) : (
-                    <>
-                      <span className="text-4xl">🖼️</span>
-                      <span className="mt-2 text-sm font-bold text-slate-700">اختر صورة التأكيد</span>
-                      <span className="mt-1 text-xs text-slate-400">JPG, PNG, WEBP - حتى 5MB</span>
-                    </>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowConfirmModal(false)
-                    setDeliveryImage(null)
-                    setDeliveryImagePreview(null)
-                    setConfirmOrderId(null)
-                  }}
-                  disabled={confirming}
-                  className="flex-1 rounded-2xl border-2 border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="button"
-                  onClick={() => confirmOrderId && confirmDeliveryWithImage(confirmOrderId)}
-                  disabled={!deliveryImage || confirming}
-                  className="flex-1 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:scale-[1.02] hover:shadow-emerald-600/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
-                >
-                  {confirming ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      جاري التأكيد...
-                    </span>
-                  ) : (
-                    "✅ تأكيد التوصيل"
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ConfirmDeliveryModal
+          orderId={confirmOrderId}
+          deliveryImage={deliveryImage}
+          deliveryImagePreview={deliveryImagePreview}
+          confirming={confirming}
+          fileInputRef={fileInputRef}
+          onImageSelect={handleImageSelect}
+          onConfirm={() => confirmOrderId && confirmDeliveryWithImage(confirmOrderId)}
+          onClose={() => {
+            setShowConfirmModal(false)
+            setDeliveryImage(null)
+            setDeliveryImagePreview(null)
+            setConfirmOrderId(null)
+          }}
+        />
       )}
 
-      {/* Animations */}
-      <style>{`
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        .animate-slideUp {
-          animation: slideUp 0.3s ease-out;
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.7; }
-        }
-
-        .animate-pulse {
-          animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        .animate-spin {
-          animation: spin 0.8s linear infinite;
-        }
-      `}</style>
+      {/* Styles */}
+      <ModalStyles />
     </div>
   )
 }
+
+// =====================================================
+// Sub-components
+// =====================================================
+
+// Spinner Icon
+const SpinnerIcon = () => (
+  <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+  </svg>
+)
+
+// New Orders Alert
+const NewOrdersAlert = ({ count, onDismiss }: { count: number; onDismiss: () => void }) => (
+  <div className="mb-4 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 animate-pulse">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <span className="text-2xl">🔔</span>
+        <div>
+          <p className="font-black text-indigo-700">
+            لديك {count} طلب{count > 1 ? "ات" : ""} جديد{count > 1 ? "ة" : ""}
+          </p>
+          <p className="text-sm text-indigo-600">تم إسناد {count > 1 ? "ها" : "ه"} إليك</p>
+        </div>
+      </div>
+      <button onClick={onDismiss} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500">
+        تم المشاهدة
+      </button>
+    </div>
+  </div>
+)
+
+// Stats Cards
+const StatsCards = ({ stats }: { stats: { total: number; waiting: number; out: number; delivered: number } }) => (
+  <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+    {[
+      ["كل الطلبات", stats.total, "text-slate-900"],
+      ["لسه مستلمها", stats.waiting, "text-violet-600"],
+      ["خارج للتوصيل", stats.out, "text-blue-600"],
+      ["وصلت", stats.delivered, "text-emerald-600"],
+    ].map(([label, value, color]) => (
+      <div key={String(label)} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-bold text-slate-400">{label}</p>
+        <p className={`mt-2 text-3xl font-black ${color}`}>{value}</p>
+      </div>
+    ))}
+  </div>
+)
+
+// Loading State
+const LoadingState = () => (
+  <div className="rounded-3xl bg-white py-20 text-center shadow-sm">
+    <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-indigo-600" />
+    <p className="mt-4 font-semibold text-slate-500">جاري تحميل طلباتك...</p>
+  </div>
+)
+
+// Empty State
+const EmptyState = () => (
+  <div className="rounded-3xl bg-white py-20 text-center shadow-sm">
+    <div className="text-6xl">📦</div>
+    <h2 className="mt-5 text-xl font-black text-slate-800">مفيش طلبات مسندة ليك</h2>
+    <p className="mt-2 text-sm text-slate-400">لما الأدمن يعين لك طلب هيظهر هنا.</p>
+  </div>
+)
+
+// Order Card
+const OrderCard = ({
+  order,
+  renderOrderItems,
+  renderDeliveryProofImage,
+  renderOrderActions,
+}: {
+  order: Order
+  renderOrderItems: (items: OrderItem[]) => React.ReactNode
+  renderDeliveryProofImage: (image: string) => React.ReactNode
+  renderOrderActions: (order: Order) => React.ReactNode
+}) => {
+  const statusConfig = getStatusConfig(order.status)
+
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold text-slate-400">رقم الطلب</p>
+          <h2 className="text-xl font-black text-slate-900">#{order.id}</h2>
+        </div>
+        <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${statusConfig.className}`}>
+          {statusConfig.label}
+        </span>
+      </div>
+
+      <div className="mt-5 space-y-3 rounded-2xl bg-slate-50 p-4">
+        <p className="font-bold text-slate-800">👤 {order.customer_name}</p>
+        <p className="text-sm text-slate-600">📞 {order.phone}</p>
+        <p className="text-sm leading-6 text-slate-600">📍 {order.address}</p>
+        {order.notes && <p className="text-sm text-slate-500">📝 {order.notes}</p>}
+        <div className="flex items-center justify-between border-t border-slate-200 pt-3">
+          <span className="text-sm font-bold text-slate-500">الإجمالي</span>
+          <span className="text-lg font-black text-indigo-600">{formatMoney(order.total)} جنيه</span>
+        </div>
+      </div>
+
+      {renderOrderItems(order.order_items || [])}
+      {renderDeliveryProofImage(order.delivery_proof_image || "")}
+      {renderOrderActions(order)}
+    </article>
+  )
+}
+
+// Confirm Delivery Modal
+const ConfirmDeliveryModal = ({
+  orderId,
+  deliveryImage,
+  deliveryImagePreview,
+  confirming,
+  fileInputRef,
+  onImageSelect,
+  onConfirm,
+  onClose,
+}: {
+  orderId: number | null
+  deliveryImage: File | null
+  deliveryImagePreview: string | null
+  confirming: boolean
+  fileInputRef: React.RefObject<HTMLInputElement>
+  onImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onConfirm: () => void
+  onClose: () => void
+}) => (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
+    <div className="w-full max-w-md transform overflow-hidden rounded-3xl bg-white shadow-2xl transition-all duration-300 animate-slideUp">
+      <div className="relative bg-gradient-to-br from-emerald-600 to-emerald-700 px-6 py-6 text-center text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,_white_1px,_transparent_1px)] bg-[length:20px_20px] opacity-10" />
+        <div className="relative z-10">
+          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
+            <span className="text-3xl">📸</span>
+          </div>
+          <h2 className="text-xl font-black">تأكيد التوصيل</h2>
+          <p className="mt-1 text-sm text-white/80">ارفع صورة تأكيد وصول الطلب #{orderId}</p>
+        </div>
+      </div>
+
+      <div className="p-6">
+        <p className="mb-4 text-center text-sm text-slate-600">يرجى رفع صورة توضح وصول الطلب للعميل</p>
+
+        <div className="mb-4">
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 transition hover:border-emerald-400 hover:bg-emerald-50">
+            {deliveryImagePreview ? (
+              <div className="w-full">
+                <img src={deliveryImagePreview} alt="معاينة الصورة" className="mx-auto max-h-48 rounded-lg object-cover" />
+                <p className="mt-2 text-sm font-bold text-emerald-600">✓ تم اختيار الصورة</p>
+              </div>
+            ) : (
+              <>
+                <span className="text-4xl">🖼️</span>
+                <span className="mt-2 text-sm font-bold text-slate-700">اختر صورة التأكيد</span>
+                <span className="mt-1 text-xs text-slate-400">JPG, PNG, WEBP - حتى 5MB</span>
+              </>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={onImageSelect}
+              className="hidden"
+            />
+          </label>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={confirming}
+            className="flex-1 rounded-2xl border-2 border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            إلغاء
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!deliveryImage || confirming}
+            className="flex-1 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:scale-[1.02] hover:shadow-emerald-600/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
+          >
+            {confirming ? (
+              <span className="flex items-center justify-center gap-2">
+                <SpinnerIcon /> جاري التأكيد...
+              </span>
+            ) : (
+              "✅ تأكيد التوصيل"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
+// Modal Styles
+const ModalStyles = () => (
+  <style>{`
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .animate-slideUp { animation: slideUp 0.3s ease-out; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin { animation: spin 0.8s linear infinite; }
+  `}</style>
+)
