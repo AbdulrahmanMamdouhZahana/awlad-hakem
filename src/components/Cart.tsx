@@ -1,4 +1,3 @@
-// src/components/Cart.tsx
 
 import { Link } from "react-router-dom"
 
@@ -10,12 +9,18 @@ interface iProducts {
   unit: string
   image: string
   stock: number
+  sale_type?: "piece" | "weight" | "both"
+  piece_price?: number | null
+  weight_price?: number | null
   created_at?: string
 }
 
 interface CartItem {
   product: iProducts
   quantity: number
+  saleType: "piece" | "weight"
+  weight?: number
+  unitPrice: number
 }
 
 interface IProps {
@@ -40,17 +45,34 @@ const Cart = ({
   mode = "page",
 }: IProps) => {
 
-  const total = cart.reduce((sum, item) => {
-    if (item.product.stock <= 0) return sum
+  const getItemTotal = (item: CartItem) => {
+    if (item.product.stock <= 0) return 0
+
+    if (item.saleType === "weight") {
+      return (
+        Number(item.unitPrice) *
+        Number(item.weight || 0)
+      )
+    }
 
     return (
-      sum +
-      item.product.price * item.quantity
+      Number(item.unitPrice) *
+      Number(item.quantity)
     )
-  }, 0)
+  }
+
+  const total = cart.reduce(
+    (sum, item) =>
+      sum + getItemTotal(item),
+    0
+  )
 
   const totalItems = cart.reduce(
-    (sum, item) => sum + item.quantity,
+    (sum, item) =>
+      sum +
+      (item.saleType === "weight"
+        ? 1
+        : item.quantity),
     0
   )
 
@@ -338,7 +360,7 @@ const Cart = ({
             const subtotal =
               unavailable
                 ? 0
-                : item.product.price * item.quantity
+                : getItemTotal(item)
 
             return (
               <div
@@ -406,6 +428,12 @@ const Cart = ({
                         {item.product.unit}
                       </p>
 
+                      <p className="mt-1 text-[11px] font-bold text-indigo-600">
+                        {item.saleType === "weight"
+                          ? `بالوزن • ${Number(item.weight || 0).toFixed(3)} كجم × ${Number(item.unitPrice).toFixed(2)} جنيه/كجم`
+                          : `بالقطعة • ${Number(item.unitPrice).toFixed(2)} جنيه/قطعة`}
+                      </p>
+
                     </div>
 
                     <button
@@ -440,78 +468,70 @@ const Cart = ({
                         {subtotal.toFixed(2)} جنيه
                       </span>
 
-                      {/* Quantity */}
+                      {/* Quantity / Weight */}
 
-                      <div
-                        className="
-                          flex
-                          h-7
-                          items-center
-                          rounded-lg
-                          border
-                          border-slate-200
-                        "
-                      >
+                      <div className="flex items-center gap-2">
+                        {item.saleType === "weight" ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onDecrease(item.product.id)
+                              }
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-sm text-slate-500 hover:bg-slate-50"
+                            >
+                              −
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onDecrease(item.product.id)
-                          }
-                          className="
-                            flex
-                            h-7
-                            w-7
-                            items-center
-                            justify-center
-                            text-sm
-                            text-slate-500
-                            hover:bg-slate-50
-                          "
-                        >
-                          −
-                        </button>
+                            <span className="min-w-20 text-center text-xs font-bold">
+                              {Number(item.weight || 0).toFixed(3)} كجم
+                            </span>
 
-                        <span
-                          className="
-                            flex
-                            h-7
-                            min-w-7
-                            items-center
-                            justify-center
-                            border-x
-                            border-slate-200
-                            text-xs
-                            font-bold
-                          "
-                        >
-                          {item.quantity}
-                        </span>
+                            <button
+                              type="button"
+                              disabled={
+                                Number(item.weight || 0) >=
+                                Number(item.product.stock)
+                              }
+                              onClick={() =>
+                                onIncrease(item.product.id)
+                              }
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-sm text-slate-500 hover:bg-slate-50 disabled:text-slate-300"
+                            >
+                              +
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex h-7 items-center rounded-lg border border-slate-200">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onDecrease(item.product.id)
+                              }
+                              className="flex h-7 w-7 items-center justify-center text-sm text-slate-500 hover:bg-slate-50"
+                            >
+                              −
+                            </button>
 
-                        <button
-                          type="button"
-                          disabled={
-                            item.quantity >=
-                            item.product.stock
-                          }
-                          onClick={() =>
-                            onIncrease(item.product.id)
-                          }
-                          className="
-                            flex
-                            h-7
-                            w-7
-                            items-center
-                            justify-center
-                            text-sm
-                            text-slate-500
-                            hover:bg-slate-50
-                            disabled:text-slate-300
-                          "
-                        >
-                          +
-                        </button>
+                            <span className="flex h-7 min-w-7 items-center justify-center border-x border-slate-200 text-xs font-bold">
+                              {item.quantity}
+                            </span>
 
+                            <button
+                              type="button"
+                              disabled={
+                                item.quantity >=
+                                item.product.stock
+                              }
+                              onClick={() =>
+                                onIncrease(item.product.id)
+                              }
+                              className="flex h-7 w-7 items-center justify-center text-sm text-slate-500 hover:bg-slate-50 disabled:text-slate-300"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                     </div>
@@ -702,8 +722,7 @@ const Cart = ({
                   const subtotal =
                     unavailable
                       ? 0
-                      : item.product.price *
-                        item.quantity
+                      : getItemTotal(item)
 
                   return (
                     <div
@@ -767,6 +786,12 @@ const Cart = ({
                                 {item.product.unit}
                               </p>
 
+                              <p className="mt-1 text-xs font-bold text-indigo-600">
+                                {item.saleType === "weight"
+                                  ? `بالوزن: ${Number(item.weight || 0).toFixed(3)} كجم × ${Number(item.unitPrice).toFixed(2)} جنيه/كجم`
+                                  : `بالقطعة: ${Number(item.unitPrice).toFixed(2)} جنيه/قطعة`}
+                              </p>
+
                             </div>
 
                             <button
@@ -809,72 +834,67 @@ const Cart = ({
                                 {subtotal.toFixed(2)} جنيه
                               </span>
 
-                              <div
-                                className="
-                                  flex
-                                  items-center
-                                  rounded-lg
-                                  border
-                                  border-slate-200
-                                "
-                              >
+                              {item.saleType === "weight" ? (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      onDecrease(item.product.id)
+                                    }
+                                    className="h-8 w-8 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                  >
+                                    −
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    onDecrease(
-                                      item.product.id
-                                    )
-                                  }
-                                  className="
-                                    h-8
-                                    w-8
-                                    text-slate-600
-                                    hover:bg-slate-50
-                                  "
-                                >
-                                  −
-                                </button>
+                                  <span className="min-w-24 text-center text-xs font-bold">
+                                    {Number(item.weight || 0).toFixed(3)} كجم
+                                  </span>
 
-                                <span
-                                  className="
-                                    flex
-                                    h-8
-                                    min-w-8
-                                    items-center
-                                    justify-center
-                                    border-x
-                                    border-slate-200
-                                    text-xs
-                                    font-bold
-                                  "
-                                >
-                                  {item.quantity}
-                                </span>
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      Number(item.weight || 0) >=
+                                      Number(item.product.stock)
+                                    }
+                                    onClick={() =>
+                                      onIncrease(item.product.id)
+                                    }
+                                    className="h-8 w-8 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:text-slate-300"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center rounded-lg border border-slate-200">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      onDecrease(item.product.id)
+                                    }
+                                    className="h-8 w-8 text-slate-600 hover:bg-slate-50"
+                                  >
+                                    −
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  disabled={
-                                    item.quantity >=
-                                    item.product.stock
-                                  }
-                                  onClick={() =>
-                                    onIncrease(
-                                      item.product.id
-                                    )
-                                  }
-                                  className="
-                                    h-8
-                                    w-8
-                                    text-slate-600
-                                    hover:bg-slate-50
-                                    disabled:text-slate-300
-                                  "
-                                >
-                                  +
-                                </button>
+                                  <span className="flex h-8 min-w-8 items-center justify-center border-x border-slate-200 text-xs font-bold">
+                                    {item.quantity}
+                                  </span>
 
-                              </div>
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      item.quantity >=
+                                      item.product.stock
+                                    }
+                                    onClick={() =>
+                                      onIncrease(item.product.id)
+                                    }
+                                    className="h-8 w-8 text-slate-600 hover:bg-slate-50 disabled:text-slate-300"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              )}
 
                             </div>
 

@@ -1,4 +1,4 @@
-import Card from "./Card";
+import Card from "./Card"
 
 export interface Delivery {
   id: number
@@ -9,6 +9,14 @@ export interface Delivery {
   is_active?: boolean
 }
 
+export interface BankAccount {
+  id: number
+  bank_name: string
+  account_name: string
+  account_number: string
+  account_type: string
+  is_active: boolean
+}
 
 export interface OrderItem {
   id: number
@@ -19,8 +27,6 @@ export interface OrderItem {
   quantity: number
 }
 
-
-
 export interface Order {
   id: number
   customer_name: string
@@ -30,11 +36,19 @@ export interface Order {
   payment_method: string
   total: number
   status: string
+
+  // Payment information
+  transfer_image?: string | null
+  bank_account_id?: number | null
+  bank_account?: BankAccount | null
+
   latitude: number | null
   longitude: number | null
   created_at?: string
   order_items?: OrderItem[]
+
   delivery_id?: number | null
+
   delivery?: {
     id: number
     name: string
@@ -46,15 +60,15 @@ export interface Order {
 }
 
 interface OrderCardProps {
-  order: Order;
-  onViewDetails?: (order: Order) => void;
-  onConfirm?: (orderId: number) => void;
-  onCancel?: (orderId: number) => void;
-  isConfirming?: boolean;
-  isCancelling?: boolean;
-  showActions?: boolean;
-  className?: string;
-  compact?: boolean;
+  order: Order
+  onViewDetails?: (order: Order) => void
+  onConfirm?: (orderId: number) => void
+  onCancel?: (orderId: number) => void
+  isConfirming?: boolean
+  isCancelling?: boolean
+  showActions?: boolean
+  className?: string
+  compact?: boolean
 }
 
 const OrderCard = ({
@@ -70,84 +84,160 @@ const OrderCard = ({
 }: OrderCardProps) => {
   const formatDate = (date?: string) => {
     return date
-  ? new Date(date).toLocaleString("ar-EG", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  : "-"
-  };
+      ? new Date(date).toLocaleString("ar-EG", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "-"
+  }
+
+  // =============================================
+  // Payment Method
+  // =============================================
+
+  const getPaymentMethodLabel = (paymentMethod?: string) => {
+    const method = String(paymentMethod || "").toLowerCase()
+
+    if (
+      method === "electronic" ||
+      method === "online" ||
+      method === "bank_transfer" ||
+      method === "transfer"
+    ) {
+      return "دفع إلكتروني"
+    }
+
+    if (
+      method === "cash" ||
+      method === "cod" ||
+      method === "cash_on_delivery"
+    ) {
+      return "الدفع عند الاستلام"
+    }
+
+    return paymentMethod || "غير محدد"
+  }
+
+  const isElectronicPayment = (() => {
+    const method = String(order.payment_method || "").trim().toLowerCase()
+
+    return (
+      method === "electronic" ||
+      method === "online" ||
+      method === "bank_transfer" ||
+      method === "transfer" ||
+      method === "الدفع إلكتروني".toLowerCase() ||
+      Boolean(order.transfer_image)
+    )
+  })()
+
+  // =============================================
+  // Status
+  // =============================================
 
   const getStatusLabel = (status: string) => {
-    switch (status) {
+    const normalizedStatus = status === "pending_approval" ? "pending" : status
+
+    switch (normalizedStatus) {
       case "confirmed":
-        return "مؤكد";
+        return "مؤكد"
       case "pending":
-        return compact ? "جديد" : "قيد الانتظار";
+        return compact ? "جديد" : "قيد الانتظار"
       case "cancelled":
-        return "ملغي";
+        return "ملغي"
       case "delivered":
-        return "تم التوصيل";
+        return "تم التوصيل"
+      case "assigned":
+        return "تم التعيين"
+      case "out_for_delivery":
+        return "خارج للتوصيل"
       default:
-        return status;
+        return status
     }
-  };
+  }
 
   const getStatusClass = (status: string) => {
-    switch (status) {
+    const normalizedStatus = status === "pending_approval" ? "pending" : status
+
+    switch (normalizedStatus) {
       case "confirmed":
-        return compact 
+        return compact
           ? "bg-emerald-100 text-emerald-700"
-          : "bg-emerald-50 text-emerald-700 ring-emerald-200";
+          : "bg-emerald-50 text-emerald-700 ring-emerald-200"
       case "cancelled":
         return compact
           ? "bg-red-100 text-red-700"
-          : "bg-red-50 text-red-700 ring-red-200";
+          : "bg-red-50 text-red-700 ring-red-200"
       case "delivered":
         return compact
           ? "bg-blue-100 text-blue-700"
-          : "bg-blue-50 text-blue-700 ring-blue-200";
+          : "bg-blue-50 text-blue-700 ring-blue-200"
+      case "assigned":
+        return compact
+          ? "bg-violet-100 text-violet-700"
+          : "bg-violet-50 text-violet-700 ring-violet-200"
+      case "out_for_delivery":
+        return compact
+          ? "bg-blue-100 text-blue-700"
+          : "bg-blue-50 text-blue-700 ring-blue-200"
       default:
         return compact
           ? "bg-amber-100 text-amber-700"
-          : "bg-amber-50 text-amber-700 ring-amber-200";
+          : "bg-amber-50 text-amber-700 ring-amber-200"
     }
-  };
+  }
 
   const getStatusEmoji = (status: string) => {
-    switch (status) {
+    const normalizedStatus = status === "pending_approval" ? "pending" : status
+
+    switch (normalizedStatus) {
       case "confirmed":
-        return "🟢";
+        return "🟢"
       case "pending":
-        return "🟡";
+        return "🟡"
       case "cancelled":
-        return "🔴";
+        return "🔴"
       case "delivered":
-        return "🔵";
+        return "🔵"
+      case "assigned":
+        return "🟣"
+      case "out_for_delivery":
+        return "🚚"
       default:
-        return "⚪";
+        return "⚪"
     }
-  };
+  }
+
+  // =============================================
+  // Google Maps
+  // =============================================
 
   const openGoogleMaps = (e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.stopPropagation()
+
     if (order.latitude === null || order.longitude === null) {
-      return;
+      return
     }
-    const url = `https://www.google.com/maps?q=${order.latitude},${order.longitude}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
 
-  const totalItems = order.order_items?.reduce(
-    (sum, item) => sum + Number(item.quantity),
-    0
-  ) || 0;
+    const url = `https://www.google.com/maps?q=${order.latitude},${order.longitude}`
+
+    window.open(url, "_blank", "noopener,noreferrer")
+  }
 
   // =============================================
-  // COMPACT VERSION (for Dashboard)
+  // Total Items
   // =============================================
+
+  const totalItems =
+    order.order_items?.reduce((sum, item) => sum + Number(item.quantity), 0) || 0
+
+  // =============================================
+  // COMPACT VERSION
+  // =============================================
+
   if (compact) {
     return (
       <Card className={className}>
@@ -159,6 +249,7 @@ const OrderCard = ({
                 <h3 className="text-lg font-bold text-slate-900">
                   طلب #{order.id}
                 </h3>
+
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusClass(
                     order.status
@@ -167,14 +258,16 @@ const OrderCard = ({
                   {getStatusEmoji(order.status)} {getStatusLabel(order.status)}
                 </span>
               </div>
+
               {order.created_at && (
                 <p className="mt-1 text-xs text-slate-400">
                   {formatDate(order.created_at)}
                 </p>
               )}
             </div>
+
             <span className="text-xl font-bold text-slate-900">
-              {order.total} ج.م
+              {Number(order.total).toLocaleString("ar-EG")} ج.م
             </span>
           </div>
 
@@ -186,15 +279,18 @@ const OrderCard = ({
                 {order.customer_name}
               </span>
             </p>
+
             <p className="text-sm">
               <span className="font-semibold text-slate-500">الهاتف:</span>{" "}
               <span className="font-bold text-slate-900">{order.phone}</span>
             </p>
+
             <p className="text-sm">
               <span className="font-semibold text-slate-500">العنوان:</span>{" "}
               <span className="text-slate-700">{order.address}</span>
             </p>
-            {order.latitude && order.longitude && (
+
+            {order.latitude !== null && order.longitude !== null && (
               <a
                 href={`https://www.google.com/maps?q=${order.latitude},${order.longitude}`}
                 target="_blank"
@@ -205,19 +301,93 @@ const OrderCard = ({
                 📍 فتح الموقع
               </a>
             )}
+
+            {/* Payment */}
             <p className="text-sm">
               <span className="font-semibold text-slate-500">الدفع:</span>{" "}
-              <span className="text-slate-700">{order.payment_method}</span>
+              <span className="font-bold text-slate-700">
+                {getPaymentMethodLabel(order.payment_method)}
+              </span>
             </p>
+
+            {/* Electronic Payment Details - Compact */}
+            {isElectronicPayment && (
+              <div className="mt-3 space-y-3 rounded-xl border border-blue-100 bg-blue-50 p-3">
+                {order.bank_account && (
+                  <div className="rounded-xl bg-white p-3">
+                    <p className="text-xs font-black text-blue-700">
+                      🏦 الحساب المحول إليه
+                    </p>
+
+                    <p className="mt-1 font-black text-blue-900">
+                      {order.bank_account.bank_name}
+                    </p>
+
+                    <div className="mt-2 space-y-1 text-sm text-slate-700">
+                      <p>
+                        اسم الحساب:{" "}
+                        <span className="font-bold">
+                          {order.bank_account.account_name}
+                        </span>
+                      </p>
+
+                      <p>
+                        رقم الحساب:{" "}
+                        <span dir="ltr" className="font-bold">
+                          {order.bank_account.account_number}
+                        </span>
+                      </p>
+
+                      <p>
+                        نوع الحساب:{" "}
+                        <span className="font-bold">
+                          {order.bank_account.account_type === "instapay"
+                            ? "InstaPay"
+                            : order.bank_account.account_type}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {order.transfer_image && (
+                  <div className="rounded-xl border border-blue-100 bg-white p-3">
+                    <p className="mb-2 text-xs font-black text-blue-700">
+                      🖼️ صورة التحويل
+                    </p>
+
+                    <a
+                      href={order.transfer_image}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="block"
+                    >
+                      <img
+                        src={order.transfer_image}
+                        alt="صورة التحويل"
+                        className="h-32 w-full rounded-xl border border-blue-200 bg-white object-contain transition hover:opacity-90"
+                      />
+                    </a>
+
+                    <p className="mt-2 text-center text-[11px] font-bold text-blue-600">
+                      اضغط على الصورة لعرضها بالكامل
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {order.delivery && (
               <div className="mt-3 rounded-xl bg-emerald-50 p-3">
                 <p className="text-xs font-bold text-emerald-600">
                   🚚 الدليفري المسؤول
                 </p>
+
                 <p className="mt-1 font-black text-emerald-900">
                   {order.delivery.name}
                 </p>
+
                 <a
                   href={`tel:${order.delivery.phone}`}
                   className="text-sm font-bold text-emerald-700 hover:underline"
@@ -232,6 +402,7 @@ const OrderCard = ({
           {/* Items Preview */}
           <div className="mt-4">
             <p className="mb-2 text-sm font-bold text-slate-700">المنتجات</p>
+
             <div className="space-y-2">
               {order.order_items?.slice(0, 2).map((item) => (
                 <div
@@ -242,11 +413,14 @@ const OrderCard = ({
                     {item.product_name}{" "}
                     <span className="font-bold">× {item.quantity}</span>
                   </span>
+
                   <span className="font-semibold text-slate-900">
-                    {item.price * item.quantity} ج.م
+                    {Number(item.price * item.quantity).toLocaleString("ar-EG")}{" "}
+                    ج.م
                   </span>
                 </div>
               ))}
+
               {order.order_items && order.order_items.length > 2 && (
                 <p className="pt-1 text-xs text-slate-400">
                   + {order.order_items.length - 2} منتجات أخرى
@@ -275,26 +449,28 @@ const OrderCard = ({
                   عرض التفاصيل
                 </button>
               )}
-              {onConfirm && order.status === "pending" && (
+
+              {onConfirm && (order.status === "pending" || order.status === "pending_approval") && (
                 <button
                   type="button"
                   disabled={isConfirming}
                   onClick={() => onConfirm(order.id)}
                   className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isConfirming ? "جاري التأكيد..." : "✓ تأكيد"}
+                  {isConfirming ? "جاري التأكيد..." : "✓ تأكيد الطلب"}
                 </button>
               )}
             </div>
           )}
         </div>
       </Card>
-    );
+    )
   }
 
   // =============================================
-  // FULL VERSION (for Orders Page)
+  // FULL VERSION
   // =============================================
+
   return (
     <Card className={className}>
       {/* Order Header */}
@@ -305,6 +481,7 @@ const OrderCard = ({
               <span className="text-lg font-black text-slate-950">
                 طلب #{order.id}
               </span>
+
               <span
                 className={`rounded-full px-3 py-1 text-[11px] font-black ring-1 ${getStatusClass(
                   order.status
@@ -313,12 +490,15 @@ const OrderCard = ({
                 {getStatusEmoji(order.status)} {getStatusLabel(order.status)}
               </span>
             </div>
+
             <p className="mt-1 text-xs font-medium text-slate-400">
               {formatDate(order.created_at)}
             </p>
           </div>
+
           <div className="text-left">
             <p className="text-xs font-bold text-slate-400">الإجمالي</p>
+
             <p className="mt-1 text-xl font-black text-indigo-700">
               {Number(order.total).toLocaleString("ar-EG")}
               <span className="mr-1 text-xs text-slate-500">ج.م</span>
@@ -332,12 +512,15 @@ const OrderCard = ({
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-[11px] font-bold text-slate-400">العميل</p>
+
             <p className="mt-1 font-black text-slate-800">
               {order.customer_name}
             </p>
           </div>
+
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-[11px] font-bold text-slate-400">الهاتف</p>
+
             <a
               href={`tel:${order.phone}`}
               className="mt-1 block font-black text-indigo-600 hover:underline"
@@ -354,14 +537,17 @@ const OrderCard = ({
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-500">
               📍
             </div>
+
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-bold text-slate-400">
                 عنوان العميل
               </p>
+
               <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
                 {order.address || "لم يتم تحديد عنوان"}
               </p>
             </div>
+
             {order.latitude !== null && order.longitude !== null && (
               <button
                 type="button"
@@ -378,28 +564,142 @@ const OrderCard = ({
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-[11px] font-bold text-slate-400">طريقة الدفع</p>
+
             <p className="mt-1 font-black text-slate-800">
-              {order.payment_method || "غير محدد"}
+              {getPaymentMethodLabel(order.payment_method)}
             </p>
           </div>
+
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-[11px] font-bold text-slate-400">
               عدد المنتجات
             </p>
+
             <p className="mt-1 font-black text-slate-800">{totalItems}</p>
           </div>
         </div>
 
+        {/* =============================================
+            Transfer Image - Full Version (Smaller)
+        ============================================= */}
+
+        {isElectronicPayment && (
+          <div className="space-y-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+            {/* Bank Account */}
+            {order.bank_account && (
+              <div className="rounded-2xl border border-blue-100 bg-white p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-xl">🏦</span>
+
+                  <div>
+                    <p className="text-[11px] font-bold text-blue-500">
+                      الحساب المحول إليه
+                    </p>
+
+                    <p className="text-base font-black text-blue-900">
+                      {order.bank_account.bank_name}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-[11px] font-bold text-slate-400">
+                      اسم الحساب
+                    </p>
+
+                    <p className="mt-1 font-black text-slate-800">
+                      {order.bank_account.account_name}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-[11px] font-bold text-slate-400">
+                      رقم الحساب
+                    </p>
+
+                    <p
+                      dir="ltr"
+                      className="mt-1 text-right font-black text-slate-800"
+                    >
+                      {order.bank_account.account_number}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-3 sm:col-span-2">
+                    <p className="text-[11px] font-bold text-slate-400">
+                      نوع الحساب
+                    </p>
+
+                    <p className="mt-1 font-black text-slate-800">
+                      {order.bank_account.account_type === "instapay"
+                        ? "InstaPay"
+                        : order.bank_account.account_type}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Transfer Image */}
+            {order.transfer_image && (
+              <div className="rounded-2xl border border-blue-200 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-black text-blue-600">
+                      💳 الدفع الإلكتروني
+                    </p>
+
+                    <p className="mt-1 text-base font-black text-blue-900">
+                      صورة التحويل
+                    </p>
+                  </div>
+
+                  <a
+                    href={order.transfer_image}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white transition hover:bg-blue-500"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    فتح الصورة
+                  </a>
+                </div>
+
+                <a
+                  href={order.transfer_image}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <img
+                    src={order.transfer_image}
+                    alt="صورة التحويل"
+                    className="max-h-48 w-full rounded-2xl border border-blue-200 bg-white object-contain transition hover:opacity-90"
+                  />
+                </a>
+
+                <p className="mt-2 text-center text-xs font-bold text-blue-600">
+                  اضغط على الصورة لعرضها بالحجم الكامل
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Delivery */}
         {order.delivery && (
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
             <p className="text-[11px] font-black text-emerald-600">
               🚚 الدليفري المسؤول
             </p>
+
             <div className="mt-1 flex items-center justify-between gap-3">
               <div>
                 <p className="font-black text-emerald-900">
                   {order.delivery.name}
                 </p>
+
                 <a
                   href={`tel:${order.delivery.phone}`}
                   className="text-sm font-bold text-emerald-700 hover:underline"
@@ -412,9 +712,10 @@ const OrderCard = ({
           </div>
         )}
 
-        {/* Items Preview */}
+        {/* Items */}
         <div>
           <p className="mb-3 text-sm font-black text-slate-800">المنتجات</p>
+
           <div className="space-y-2">
             {order.order_items?.slice(0, 3).map((item) => (
               <div
@@ -425,19 +726,22 @@ const OrderCard = ({
                   <p className="truncate text-sm font-bold text-slate-700">
                     {item.product_name}
                   </p>
+
                   <p className="text-[11px] text-slate-400">
                     {item.quantity} ×{" "}
                     {Number(item.price).toLocaleString("ar-EG")} ج.م
                   </p>
                 </div>
+
                 <p className="mr-3 shrink-0 text-sm font-black text-slate-800">
-                  {(Number(item.price) * Number(item.quantity)).toLocaleString(
-                    "ar-EG"
-                  )}{" "}
+                  {(
+                    Number(item.price) * Number(item.quantity)
+                  ).toLocaleString("ar-EG")}{" "}
                   ج.م
                 </p>
               </div>
             ))}
+
             {order.order_items && order.order_items.length > 3 && (
               <p className="pt-1 text-center text-xs font-bold text-slate-400">
                 + {order.order_items.length - 3} منتجات أخرى
@@ -452,6 +756,7 @@ const OrderCard = ({
             <p className="text-[11px] font-black text-amber-700">
               ملاحظات العميل
             </p>
+
             <p className="mt-1 text-sm font-semibold leading-6 text-amber-900">
               {order.notes}
             </p>
@@ -470,31 +775,37 @@ const OrderCard = ({
                 عرض التفاصيل
               </button>
             )}
-            {onConfirm && order.status === "pending" && (
+
+            {onConfirm && (order.status === "pending" || order.status === "pending_approval") && (
               <button
                 type="button"
                 disabled={isConfirming || isCancelling}
                 onClick={() => onConfirm(order.id)}
-                className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isConfirming ? "جاري التأكيد..." : "✓ تأكيد الطلب"}
               </button>
             )}
-            {onCancel && (order.status === "pending" || order.status === "delivered") && (
+
+            {onCancel && ((order.status === "pending" || order.status === "pending_approval") || order.status === "delivered") && (
               <button
                 type="button"
                 disabled={isConfirming || isCancelling}
                 onClick={() => onCancel(order.id)}
                 className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isCancelling ? "جاري الحذف..." : order.status === "delivered" ? "🗑 حذف الطلب" : "✕ إلغاء الطلب"}
+                {isCancelling
+                  ? "جاري الحذف..."
+                  : order.status === "delivered"
+                  ? "🗑 حذف الطلب"
+                  : "✕ إلغاء الطلب"}
               </button>
             )}
           </div>
         )}
       </div>
     </Card>
-  );
-};
+  )
+}
 
-export default OrderCard;
+export default OrderCard

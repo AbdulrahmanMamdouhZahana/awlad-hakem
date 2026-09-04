@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { createPortal } from "react-dom"
 
 interface iProducts {
   id: number
@@ -8,6 +9,9 @@ interface iProducts {
   unit: string
   image: string
   stock: number
+  sale_type?: "piece" | "weight" | "both"
+  piece_price?: number | null
+  weight_price?: number | null
   created_at?: string
 }
 
@@ -15,11 +19,15 @@ interface IProps {
   product: iProducts
   onDelete?: (id: number) => void
   onEdit?: (product: iProducts) => void
-  onAddToCart?: (product: iProducts) => void
+  onAddToCart?: (
+    product: iProducts,
+    options?: {
+      saleType?: "piece" | "weight"
+      weight?: number
+    }
+  ) => void
 }
 
-
-// تقسيم الأقسام من منظور العميل: 3 أقسام رئيسية فقط
 const CATEGORY_GROUPS: Record<string, string[]> = {
   "🛒 السوبر ماركت": [
     "فيبا", "تايجر", "غسيل اطباق", "مخلل", "الضحى", "جهينه", "نسله",
@@ -66,11 +74,68 @@ const ProductCard = ({
   onAddToCart,
 }: IProps) => {
   const isAdmin = Boolean(onDelete || onEdit)
-  const isAvailable = product.stock > 0
+  const isAvailable = Number(product.stock) > 0
 
-  // =========================
-  // Favorite
-  // =========================
+  const saleType = product.sale_type || "piece"
+  const piecePrice = Number(
+    product.piece_price ?? product.price ?? 0
+  )
+  const weightPrice = Number(
+    product.weight_price ?? product.price ?? 0
+  )
+
+  const [showSaleOptions, setShowSaleOptions] = useState(false)
+  const [selectedSaleType, setSelectedSaleType] = useState<"piece" | "weight">(
+    saleType === "weight" ? "weight" : "piece"
+  )
+  const [selectedWeight, setSelectedWeight] = useState("0.25")
+
+  const openAddOptions = () => {
+    if (!onAddToCart || !isAvailable) return
+
+    if (saleType === "piece") {
+      onAddToCart(product, { saleType: "piece" })
+      return
+    }
+
+    if (saleType === "weight") {
+      setSelectedSaleType("weight")
+      setSelectedWeight("0.25")
+      setShowSaleOptions(true)
+      return
+    }
+
+    setSelectedSaleType("piece")
+    setSelectedWeight("0.25")
+    setShowSaleOptions(true)
+  }
+
+  const confirmAdd = () => {
+    if (!onAddToCart) return
+
+    if (selectedSaleType === "weight") {
+      const weight = Number(selectedWeight)
+
+      if (!Number.isFinite(weight) || weight <= 0) {
+        return
+      }
+
+      if (weight > Number(product.stock)) {
+        return
+      }
+
+      onAddToCart(product, {
+        saleType: "weight",
+        weight,
+      })
+    } else {
+      onAddToCart(product, {
+        saleType: "piece",
+      })
+    }
+
+    setShowSaleOptions(false)
+  }
 
   const [isFavorite, setIsFavorite] = useState(() => {
     try {
@@ -95,19 +160,15 @@ const ProductCard = ({
       let updatedFavorites: number[]
 
       if (favorites.includes(product.id)) {
-        // Remove
         updatedFavorites = favorites.filter(
           (id) => id !== product.id
         )
-
         setIsFavorite(false)
       } else {
-        // Add
         updatedFavorites = [
           ...favorites,
           product.id,
         ]
-
         setIsFavorite(true)
       }
 
@@ -116,7 +177,6 @@ const ProductCard = ({
         JSON.stringify(updatedFavorites)
       )
 
-      // Allow other components to know favorites changed
       window.dispatchEvent(
         new CustomEvent("favoritesChanged")
       )
@@ -126,6 +186,11 @@ const ProductCard = ({
         error
       )
     }
+  }
+
+  const isValidWeight = () => {
+    const weight = Number(selectedWeight)
+    return weight > 0 && weight <= Number(product.stock)
   }
 
   return (
@@ -148,10 +213,6 @@ const ProductCard = ({
       "
     >
 
-      {/* =========================
-          Image
-      ========================= */}
-
       <div className="relative h-44 overflow-hidden bg-[#eef3f3] sm:h-48">
 
         <img
@@ -172,10 +233,6 @@ const ProductCard = ({
               "https://via.placeholder.com/400x300?text=Product"
           }}
         />
-
-        {/* =========================
-            Availability
-        ========================= */}
 
         <span
           className={`
@@ -198,10 +255,6 @@ const ProductCard = ({
             ? "متوفر"
             : "غير متوفر"}
         </span>
-
-        {/* =========================
-            Favorite
-        ========================= */}
 
         {!isAdmin && (
           <button
@@ -258,10 +311,6 @@ const ProductCard = ({
             </svg>
           </button>
         )}
-
-        {/* =========================
-            Admin Actions
-        ========================= */}
 
         {isAdmin && (
           <div className="absolute bottom-2 left-2 flex gap-1.5">
@@ -347,13 +396,8 @@ const ProductCard = ({
 
       </div>
 
-      {/* =========================
-          Content
-      ========================= */}
-
       <div className="flex flex-1 flex-col px-3 py-3">
 
-        {/* Customer Category */}
         {(() => {
           const { mainCategory, subCategory } = getCategoryInfo(product.category)
 
@@ -375,8 +419,6 @@ const ProductCard = ({
           )
         })()}
 
-        {/* Name */}
-
         <h3
           className="
             min-h-[38px]
@@ -392,57 +434,73 @@ const ProductCard = ({
           {product.name}
         </h3>
 
-        {/* Rating */}
-
         <div className="mt-1 flex items-center gap-1">
           <div className="flex text-[10px] text-amber-400">
             ★★★★★
           </div>
 
           <span className="text-[9px] font-medium text-slate-400">
-            ({product.stock})
+            {saleType === "weight"
+              ? `متوفر ${Number(product.stock).toFixed(2)} كجم`
+              : `متوفر ${Number(product.stock).toFixed(0)} قطعة`}
           </span>
         </div>
 
-        {/* =========================
-            Bottom
-        ========================= */}
-
         <div className="mt-3 flex items-center justify-between gap-2">
 
-          {/* Price */}
-
           <div className="min-w-0">
-            {product.price > 0 ? (
-              <div className="flex items-baseline gap-1">
-
-                <span className="text-sm font-black text-slate-900 sm:text-base">
-                  {product.price.toFixed(2)} جنية مصري
+            {saleType === "weight" ? (
+              weightPrice > 0 ? (
+                <div>
+                  <div className="text-sm font-black text-slate-900 sm:text-base">
+                    {weightPrice.toFixed(2)} جنية / كجم
+                  </div>
+                  <div className="mt-0.5 text-[9px] font-medium text-slate-400">
+                    متوفر {Number(product.stock).toFixed(2)} كجم
+                  </div>
+                </div>
+              ) : (
+                <span className="text-xs font-semibold text-slate-400">
+                  سعر الكيلو غير محدد
                 </span>
-
-                {product.unit && (
-                  <span className="truncate text-[9px] font-medium text-slate-400">
-                    / {product.unit}
-                  </span>
-                )}
-
+              )
+            ) : saleType === "both" ? (
+              <div className="space-y-0.5">
+                <div className="text-[11px] font-black text-slate-900">
+                  قطعة: {piecePrice.toFixed(2)} جنيه
+                </div>
+                <div className="text-[11px] font-black text-slate-900">
+                  كيلو: {weightPrice.toFixed(2)} جنيه
+                </div>
+                <div className="text-[9px] font-medium text-slate-400">
+                  متوفر: {Number(product.stock).toFixed(2)}
+                </div>
               </div>
             ) : (
-              <span className="text-xs font-semibold text-slate-400">
-                السعر غير محدد
-              </span>
+              piecePrice > 0 ? (
+                <div className="flex items-baseline gap-1">
+                  <span className="text-sm font-black text-slate-900 sm:text-base">
+                    {piecePrice.toFixed(2)} جنية مصري
+                  </span>
+                  {product.unit && (
+                    <span className="truncate text-[9px] font-medium text-slate-400">
+                      / {product.unit}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-xs font-semibold text-slate-400">
+                  السعر غير محدد
+                </span>
+              )
             )}
           </div>
-
-          {/* Add To Cart */}
 
           {onAddToCart && !isAdmin && (
             <button
               type="button"
               disabled={!isAvailable}
-              onClick={() =>
-                onAddToCart(product)
-              }
+              onClick={openAddOptions}
               className="
                 flex
                 shrink-0
@@ -488,6 +546,125 @@ const ProductCard = ({
         </div>
 
       </div>
+
+      {/* =========================
+          Modal باستخدام createPortal - تم الإصلاح
+      ========================= */}
+      {showSaleOptions && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowSaleOptions(false)}
+        >
+          <div
+            dir="rtl"
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black text-slate-900">
+                اختر طريقة البيع
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowSaleOptions(false)}
+                className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            {saleType === "both" && (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSaleType("piece")}
+                  className={`rounded-xl border p-3 text-sm font-black ${
+                    selectedSaleType === "piece"
+                      ? "border-[#17656b] bg-[#17656b] text-white"
+                      : "border-slate-200 bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  بالقطعة
+                  <div className="mt-1 text-xs opacity-80">
+                    {piecePrice.toFixed(2)} جنيه
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedSaleType("weight")}
+                  className={`rounded-xl border p-3 text-sm font-black ${
+                    selectedSaleType === "weight"
+                      ? "border-[#17656b] bg-[#17656b] text-white"
+                      : "border-slate-200 bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  بالوزن
+                  <div className="mt-1 text-xs opacity-80">
+                    {weightPrice.toFixed(2)} جنيه/كجم
+                  </div>
+                </button>
+              </div>
+            )}
+
+            {selectedSaleType === "weight" ? (
+              <div className="mt-5">
+                <label className="mb-2 block text-xs font-black text-slate-700">
+                  الكمية المطلوبة بالكيلو
+                </label>
+
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={selectedWeight}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                      setSelectedWeight(val)
+                    }
+                  }}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-lg font-black outline-none focus:border-[#17656b]"
+                />
+
+                <div className="mt-2 text-center text-[11px] text-slate-400">
+                  المتاح: {Number(product.stock).toFixed(2)} كجم
+                </div>
+
+                <div className="mt-3 rounded-xl bg-slate-50 p-3 text-center">
+                  <span className="text-xs text-slate-500">
+                    الإجمالي
+                  </span>
+                  <div className="mt-1 text-lg font-black text-[#17656b]">
+                    {(Number(selectedWeight || 0) * weightPrice).toFixed(2)} جنيه
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-5 rounded-xl bg-slate-50 p-3 text-center">
+                <span className="text-xs text-slate-500">
+                  سعر القطعة
+                </span>
+                <div className="mt-1 text-lg font-black text-[#17656b]">
+                  {piecePrice.toFixed(2)} جنيه
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              disabled={
+                selectedSaleType === "weight" && !isValidWeight()
+              }
+              onClick={confirmAdd}
+              className="mt-5 w-full rounded-xl bg-[#17656b] py-3 text-sm font-black text-white transition hover:bg-[#12555a] disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              إضافة للسلة
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
 
     </article>
   )

@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import { apiFetch } from "../../services/api"
+import Swal from "sweetalert2"
 
 interface Delivery {
   id: number
@@ -264,7 +265,7 @@ export default function Deliveries() {
   }
 
   // =====================================================
-  // TOGGLE ACTIVE
+  // TOGGLE ACTIVE - with SweetAlert2
   // =====================================================
 
   const toggleDelivery = async (
@@ -274,11 +275,19 @@ export default function Deliveries() {
       ? "تعطيل"
       : "تفعيل"
 
-    const confirmed = window.confirm(
-      `هل أنت متأكد من ${action} حساب ${delivery.name}؟`
-    )
+    const result = await Swal.fire({
+      title: `هل أنت متأكد؟`,
+      text: `هل أنت متأكد من ${action} حساب "${delivery.name}"؟`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: delivery.is_active ? "#dc2626" : "#10b981",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: delivery.is_active ? "نعم، تعطيل" : "نعم، تفعيل",
+      cancelButtonText: "إلغاء",
+      reverseButtons: true,
+    })
 
-    if (!confirmed) return
+    if (!result.isConfirmed) return
 
     try {
       const data = await apiFetch(
@@ -314,35 +323,59 @@ export default function Deliveries() {
   }
 
   // =====================================================
-  // CHANGE PASSWORD
+  // CHANGE PASSWORD - with SweetAlert2
   // =====================================================
 
   const changePassword = async (
     delivery: Delivery
   ) => {
-    const password = window.prompt(
-      `اكتب كلمة المرور الجديدة لـ ${delivery.name}\n\nيجب أن تكون 8 أحرف على الأقل`
-    )
+    const { value: password } = await Swal.fire({
+      title: `تغيير كلمة المرور لـ ${delivery.name}`,
+      text: "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
+      input: "password",
+      inputPlaceholder: "أدخل كلمة المرور الجديدة",
+      showCancelButton: true,
+      confirmButtonColor: "#f59e0b",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "تغيير",
+      cancelButtonText: "إلغاء",
+      reverseButtons: true,
+      inputValidator: (value) => {
+        if (!value) {
+          return "يرجى إدخال كلمة المرور"
+        }
+        if (value.length < 8) {
+          return "كلمة المرور يجب أن تكون 8 أحرف على الأقل"
+        }
+        return null
+      }
+    })
 
-    if (password === null) return
+    if (!password) return
 
-    if (password.length < 8) {
-      toast.error(
-        "كلمة المرور يجب أن تكون 8 أحرف على الأقل"
-      )
-      return
-    }
+    const { value: confirmation } = await Swal.fire({
+      title: "تأكيد كلمة المرور",
+      text: "أعد كتابة كلمة المرور الجديدة",
+      input: "password",
+      inputPlaceholder: "أعد كتابة كلمة المرور",
+      showCancelButton: true,
+      confirmButtonColor: "#f59e0b",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "تأكيد",
+      cancelButtonText: "إلغاء",
+      reverseButtons: true,
+      inputValidator: (value) => {
+        if (!value) {
+          return "يرجى إدخال تأكيد كلمة المرور"
+        }
+        if (value !== password) {
+          return "كلمتا المرور غير متطابقتين"
+        }
+        return null
+      }
+    })
 
-    const confirmation = window.prompt(
-      "أعد كتابة كلمة المرور الجديدة"
-    )
-
-    if (confirmation === null) return
-
-    if (password !== confirmation) {
-      toast.error("كلمتا المرور غير متطابقتين")
-      return
-    }
+    if (!confirmation) return
 
     try {
       await apiFetch(
@@ -374,17 +407,25 @@ export default function Deliveries() {
   }
 
   // =====================================================
-  // DELETE DELIVERY
+  // DELETE DELIVERY - with SweetAlert2
   // =====================================================
 
   const deleteDelivery = async (
     delivery: Delivery
   ) => {
-    const confirmed = window.confirm(
-      `هل أنت متأكد من حذف حساب "${delivery.name}"؟\n\nلا يمكن التراجع عن هذه العملية.`
-    )
+    const result = await Swal.fire({
+      title: `حذف حساب "${delivery.name}"`,
+      text: "هل أنت متأكد من حذف هذا الحساب؟ لا يمكن التراجع عن هذه العملية.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "نعم، حذف",
+      cancelButtonText: "إلغاء",
+      reverseButtons: true,
+    })
 
-    if (!confirmed) return
+    if (!result.isConfirmed) return
 
     try {
       await apiFetch(
@@ -460,19 +501,19 @@ export default function Deliveries() {
   return (
     <div
       dir="rtl"
-      className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8"
+      className="min-h-screen bg-slate-50 p-3 sm:p-4 md:p-6 lg:p-8"
     >
       {/* ================================================= */}
       {/* HEADER */}
       {/* ================================================= */}
 
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">
+          <h1 className="text-xl font-black text-slate-900 sm:text-2xl md:text-3xl">
             إدارة الدليفري
           </h1>
 
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-slate-500">
             إدارة حسابات الدليفري والصلاحيات والحالة
           </p>
         </div>
@@ -487,8 +528,8 @@ export default function Deliveries() {
             gap-2
             rounded-xl
             bg-indigo-600
-            px-5
-            py-3
+            px-4
+            py-2.5
             text-sm
             font-black
             text-white
@@ -497,6 +538,8 @@ export default function Deliveries() {
             transition
             hover:bg-indigo-700
             active:scale-[0.98]
+            sm:px-5
+            sm:py-3
           "
         >
           <span className="text-xl leading-none">
@@ -511,23 +554,23 @@ export default function Deliveries() {
       {/* STATS */}
       {/* ================================================= */}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <p className="text-sm font-bold text-slate-500">
             إجمالي الدليفري
           </p>
 
-          <p className="mt-2 text-3xl font-black text-slate-900">
+          <p className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">
             {deliveries.length}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <p className="text-sm font-bold text-slate-500">
             الحسابات النشطة
           </p>
 
-          <p className="mt-2 text-3xl font-black text-emerald-600">
+          <p className="mt-2 text-2xl font-black text-emerald-600 sm:text-3xl">
             {
               deliveries.filter(
                 (delivery) =>
@@ -537,12 +580,12 @@ export default function Deliveries() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <p className="text-sm font-bold text-slate-500">
             الحسابات المعطلة
           </p>
 
-          <p className="mt-2 text-3xl font-black text-red-600">
+          <p className="mt-2 text-2xl font-black text-red-600 sm:text-3xl">
             {
               deliveries.filter(
                 (delivery) =>
@@ -554,17 +597,17 @@ export default function Deliveries() {
       </div>
 
       {/* ================================================= */}
-      {/* TABLE */}
+      {/* TABLE - MOBILE RESPONSIVE */}
       {/* ================================================= */}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {deliveries.length === 0 ? (
-          <div className="flex min-h-[350px] flex-col items-center justify-center p-8 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-50 text-4xl">
+          <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center sm:p-8">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50 text-3xl sm:h-20 sm:w-20 sm:text-4xl">
               🚚
             </div>
 
-            <h2 className="mt-5 text-xl font-black text-slate-900">
+            <h2 className="mt-4 text-lg font-black text-slate-900 sm:mt-5 sm:text-xl">
               لا يوجد دليفري حتى الآن
             </h2>
 
@@ -576,180 +619,279 @@ export default function Deliveries() {
             <button
               type="button"
               onClick={openCreateModal}
-              className="mt-5 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white transition hover:bg-indigo-700"
+              className="mt-4 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-indigo-700 sm:mt-5 sm:px-5 sm:py-3"
             >
               إضافة أول دليفري
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-right">
-              <thead className="border-b border-slate-200 bg-slate-50">
-                <tr>
-                  <th className="px-5 py-4 text-xs font-black text-slate-500">
-                    الدليفري
-                  </th>
+          <div>
+            {/* ============================================= */}
+            {/* DESKTOP TABLE - Hidden on mobile */}
+            {/* ============================================= */}
 
-                  <th className="px-5 py-4 text-xs font-black text-slate-500">
-                    البريد الإلكتروني
-                  </th>
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full min-w-[900px] text-right">
+                <thead className="border-b border-slate-200 bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-xs font-black text-slate-500">
+                      الدليفري
+                    </th>
 
-                  <th className="px-5 py-4 text-xs font-black text-slate-500">
-                    الهاتف
-                  </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-500">
+                      البريد الإلكتروني
+                    </th>
 
-                  <th className="px-5 py-4 text-xs font-black text-slate-500">
-                    الحالة
-                  </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-500">
+                      الهاتف
+                    </th>
 
-                  <th className="px-5 py-4 text-xs font-black text-slate-500">
-                    تاريخ الإنشاء
-                  </th>
+                    <th className="px-4 py-3 text-xs font-black text-slate-500">
+                      الحالة
+                    </th>
 
-                  <th className="px-5 py-4 text-xs font-black text-slate-500">
-                    الإجراءات
-                  </th>
-                </tr>
-              </thead>
+                    <th className="px-4 py-3 text-xs font-black text-slate-500">
+                      تاريخ الإنشاء
+                    </th>
 
-              <tbody className="divide-y divide-slate-100">
-                {deliveries.map((delivery) => (
-                  <tr
-                    key={delivery.id}
-                    className="transition hover:bg-slate-50"
-                  >
-                    {/* NAME */}
-
-                    <td className="px-5 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-lg">
-                          🚚
-                        </div>
-
-                        <div>
-                          <p className="font-black text-slate-900">
-                            {delivery.name}
-                          </p>
-
-                          <p className="mt-1 text-xs text-slate-400">
-                            ID #{delivery.id}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* EMAIL */}
-
-                    <td className="px-5 py-5">
-                      <span className="text-sm font-medium text-slate-600">
-                        {delivery.email}
-                      </span>
-                    </td>
-
-                    {/* PHONE */}
-
-                    <td className="px-5 py-5">
-                      <span
-                        dir="ltr"
-                        className="text-sm font-bold text-slate-700"
-                      >
-                        {delivery.phone}
-                      </span>
-                    </td>
-
-                    {/* STATUS */}
-
-                    <td className="px-5 py-5">
-                      {delivery.is_active ? (
-                        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700">
-                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                          نشط
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-xs font-black text-red-700">
-                          <span className="h-2 w-2 rounded-full bg-red-500" />
-                          معطل
-                        </span>
-                      )}
-                    </td>
-
-                    {/* CREATED */}
-
-                    <td className="px-5 py-5">
-                      <span className="text-sm text-slate-500">
-                        {delivery.created_at
-                          ? new Date(
-                              delivery.created_at
-                            ).toLocaleDateString(
-                              "ar-EG"
-                            )
-                          : "-"}
-                      </span>
-                    </td>
-
-                    {/* ACTIONS */}
-
-                    <td className="px-5 py-5">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openEditModal(
-                              delivery
-                            )
-                          }
-                          className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-200"
-                        >
-                          تعديل
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            toggleDelivery(
-                              delivery
-                            )
-                          }
-                          className={
-                            delivery.is_active
-                              ? "rounded-lg bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100"
-                              : "rounded-lg bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 transition hover:bg-emerald-100"
-                          }
-                        >
-                          {delivery.is_active
-                            ? "تعطيل"
-                            : "تفعيل"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            changePassword(
-                              delivery
-                            )
-                          }
-                          className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100"
-                        >
-                          Password
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            deleteDelivery(
-                              delivery
-                            )
-                          }
-                          className="rounded-lg bg-red-600 px-3 py-2 text-xs font-black text-white transition hover:bg-red-700"
-                        >
-                          حذف
-                        </button>
-                      </div>
-                    </td>
+                    <th className="px-4 py-3 text-xs font-black text-slate-500">
+                      الإجراءات
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {deliveries.map((delivery) => (
+                    <tr
+                      key={delivery.id}
+                      className="transition hover:bg-slate-50"
+                    >
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-lg">
+                            🚚
+                          </div>
+
+                          <div>
+                            <p className="font-black text-slate-900">
+                              {delivery.name}
+                            </p>
+
+                            <p className="mt-0.5 text-xs text-slate-400">
+                              ID #{delivery.id}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span className="text-sm font-medium text-slate-600">
+                          {delivery.email}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span
+                          dir="ltr"
+                          className="text-sm font-bold text-slate-700"
+                        >
+                          {delivery.phone}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        {delivery.is_active ? (
+                          <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                            نشط
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-xs font-black text-red-700">
+                            <span className="h-2 w-2 rounded-full bg-red-500" />
+                            معطل
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span className="text-sm text-slate-500">
+                          {delivery.created_at
+                            ? new Date(
+                                delivery.created_at
+                              ).toLocaleDateString(
+                                "ar-EG"
+                              )
+                            : "-"}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openEditModal(
+                                delivery
+                              )
+                            }
+                            className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-200"
+                          >
+                            تعديل
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              toggleDelivery(
+                                delivery
+                              )
+                            }
+                            className={
+                              delivery.is_active
+                                ? "rounded-lg bg-red-50 px-3 py-1.5 text-xs font-black text-red-700 transition hover:bg-red-100"
+                                : "rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700 transition hover:bg-emerald-100"
+                            }
+                          >
+                            {delivery.is_active
+                              ? "تعطيل"
+                              : "تفعيل"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              changePassword(
+                                delivery
+                              )
+                            }
+                            className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-700 transition hover:bg-amber-100"
+                          >
+                            Password
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              deleteDelivery(
+                                delivery
+                              )
+                            }
+                            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-black text-white transition hover:bg-red-700"
+                          >
+                            حذف
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ============================================= */}
+            {/* MOBILE CARDS - Visible only on mobile */}
+            {/* ============================================= */}
+
+            <div className="block lg:hidden divide-y divide-slate-100">
+              {deliveries.map((delivery) => (
+                <div
+                  key={delivery.id}
+                  className="p-4 space-y-3 hover:bg-slate-50 transition"
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-lg">
+                        🚚
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900">
+                          {delivery.name}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          ID #{delivery.id}
+                        </p>
+                      </div>
+                    </div>
+
+                    {delivery.is_active ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        نشط
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-black text-red-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                        معطل
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-sm">
+                    <div>
+                      <p className="text-xs font-bold text-slate-400">البريد</p>
+                      <p className="font-medium text-slate-700 truncate">
+                        {delivery.email}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-400">الهاتف</p>
+                      <p className="font-bold text-slate-700" dir="ltr">
+                        {delivery.phone}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs font-bold text-slate-400">تاريخ الإنشاء</p>
+                      <p className="text-slate-600">
+                        {delivery.created_at
+                          ? new Date(delivery.created_at).toLocaleDateString("ar-EG")
+                          : "-"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(delivery)}
+                      className="flex-1 min-w-[60px] rounded-lg bg-slate-100 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-200"
+                    >
+                      تعديل
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleDelivery(delivery)}
+                      className={`flex-1 min-w-[60px] rounded-lg px-3 py-2 text-xs font-black transition ${
+                        delivery.is_active
+                          ? "bg-red-50 text-red-700 hover:bg-red-100"
+                          : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      }`}
+                    >
+                      {delivery.is_active ? "تعطيل" : "تفعيل"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => changePassword(delivery)}
+                      className="flex-1 min-w-[60px] rounded-lg bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-100"
+                    >
+                      Password
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => deleteDelivery(delivery)}
+                      className="flex-1 min-w-[60px] rounded-lg bg-red-600 px-3 py-2 text-xs font-black text-white transition hover:bg-red-700"
+                    >
+                      حذف
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -772,9 +914,9 @@ export default function Deliveries() {
           >
             {/* MODAL HEADER */}
 
-            <div className="flex items-center justify-between border-b border-slate-100 p-6">
+            <div className="flex items-center justify-between border-b border-slate-100 p-4 sm:p-6">
               <div>
-                <h2 className="text-xl font-black text-slate-900">
+                <h2 className="text-lg font-black text-slate-900 sm:text-xl">
                   {editingDelivery
                     ? "تعديل الدليفري"
                     : "إضافة دليفري جديد"}
@@ -790,7 +932,7 @@ export default function Deliveries() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 sm:h-9 sm:w-9"
               >
                 ✕
               </button>
@@ -800,7 +942,7 @@ export default function Deliveries() {
 
             <form
               onSubmit={handleSubmit}
-              className="space-y-5 p-6"
+              className="space-y-4 p-4 sm:p-6"
             >
               {/* NAME */}
 
@@ -826,13 +968,14 @@ export default function Deliveries() {
                     border-slate-200
                     bg-white
                     px-4
-                    py-3
+                    py-2.5
                     text-sm
                     outline-none
                     transition
                     focus:border-indigo-500
                     focus:ring-4
                     focus:ring-indigo-500/10
+                    sm:py-3
                   "
                 />
               </div>
@@ -862,13 +1005,14 @@ export default function Deliveries() {
                     border-slate-200
                     bg-white
                     px-4
-                    py-3
+                    py-2.5
                     text-sm
                     outline-none
                     transition
                     focus:border-indigo-500
                     focus:ring-4
                     focus:ring-indigo-500/10
+                    sm:py-3
                   "
                 />
               </div>
@@ -898,13 +1042,14 @@ export default function Deliveries() {
                     border-slate-200
                     bg-white
                     px-4
-                    py-3
+                    py-2.5
                     text-sm
                     outline-none
                     transition
                     focus:border-indigo-500
                     focus:ring-4
                     focus:ring-indigo-500/10
+                    sm:py-3
                   "
                 />
               </div>
@@ -936,13 +1081,14 @@ export default function Deliveries() {
                         border-slate-200
                         bg-white
                         px-4
-                        py-3
+                        py-2.5
                         text-sm
                         outline-none
                         transition
                         focus:border-indigo-500
                         focus:ring-4
                         focus:ring-indigo-500/10
+                        sm:py-3
                       "
                     />
                   </div>
@@ -972,13 +1118,14 @@ export default function Deliveries() {
                         border-slate-200
                         bg-white
                         px-4
-                        py-3
+                        py-2.5
                         text-sm
                         outline-none
                         transition
                         focus:border-indigo-500
                         focus:ring-4
                         focus:ring-indigo-500/10
+                        sm:py-3
                       "
                     />
                   </div>
@@ -988,7 +1135,7 @@ export default function Deliveries() {
               {/* NOTE */}
 
               {!editingDelivery && (
-                <div className="rounded-xl bg-indigo-50 p-4 text-sm leading-6 text-indigo-700">
+                <div className="rounded-xl bg-indigo-50 p-3 text-sm leading-6 text-indigo-700 sm:p-4">
                   حساب الدليفري سيتم إنشاؤه كـ
                   <strong className="mx-1">
                     Delivery
@@ -1004,7 +1151,7 @@ export default function Deliveries() {
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="flex-1 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 sm:px-5 sm:py-3"
                 >
                   إلغاء
                 </button>
@@ -1012,7 +1159,7 @@ export default function Deliveries() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 sm:px-5 sm:py-3"
                 >
                   {saving
                     ? "جاري الحفظ..."

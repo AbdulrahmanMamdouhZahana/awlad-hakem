@@ -1,5 +1,7 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import toast from "react-hot-toast"
+import { supabase } from "../lib/supabase"
+import { apiFetch } from "../services/api" // ✅ إضافة apiFetch
 
 import {
   createOrder,
@@ -27,6 +29,15 @@ interface IProps {
   onSuccess: () => void
 }
 
+interface BankAccount {
+  id: number
+  bank_name: string
+  account_name: string
+  account_number: string
+  account_type: string
+  is_active: boolean
+}
+
 const Checkout = ({
   cart,
   onClose,
@@ -35,9 +46,19 @@ const Checkout = ({
 
   const [loading, setLoading] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
+  const [loadingAccounts, setLoadingAccounts] = useState(true)
 
   const [latitude, setLatitude] = useState<number | null>(null)
   const [longitude, setLongitude] = useState<number | null>(null)
+
+  // =========================
+  // Bank Transfer State
+  // =========================
+
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [selectedBankId, setSelectedBankId] = useState<number | null>(null)
+  const [transferImage, setTransferImage] = useState<File | null>(null)
+  const [transferImagePreview, setTransferImagePreview] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     customerName: "",
@@ -52,6 +73,69 @@ const Checkout = ({
       sum + item.product.price * item.quantity,
     0
   )
+
+  // =========================
+  // Load Bank Accounts from Laravel API
+  // =========================
+
+  useEffect(() => {
+    const loadBankAccounts = async () => {
+      try {
+        setLoadingAccounts(true)
+        
+        console.log("🔍 Loading bank accounts from Laravel API...")
+
+        // ✅ استخدام apiFetch لجلب البيانات من Laravel
+        const response = await apiFetch("/bank-accounts")
+
+        console.log("📦 API Response:", response)
+
+        if (response && response.data && response.data.length > 0) {
+          setBankAccounts(response.data)
+          setSelectedBankId(response.data[0].id)
+          console.log("✅ Bank accounts loaded from API:", response.data)
+        } else {
+          console.warn("⚠️ No bank accounts found in API")
+          toast.error("لا توجد حسابات بنكية متاحة حالياً")
+        }
+      } catch (error) {
+        console.error("❌ LOAD BANK ACCOUNTS ERROR:", error)
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "حدث خطأ أثناء تحميل الحسابات البنكية"
+        )
+      } finally {
+        setLoadingAccounts(false)
+      }
+    }
+    loadBankAccounts()
+  }, [])
+
+  // =========================
+  // Upload Transfer Image to Supabase
+  // =========================
+
+  const uploadTransferImage = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `transfer_${Date.now()}.${fileExt}`
+    const filePath = `transfer_images/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from("transfer-images")
+      .upload(filePath, file)
+
+    if (uploadError) {
+      console.error("UPLOAD ERROR:", uploadError)
+      throw new Error("فشل رفع صورة التحويل")
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("transfer-images")
+      .getPublicUrl(filePath)
+
+    return urlData.publicUrl
+  }
 
   // =========================
   // Get Customer Location
@@ -110,6 +194,47 @@ const Checkout = ({
   }
 
   // =========================
+  // Handle Image Selection
+  // =========================
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("من فضلك اختر ملف صورة صحيح")
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("حجم الصورة يجب ألا يتجاوز 5 ميجابايت")
+      return
+    }
+
+    setTransferImage(file)
+    setTransferImagePreview(URL.createObjectURL(file))
+  }
+
+  // =========================
+  // Copy to Clipboard
+  // =========================
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success(`تم نسخ ${label} 📋`)
+    }).catch(() => {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea")
+      textArea.value = text
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand("copy")
+      document.body.removeChild(textArea)
+      toast.success(`تم نسخ ${label} 📋`)
+    })
+  }
+
+  // =========================
   // Submit Order
   // =========================
 
@@ -124,10 +249,12 @@ const Checkout = ({
       return
     }
 
-    if (!form.phone.trim()) {
-      toast.error("من فضلك اكتب رقم الموبايل")
-      return
-    }
+  
+
+    if (!/^01\d{9}$/.test(form.phone)) {
+  toast.error("رقم الموبايل يجب أن يكون 11 رقم ويبدأ بـ 01")
+  return
+}
 
     if (!form.address.trim()) {
       toast.error("من فضلك اكتب العنوان")
@@ -145,9 +272,35 @@ const Checkout = ({
       return
     }
 
+    // ✅ التحقق من صورة التحويل للدفع الإلكتروني
+    if (form.paymentMethod === "الدفع إلكتروني") {
+      if (!transferImage) {
+        toast.error("من فضلك ارفع صورة التحويل الإلكتروني")
+        return
+      }
+      if (!selectedBankId) {
+        toast.error("من فضلك اختر الحساب المحول إليه")
+        return
+      }
+    }
+
     try {
 
       setLoading(true)
+
+      let transferImageUrl = ""
+      
+      // ✅ رفع صورة التحويل إذا كانت موجودة
+      if (transferImage) {
+        toast.loading("جاري رفع صورة التحويل...", { id: "upload-image" })
+        transferImageUrl = await uploadTransferImage(transferImage)
+        toast.dismiss("upload-image")
+      }
+
+      // ✅ تحديد حالة الطلب بناءً على طريقة الدفع
+      const orderStatus = form.paymentMethod === "الدفع إلكتروني" 
+        ? "pending_approval" 
+        : "pending"
 
       await createOrder({
 
@@ -171,6 +324,11 @@ const Checkout = ({
         latitude,
         longitude,
 
+        // ✅ إضافة بيانات التحويل
+        transferImage: transferImageUrl,
+        bankAccountId: selectedBankId,
+        status: orderStatus,
+
         items: cart.map((item) => ({
           productId:
             item.product.id,
@@ -188,7 +346,9 @@ const Checkout = ({
       })
 
       toast.success(
-        "تم إرسال طلبك بنجاح 🎉"
+        form.paymentMethod === "الدفع إلكتروني"
+          ? "تم إرسال طلبك بنجاح، في انتظار تأكيد الدفع 🎉"
+          : "تم إرسال طلبك بنجاح 🎉"
       )
 
       onSuccess()
@@ -201,7 +361,9 @@ const Checkout = ({
       )
 
       toast.error(
-        "حدث خطأ أثناء إرسال الطلب"
+        error instanceof Error
+          ? error.message
+          : "حدث خطأ أثناء إرسال الطلب"
       )
 
     } finally {
@@ -210,6 +372,13 @@ const Checkout = ({
 
     }
   }
+
+  // =========================
+  // Render
+  // =========================
+
+  // ✅ الحصول على الحساب المحدد
+  const selectedAccount = bankAccounts.find(acc => acc.id === selectedBankId)
 
   return (
     <div
@@ -289,18 +458,22 @@ const Checkout = ({
               رقم الموبايل *
             </label>
 
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  phone: e.target.value,
-                })
-              }
-              placeholder="01xxxxxxxxx"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-indigo-500"
-            />
+          <input
+  type="tel"
+  value={form.phone}
+  maxLength={11}
+  inputMode="numeric"
+  onChange={(e) => {
+    const value = e.target.value.replace(/\D/g, "").slice(0, 11)
+
+    setForm({
+      ...form,
+      phone: value,
+    })
+  }}
+  placeholder="01xxxxxxxxx"
+  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-indigo-500"
+/>
 
           </div>
 
@@ -380,7 +553,9 @@ const Checkout = ({
 
           </div>
 
-          {/* Payment */}
+          {/* =========================
+              Payment Method
+          ========================= */}
 
           <div>
 
@@ -417,7 +592,7 @@ const Checkout = ({
                   className="ml-2"
                 />
 
-                الدفع عند الاستلام
+                <span className="text-xl">💵</span> الدفع عند الاستلام
 
               </label>
 
@@ -448,13 +623,157 @@ const Checkout = ({
                   className="ml-2"
                 />
 
-                الدفع إلكتروني
+                <span className="text-xl">🏦</span> الدفع إلكتروني
 
               </label>
 
             </div>
 
           </div>
+
+          {/* =========================
+              Bank Transfer Details
+          ========================= */}
+
+          {form.paymentMethod === "الدفع إلكتروني" && (
+            <div className="rounded-2xl bg-amber-50 border-2 border-amber-200 p-5 space-y-4">
+
+              <h3 className="text-lg font-black text-amber-800 flex items-center gap-2">
+                <span>🏦</span> بيانات التحويل الإلكتروني
+              </h3>
+
+              {/* ✅ عرض الحسابات من Laravel API */}
+              {loadingAccounts ? (
+                <div className="flex justify-center py-4">
+                  <div className="flex items-center gap-2">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
+                    <span className="text-sm text-amber-700">جاري تحميل الحسابات...</span>
+                  </div>
+                </div>
+              ) : bankAccounts.length === 0 ? (
+                <div className="rounded-xl bg-amber-100 p-4 text-center">
+                  <p className="text-amber-800">⚠️ لا توجد حسابات بنكية متاحة حالياً</p>
+                  <p className="text-sm text-amber-700 mt-1">برجاء التواصل مع الدعم الفني</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-amber-700">
+                    اختر الحساب المحول إليه:
+                  </label>
+                  <div className="space-y-2">
+                    {bankAccounts.map((account) => (
+                      <label
+                        key={account.id}
+                        className={`flex items-start gap-3 rounded-xl border-2 p-3 cursor-pointer transition ${
+                          selectedBankId === account.id
+                            ? "border-emerald-500 bg-emerald-50"
+                            : "border-slate-200 hover:border-slate-300"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="bank_account"
+                          value={account.id}
+                          checked={selectedBankId === account.id}
+                          onChange={() => setSelectedBankId(account.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-slate-900">
+                              {account.account_type === "instapay" ? "📱" : "📱"} {account.bank_name}
+                            </p>
+                            <span className="text-xs bg-amber-100 px-2 py-0.5 rounded-full text-amber-700">
+                              {account.account_type === "instapay" ? "إنستاباي" : "فودافون كاش"}
+                            </span>
+                          </div>
+                          <p 
+                            className="text-lg font-bold text-indigo-600 cursor-pointer hover:text-indigo-800 transition"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              copyToClipboard(account.account_number, `رقم ${account.bank_name}`)
+                            }}
+                          >
+                            {account.account_number}
+                          </p>
+                          <p className="text-sm text-slate-600">باسم: {account.account_name}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            copyToClipboard(account.account_number, `رقم ${account.bank_name}`)
+                          }}
+                          className="shrink-0 rounded-xl bg-indigo-100 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-200 transition"
+                        >
+                          📋 نسخ
+                        </button>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ✅ عرض الحساب المحدد */}
+              {selectedAccount && (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3">
+                  <p className="text-sm font-bold text-emerald-700">✓ ستحول إلى:</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <div>
+                      <p className="font-bold text-slate-900">{selectedAccount.bank_name}</p>
+                      <p className="text-lg font-bold text-emerald-700">{selectedAccount.account_number}</p>
+                      <p className="text-sm text-slate-600">باسم: {selectedAccount.account_name}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(selectedAccount.account_number, `رقم ${selectedAccount.bank_name}`)}
+                      className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-200 transition"
+                    >
+                      📋 نسخ
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Image */}
+              <div>
+                <label className="mb-2 block text-sm font-black text-slate-700">
+                  صورة التحويل *
+                </label>
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white p-6 transition hover:border-indigo-400">
+                  {transferImagePreview ? (
+                    <div className="w-full">
+                      <img
+                        src={transferImagePreview}
+                        alt="صورة التحويل"
+                        className="mx-auto max-h-48 rounded-lg object-cover"
+                      />
+                      <p className="mt-2 text-sm font-bold text-green-600">✓ تم اختيار الصورة</p>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-4xl">📸</span>
+                      <span className="mt-2 text-sm font-bold text-slate-700">
+                        اختر صورة التحويل
+                      </span>
+                      <span className="mt-1 text-xs text-slate-400">
+                        JPG, PNG, WEBP - حتى 5MB
+                      </span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+             
+
+            </div>
+          )}
 
           {/* Notes */}
 
@@ -518,11 +837,13 @@ const Checkout = ({
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-2xl bg-indigo-600 py-4 font-bold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 py-4 font-bold text-white shadow-lg shadow-indigo-600/20 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
           >
 
             {loading
               ? "جاري إرسال الطلب..."
+              : form.paymentMethod === "الدفع إلكتروني"
+              ? `🏦 تأكيد التحويل إلى ${selectedAccount?.bank_name || ''}`
               : "تأكيد الطلب"}
 
           </button>

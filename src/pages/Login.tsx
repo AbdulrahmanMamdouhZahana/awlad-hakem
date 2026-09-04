@@ -1,7 +1,8 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL;
+// const API_URL = import.meta.env.VITE_API_URL;
+import { apiFetch } from "../services/api";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -19,41 +20,50 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/staff/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          login: login.trim(),
-          password,
-        }),
-      });
+      // const response = await fetch(`${API_URL}/staff/login`, {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //     Accept: "application/json",
+      //   },
+      //   body: JSON.stringify({
+      //     login: login.trim(),
+      //     password,
+      //   }),
+      // });
 
-      const data = await response.json().catch(() => ({}));
+      // const data = await response.json().catch(() => ({}));
 
-      // ==========================================
-      // LOGIN ERROR
-      // ==========================================
+      // // ==========================================
+      // // LOGIN ERROR
+      // // ==========================================
 
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-            "البريد الإلكتروني أو كلمة المرور غير صحيحة"
-        );
-      }
+      // if (!response.ok) {
+      //   throw new Error(
+      //     data.message ||
+      //       "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+      //   );
+      // }
 
-      // ==========================================
-      // CHECK TOKEN
-      // ==========================================
+      // // ==========================================
+      // // CHECK TOKEN
+      // // ==========================================
 
-      if (!data.token) {
-        throw new Error(
-          "لم يتم استلام رمز تسجيل الدخول من السيرفر"
-        );
-      }
+      // if (!data.token) {
+      //   throw new Error(
+      //     "لم يتم استلام رمز تسجيل الدخول من السيرفر"
+      //   );
+      // }
 
+
+
+      const data = await apiFetch("/staff/login", {
+  method: "POST",
+  body: JSON.stringify({
+    login: login.trim(),
+    password,
+  }),
+});
       // ==========================================
       // CHECK USER
       // ==========================================

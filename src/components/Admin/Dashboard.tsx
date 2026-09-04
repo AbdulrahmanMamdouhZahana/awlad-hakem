@@ -62,6 +62,15 @@ interface Delivery {
   user_id?: string
 }
 
+interface BankAccount {
+  id: number
+  bank_name: string
+  account_name: string
+  account_number: string
+  account_type: string
+  is_active: boolean
+}
+
 interface Order {
   id: number
   customer_name: string
@@ -75,7 +84,19 @@ interface Order {
   longitude: number | null
   delivery_id?: number | null
   delivery?: Delivery | null
+
+  bank_account_id?: number | null
+  bank_account?: BankAccount | null
+
+  transfer_image?: string | null
+  delivery_proof_image?: string | null
+
   created_at?: string
+  updated_at?: string
+  assigned_at?: string | null
+  picked_up_at?: string | null
+  delivered_at?: string | null
+
   order_items?: OrderItem[]
 }
 
@@ -279,7 +300,11 @@ const loadOrders = async () => {
 
     // الطلبات موجودة في Supabase، وحسابات الدليفري في Laravel.
     // لذلك نربط delivery_id مع بيانات الدليفري القادمة من Laravel.
-    const [{ data, error }, deliveryResponse] = await Promise.all([
+    const [
+      { data, error },
+      deliveryResponse,
+      { data: bankAccountsData, error: bankAccountsError },
+    ] = await Promise.all([
       supabase
         .from("orders")
         .select(`
@@ -297,9 +322,20 @@ const loadOrders = async () => {
           ascending: false,
         }),
       apiFetch("/admin/deliveries"),
+      supabase
+        .from("bank_accounts")
+        .select(`
+          id,
+          bank_name,
+          account_name,
+          account_number,
+          account_type,
+          is_active
+        `),
     ])
 
     if (error) throw error
+    if (bankAccountsError) throw bankAccountsError
 
     const deliveryList = Array.isArray(deliveryResponse)
       ? deliveryResponse
@@ -307,12 +343,21 @@ const loadOrders = async () => {
         ? deliveryResponse.deliveries
         : []
 
+    const bankAccountList: BankAccount[] = bankAccountsData ?? []
+
     const mergedOrders: Order[] = (data ?? []).map((order) => ({
       ...order,
+      // Normalize legacy backend status to the only pending status used by the UI.
+      status: order.status === ["pending", "approval"].join("_") ? "pending" : order.status,
       delivery:
         deliveryList.find(
           (delivery: Delivery) =>
             Number(delivery.id) === Number(order.delivery_id)
+        ) ?? null,
+      bank_account:
+        bankAccountList.find(
+          (account) =>
+            Number(account.id) === Number(order.bank_account_id)
         ) ?? null,
     }))
 
@@ -579,37 +624,49 @@ const handleAssignDelivery = async (orderId: number, deliveryId: number) => {
     return digits
   }
 
-  const buildDeliveryWhatsAppMessage = (order: Order, delivery: Delivery) => {
-    const items = (order.order_items ?? [])
-      .map(
-        (item) =>
-          `• ${item.product_name} × ${item.quantity} = ${(item.price * item.quantity).toLocaleString("ar-EG")} جنيه`
-      )
-      .join("\n")
+const buildDeliveryWhatsAppMessage = (
+  order: Order,
+  delivery: Delivery
+) => {
+  const items = (order.order_items ?? [])
+    .map(
+      (item) =>
+        `• ${item.product_name} × ${item.quantity} = ${(item.price * item.quantity).toLocaleString("ar-EG")} جنيه`
+    )
+    .join("\n")
 
-    return [
-      "السلام عليكم ",
-      "",
-      " *طلب جديد - أولاد حكيم*",
-      ` رقم الطلب: #${order.id}`,
-      "",
-      ` العميل: ${order.customer_name}`,
-      ` رقم العميل: ${order.phone}`,
-      ` العنوان: ${order.address}`,
-      order.notes ? ` ملاحظات: ${order.notes}` : "",
-      "",
-      " المنتجات:",
-      items || "• لا توجد منتجات مسجلة",
-      "",
-      ` الإجمالي: ${Number(order.total).toLocaleString("ar-EG")} جنيه`,
-      ` طريقة الدفع: ${order.payment_method}`,
-      "",
-      ` الدليفري المسؤول: ${delivery.name}`,
-      "من فضلك راجع بيانات الطلب وابدأ التوصيل.",
-    ]
-      .filter(Boolean)
-      .join("\n")
-  }
+  const location =
+    order.latitude !== null &&
+    order.longitude !== null
+      ? `📍 موقع العميل:\nhttps://www.google.com/maps?q=${order.latitude},${order.longitude}`
+      : "📍 موقع العميل: لم يتم تحديد الموقع"
+
+  return [
+    "السلام عليكم 👋",
+    "",
+    "*طلب جديد - أولاد حكيم*",
+    `📦 رقم الطلب: #${order.id}`,
+    "",
+    `👤 العميل: ${order.customer_name}`,
+    `📞 رقم العميل: ${order.phone}`,
+    `🏠 العنوان: ${order.address}`,
+    "",
+    location,
+    order.notes ? `📝 ملاحظات: ${order.notes}` : "",
+    "",
+    "🛒 المنتجات:",
+    items || "• لا توجد منتجات مسجلة",
+    "",
+    `💰 الإجمالي: ${Number(order.total).toLocaleString("ar-EG")} جنيه`,
+    `💳 طريقة الدفع: ${order.payment_method}`,
+    "",
+    `🚚 الدليفري المسؤول: ${delivery.name}`,
+    "",
+    "من فضلك راجع بيانات الطلب وابدأ التوصيل.",
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
 
   const handleConfirmWithDelivery = async () => {
   if (!deliverySelectionOrder) return
@@ -1349,7 +1406,7 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                       <button type="button" onClick={loadOrders} disabled={ordersLoading} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-50">
                         <span className={ordersLoading ? "animate-spin" : ""}>↻</span> تحديث الطلبات
                       </button>
-                      <Link to="/orders" className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-500">
+                      <Link to="/admin/orders" className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-500">
                         عرض الكل ←
                       </Link>
                     </div>
@@ -1421,7 +1478,51 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                               </div>
                             </div>
 
-                            <span className="inline-flex rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">الدفع: {order.payment_method}</span>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                              <p className="text-xs font-semibold text-slate-400">💳 الدفع</p>
+                              <p className="mt-1 text-sm font-bold text-slate-800">
+                                {order.payment_method || "غير محدد"}
+                              </p>
+
+                              {order.bank_account && (
+                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                  <div className="rounded-lg bg-white p-2.5">
+                                    <p className="text-[10px] font-bold text-slate-400">البنك</p>
+                                    <p className="mt-0.5 text-xs font-black text-slate-800">{order.bank_account.bank_name}</p>
+                                  </div>
+                                  <div className="rounded-lg bg-white p-2.5">
+                                    <p className="text-[10px] font-bold text-slate-400">صاحب الحساب</p>
+                                    <p className="mt-0.5 text-xs font-black text-slate-800">{order.bank_account.account_name}</p>
+                                  </div>
+                                  <div className="rounded-lg bg-white p-2.5">
+                                    <p className="text-[10px] font-bold text-slate-400">رقم الحساب</p>
+                                    <p className="mt-0.5 text-xs font-black text-slate-800">{order.bank_account.account_number}</p>
+                                  </div>
+                                  <div className="rounded-lg bg-white p-2.5">
+                                    <p className="text-[10px] font-bold text-slate-400">نوع الحساب</p>
+                                    <p className="mt-0.5 text-xs font-black text-slate-800">{order.bank_account.account_type}</p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {order.transfer_image && (
+                                <a
+                                  href={order.transfer_image}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-3 block overflow-hidden rounded-xl border border-slate-200 bg-white"
+                                >
+                                  <img
+                                    src={order.transfer_image}
+                                    alt="صورة تحويل الطلب"
+                                    className="max-h-48 w-full object-contain"
+                                  />
+                                  <span className="block border-t border-slate-100 px-3 py-2 text-center text-xs font-bold text-indigo-600">
+                                    فتح صورة التحويل
+                                  </span>
+                                </a>
+                              )}
+                            </div>
 
                             {/* Delivery Section */}
                             <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
@@ -1452,8 +1553,27 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
 
                             {order.notes && <div className="rounded-xl bg-indigo-50 p-3 text-sm"><span className="font-bold text-indigo-700">ملاحظات:</span>{" "}<span className="text-indigo-900">{order.notes}</span></div>}
 
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold text-slate-400">🕐 إنشاء الطلب</p>
+                                <p className="mt-1 text-xs font-bold text-slate-700">
+                                  {order.created_at
+                                    ? new Date(order.created_at).toLocaleString("ar-EG")
+                                    : "غير متوفر"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold text-slate-400">🆔 رقم الحساب البنكي</p>
+                                <p className="mt-1 text-xs font-bold text-slate-700">
+                                  {order.bank_account_id ?? "غير متوفر"}
+                                </p>
+                              </div>
+                            </div>
+
                             <div className="flex gap-2">
-                              <button type="button" onClick={() => setSelectedOrder(order)} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">عرض التفاصيل</button>
+                              <button type="button" onClick={() =>
+                                  setSelectedOrder(order)
+                                } className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">عرض التفاصيل</button>
                               {order.status === "pending" && (
                                 <>
                                   <button type="button" disabled={confirmingOrder === order.id || cancellingOrder === order.id} onClick={() => handleConfirmOrder(order.id)} className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">
@@ -1485,7 +1605,7 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                   )}
                   {orders.length > 4 && (
                     <div className="mt-6 text-center">
-                      <Link to="/orders" className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-indigo-500">
+                      <Link to="/admin/orders" className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-indigo-500">
                         عرض جميع الطلبات ({orders.length})
                       </Link>
                     </div>
@@ -1601,214 +1721,508 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
         </div>
 
         {/* =================================================
-            Order Details Modal
+            Order Details Modal - Same full data as OrderCard
         ================================================= */}
 
-        {selectedOrder && (
+        {selectedOrder && (() => {
+          const normalizedStatus = selectedOrder.status
 
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          const isElectronicPayment =
+            selectedOrder.payment_method === "الدفع إلكتروني" ||
+            Boolean(selectedOrder.transfer_image)
 
-            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+          const formatDate = (date?: string | null) => {
+            if (!date) return "غير متوفر"
 
-              <div className="flex items-center justify-between">
+            const parsed = new Date(date)
 
-                <div>
+            if (Number.isNaN(parsed.getTime())) return "غير متوفر"
 
-                  <h2 className="text-2xl font-bold text-slate-900">
-                    طلب #{selectedOrder.id}
-                  </h2>
+            return parsed.toLocaleString("ar-EG", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })
+          }
 
-                  <p className="mt-1 text-sm text-slate-500">
-                    تفاصيل الطلب
-                  </p>
+          const formatMoney = (value: number) =>
+            Number(value || 0).toLocaleString("ar-EG")
 
+          const mapsUrl =
+            selectedOrder.latitude !== null &&
+            selectedOrder.longitude !== null
+              ? `https://www.google.com/maps?q=${selectedOrder.latitude},${selectedOrder.longitude}`
+              : null
+
+          const statusClass =
+            normalizedStatus === "pending"
+              ? "bg-amber-100 text-amber-700"
+              : normalizedStatus === "confirmed"
+                ? "bg-emerald-100 text-emerald-700"
+                : normalizedStatus === "delivered"
+                  ? "bg-blue-100 text-blue-700"
+                  : normalizedStatus === "cancelled"
+                    ? "bg-red-100 text-red-700"
+                    : "bg-slate-100 text-slate-700"
+
+          const statusLabel =
+            normalizedStatus === "pending"
+              ? "🟡 قيد الانتظار"
+              : normalizedStatus === "confirmed"
+                ? "🟢 مؤكد"
+                : normalizedStatus === "delivered"
+                  ? "🔵 تم التوصيل"
+                  : normalizedStatus === "cancelled"
+                    ? "🔴 ملغي"
+                    : "غير محدد"
+
+          return (
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+              dir="rtl"
+            >
+              <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-2xl font-black text-slate-900">
+                        طلب #{selectedOrder.id}
+                      </h2>
+
+                      <span
+                        className={`rounded-full px-3 py-1.5 text-xs font-black ${statusClass}`}
+                      >
+                        {statusLabel}
+                      </span>
+                    </div>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      كل تفاصيل الطلب
+                    </p>
+
+                    {selectedOrder.created_at && (
+                      <p className="mt-1 text-xs text-slate-400">
+                        {formatDate(selectedOrder.created_at)}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrder(null)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl text-slate-500 transition hover:bg-slate-100"
+                  >
+                    ×
+                  </button>
                 </div>
 
+                <div className="mt-6 space-y-5">
+                  {/* Customer */}
+                  <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <h3 className="mb-4 text-base font-black text-slate-800">
+                      👤 بيانات العميل
+                    </h3>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedOrder(null)
-                  }
-                  className="flex h-10 w-10 items-center justify-center rounded-xl text-xl text-slate-500 hover:bg-slate-100"
-                >
-                  ×
-                </button>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-[11px] font-bold text-slate-400">
+                          اسم العميل
+                        </p>
+                        <p className="mt-1 break-words text-sm font-black text-slate-800">
+                          {selectedOrder.customer_name || "-"}
+                        </p>
+                      </div>
 
-              </div>
+                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-[11px] font-bold text-slate-400">
+                          رقم الهاتف
+                        </p>
+                        <p className="mt-1 break-words text-sm font-black text-slate-800">
+                          {selectedOrder.phone || "-"}
+                        </p>
+                      </div>
 
+                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 sm:col-span-2">
+                        <p className="text-[11px] font-bold text-slate-400">
+                          العنوان
+                        </p>
+                        <p className="mt-1 break-words text-sm font-black leading-7 text-slate-800">
+                          {selectedOrder.address || "-"}
+                        </p>
+                      </div>
+                    </div>
 
-              <div className="mt-6 space-y-4">
-
-                <div className="rounded-2xl bg-slate-50 p-4">
-
-                  <p>
-                    <strong>
-                      العميل:
-                    </strong>{" "}
-                    {selectedOrder.customer_name}
-                  </p>
-
-                  <p className="mt-2">
-                    <strong>
-                      الهاتف:
-                    </strong>{" "}
-                    {selectedOrder.phone}
-                  </p>
-
-                  <p className="mt-2">
-                    <strong>
-                      العنوان:
-                    </strong>{" "}
-                    {selectedOrder.address}
-                  </p>
-
-                  <p className="mt-2">
-                    <strong>
-                      الدفع:
-                    </strong>{" "}
-                    {selectedOrder.payment_method}
-                  </p>
-
-                </div>
-
-
-                <div>
-
-                  <h3 className="mb-3 font-bold">
-                    المنتجات
-                  </h3>
-
-                  <div className="space-y-3">
-
-                    {selectedOrder.order_items?.map(
-                      (item) => (
-
-                        <div
-                          key={item.id}
-                          className="flex justify-between rounded-xl border border-slate-200 p-3"
-                        >
-
-                          <span>
-                            {item.product_name}
-                            {" × "}
-                            {item.quantity}
-                          </span>
-
-                          <span className="font-bold">
-                            {item.price *
-                              item.quantity}{" "}
-                            جنيه
-                          </span>
-
-                        </div>
-
-                      )
+                    {mapsUrl && (
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white transition hover:bg-indigo-500"
+                      >
+                        📍 عرض موقع العميل على الخريطة
+                      </a>
                     )}
 
-                  </div>
+                    {(selectedOrder.latitude !== null ||
+                      selectedOrder.longitude !== null) && (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                          <p className="text-[11px] font-bold text-slate-400">
+                            Latitude
+                          </p>
+                          <p className="mt-1 break-words text-sm font-black text-slate-800">
+                            {selectedOrder.latitude !== null
+                              ? selectedOrder.latitude
+                              : "غير متوفر"}
+                          </p>
+                        </div>
 
-                </div>
+                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                          <p className="text-[11px] font-bold text-slate-400">
+                            Longitude
+                          </p>
+                          <p className="mt-1 break-words text-sm font-black text-slate-800">
+                            {selectedOrder.longitude !== null
+                              ? selectedOrder.longitude
+                              : "غير متوفر"}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </section>
 
+                  {/* Payment */}
+                  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h3 className="mb-4 text-base font-black text-slate-800">
+                      💳 بيانات الدفع
+                    </h3>
 
-                {/* Delivery Section in Order Details */}
-                <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
-                  <p className="font-bold text-indigo-700">🚚 الدليفري</p>
-                  <p className="mt-2 text-sm text-indigo-900">
-                    {selectedOrder.delivery?.name || "لم يتم تعيين دليفري بعد"}
-                  </p>
-                  {selectedOrder.delivery?.phone && (
-                    <p className="mt-1 text-xs text-indigo-700">
-                      {selectedOrder.delivery.phone}
-                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-[11px] font-bold text-slate-400">
+                          طريقة الدفع
+                        </p>
+                        <p className="mt-1 break-words text-sm font-black text-slate-800">
+                          {selectedOrder.payment_method || "-"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-[11px] font-bold text-slate-400">
+                          نوع الدفع
+                        </p>
+                        <p className="mt-1 break-words text-sm font-black text-slate-800">
+                          {isElectronicPayment
+                            ? "دفع إلكتروني"
+                            : "دفع عند الاستلام"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {isElectronicPayment && selectedOrder.bank_account && (
+                      <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
+                        <h4 className="mb-3 font-black text-indigo-800">
+                          🏦 الحساب الذي تم التحويل إليه
+                        </h4>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-xl bg-white px-4 py-3">
+                            <p className="text-[11px] font-bold text-slate-400">
+                              البنك
+                            </p>
+                            <p className="mt-1 font-black text-slate-800">
+                              {selectedOrder.bank_account.bank_name}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-white px-4 py-3">
+                            <p className="text-[11px] font-bold text-slate-400">
+                              اسم صاحب الحساب
+                            </p>
+                            <p className="mt-1 font-black text-slate-800">
+                              {selectedOrder.bank_account.account_name}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-white px-4 py-3">
+                            <p className="text-[11px] font-bold text-slate-400">
+                              رقم الحساب
+                            </p>
+                            <p className="mt-1 font-black text-slate-800">
+                              {selectedOrder.bank_account.account_number}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-white px-4 py-3">
+                            <p className="text-[11px] font-bold text-slate-400">
+                              نوع الحساب
+                            </p>
+                            <p className="mt-1 font-black text-slate-800">
+                              {selectedOrder.bank_account.account_type}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {isElectronicPayment && selectedOrder.transfer_image && (
+                      <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                        <h4 className="mb-3 font-black text-emerald-800">
+                          🧾 صورة التحويل
+                        </h4>
+
+                        <a
+                          href={selectedOrder.transfer_image}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-xl border border-slate-200 bg-white"
+                        >
+                          <img
+                            src={selectedOrder.transfer_image}
+                            alt="صورة تحويل الطلب"
+                            className="max-h-[450px] w-full object-contain"
+                          />
+                        </a>
+
+                        <p className="mt-2 text-center text-xs font-bold text-slate-400">
+                          اضغط على الصورة لفتحها بالحجم الكامل
+                        </p>
+                      </div>
+                    )}
+                  </section>
+
+                  {/* Products */}
+                  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-base font-black text-slate-800">
+                        🛒 المنتجات
+                      </h3>
+
+                      <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">
+                        {selectedOrder.order_items?.length || 0} منتج
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {selectedOrder.order_items &&
+                      selectedOrder.order_items.length > 0 ? (
+                        selectedOrder.order_items.map((item) => (
+                          <div
+                            key={item.id}
+                            className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="font-black text-slate-900">
+                                  {item.product_name}
+                                </p>
+
+                                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-slate-500">
+                                  <span>الكمية: {item.quantity}</span>
+                                  <span>
+                                    سعر الوحدة: {formatMoney(item.price)} ج.م
+                                  </span>
+                                  <span>رقم المنتج: #{item.product_id}</span>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 rounded-xl bg-white px-4 py-2 text-left shadow-sm">
+                                <p className="text-[11px] font-bold text-slate-400">
+                                  الإجمالي
+                                </p>
+                                <p className="font-black text-indigo-600">
+                                  {formatMoney(item.price * item.quantity)} ج.م
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-xl bg-slate-50 p-5 text-center text-sm font-bold text-slate-400">
+                          لا توجد منتجات مسجلة لهذا الطلب
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  {/* Total */}
+                  <section className="rounded-2xl bg-indigo-600 p-5 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-black">
+                        إجمالي الطلب
+                      </span>
+                      <span className="text-3xl font-black">
+                        {formatMoney(selectedOrder.total)} ج.م
+                      </span>
+                    </div>
+                  </section>
+
+                  {/* Notes */}
+                  {selectedOrder.notes && (
+                    <section className="rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
+                      <h3 className="font-black text-indigo-700">
+                        📝 ملاحظات العميل
+                      </h3>
+                      <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-7 text-indigo-950">
+                        {selectedOrder.notes}
+                      </p>
+                    </section>
                   )}
 
-                  {selectedOrder.status === "pending" && (
+                  {/* Delivery */}
+                  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h3 className="mb-4 text-base font-black text-slate-800">
+                      🚚 بيانات التوصيل
+                    </h3>
+
+                    {selectedOrder.delivery ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                          <p className="text-[11px] font-bold text-slate-400">
+                            الدليفري
+                          </p>
+                          <p className="mt-1 font-black text-slate-800">
+                            {selectedOrder.delivery.name}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                          <p className="text-[11px] font-bold text-slate-400">
+                            رقم الدليفري
+                          </p>
+                          <p className="mt-1 font-black text-slate-800">
+                            {selectedOrder.delivery.phone}
+                          </p>
+                        </div>
+
+                        {selectedOrder.delivery.email && (
+                          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                            <p className="text-[11px] font-bold text-slate-400">
+                              إيميل الدليفري
+                            </p>
+                            <p className="mt-1 break-words font-black text-slate-800">
+                              {selectedOrder.delivery.email}
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                          <p className="text-[11px] font-bold text-slate-400">
+                            رقم الدليفري الداخلي
+                          </p>
+                          <p className="mt-1 font-black text-slate-800">
+                            #{selectedOrder.delivery.id}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl bg-slate-50 p-4 text-center text-sm font-bold text-slate-400">
+                        لم يتم تعيين دليفري لهذا الطلب
+                      </div>
+                    )}
+
+                    {normalizedStatus === "pending" && (
+                      <button
+                        type="button"
+                        onClick={() => openDeliverySelection(selectedOrder)}
+                        className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white transition hover:bg-indigo-500"
+                      >
+                        🚚 اختيار الدليفري وتأكيد الطلب
+                      </button>
+                    )}
+                  </section>
+
+                  {/* Dates */}
+                  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h3 className="mb-4 text-base font-black text-slate-800">
+                      🕐 التواريخ
+                    </h3>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {[
+                        ["تاريخ إنشاء الطلب", selectedOrder.created_at],
+                        ["آخر تحديث", selectedOrder.updated_at],
+                        ["تم تعيين الدليفري", selectedOrder.assigned_at],
+                        ["تم استلام الطلب", selectedOrder.picked_up_at],
+                        ["تم التوصيل", selectedOrder.delivered_at],
+                      ].map(([label, date]) => (
+                        <div
+                          key={label}
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                        >
+                          <p className="text-[11px] font-bold text-slate-400">
+                            {label}
+                          </p>
+                          <p className="mt-1 text-sm font-black text-slate-800">
+                            {formatDate(date)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Delivery Proof */}
+                  {selectedOrder.delivery_proof_image && (
+                    <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                      <h3 className="mb-3 font-black text-blue-800">
+                        🧾 إثبات التوصيل
+                      </h3>
+
+                      <a
+                        href={selectedOrder.delivery_proof_image}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block overflow-hidden rounded-xl border border-slate-200 bg-white"
+                      >
+                        <img
+                          src={selectedOrder.delivery_proof_image}
+                          alt="إثبات توصيل الطلب"
+                          className="max-h-[450px] w-full object-contain"
+                        />
+                      </a>
+                    </section>
+                  )}
+                </div>
+
+                {/* Actions */}
+                {(normalizedStatus === "pending" ||
+                  normalizedStatus === "delivered") && (
+                  <div className="mt-6 flex gap-3">
                     <button
                       type="button"
-                      onClick={() => openDeliverySelection(selectedOrder)}
-                      className="mt-3 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-500"
+                      disabled={
+                        confirmingOrder === selectedOrder.id ||
+                        cancellingOrder === selectedOrder.id
+                      }
+                      onClick={() => handleConfirmOrder(selectedOrder.id)}
+                      className="flex-1 rounded-xl bg-emerald-600 py-3.5 font-black text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      🚚 اختيار الدليفري وتأكيد الطلب
+                      {confirmingOrder === selectedOrder.id
+                        ? "جاري التأكيد..."
+                        : "✓ تأكيد الطلب"}
                     </button>
-                  )}
-                </div>
 
-                <div className="flex items-center justify-between border-t pt-4">
-
-                  <span className="font-semibold text-slate-500">
-                    الإجمالي
-                  </span>
-
-                  <span className="text-2xl font-bold">
-                    {selectedOrder.total} جنيه
-                  </span>
-
-                </div>
-
-
-                {selectedOrder.notes && (
-
-                  <div className="rounded-xl bg-indigo-50 p-4">
-
-                    <p className="font-bold text-indigo-700">
-                      ملاحظات
-                    </p>
-
-                    <p className="mt-1 text-sm text-indigo-900">
-                      {selectedOrder.notes}
-                    </p>
-
+                    <button
+                      type="button"
+                      disabled={
+                        confirmingOrder === selectedOrder.id ||
+                        cancellingOrder === selectedOrder.id
+                      }
+                      onClick={() => handleCancelOrder(selectedOrder.id)}
+                      className="flex-1 rounded-xl bg-red-600 py-3.5 font-black text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {cancellingOrder === selectedOrder.id
+                        ? "جاري الحذف..."
+                        : normalizedStatus === "delivered"
+                          ? "🗑 حذف الطلب"
+                          : "✕ إلغاء الطلب"}
+                    </button>
                   </div>
-
                 )}
-
               </div>
-
-
-              {(selectedOrder.status === "pending" ||
-                selectedOrder.status === "delivered") && (
-
-                <div className="mt-6 flex gap-3">
-                  <button
-                    type="button"
-                    disabled={
-                      confirmingOrder === selectedOrder.id ||
-                      cancellingOrder === selectedOrder.id
-                    }
-                    onClick={() => handleConfirmOrder(selectedOrder.id)}
-                    className="flex-1 rounded-xl bg-emerald-600 py-3.5 font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
-                  >
-                    {confirmingOrder === selectedOrder.id
-                      ? "جاري التأكيد..."
-                      : "✓ تأكيد الطلب"}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={
-                      confirmingOrder === selectedOrder.id ||
-                      cancellingOrder === selectedOrder.id
-                    }
-                    onClick={() => handleCancelOrder(selectedOrder.id)}
-                    className="flex-1 rounded-xl bg-red-600 py-3.5 font-semibold text-white transition hover:bg-red-500 disabled:opacity-60"
-                  >
-                    {cancellingOrder === selectedOrder.id
-                      ? "جاري الحذف..."
-                      : selectedOrder.status === "delivered"
-                        ? "🗑 حذف الطلب"
-                        : "✕ إلغاء الطلب"}
-                  </button>
-                </div>
-
-              )}
-
             </div>
-
-          </div>
-
-        )}
-
+          )
+        })()}
 
         {/* =================================================
             Confirm + Delivery Selection Modal

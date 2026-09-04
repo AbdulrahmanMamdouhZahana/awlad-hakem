@@ -201,7 +201,13 @@ const Orders = () => {
             ? response.data
             : []
 
-      const nextOrders = list as Order[]
+      // Normalize all orders to the same flow.
+      // Electronic payments must also start as pending.
+      // Old/backend pending_approval values are converted to pending.
+      const nextOrders = (list as Order[]).map((order) => ({
+        ...order,
+        status: order.status === "pending_approval" ? "pending" : order.status,
+      }))
 
       // =====================================
       // Detect genuinely new orders
@@ -351,40 +357,49 @@ const Orders = () => {
     return digits
   }
 
-  const buildDeliveryWhatsAppMessage = (
-    order: Order,
-    delivery: Delivery
-  ) => {
-    const items = (order.order_items ?? [])
-      .map(
-        (item) =>
-          `• ${item.product_name} × ${item.quantity} = ${(Number(item.price) * item.quantity).toLocaleString("ar-EG")} جنيه`
-      )
-      .join("\n")
+const buildDeliveryWhatsAppMessage = (
+  order: Order,
+  delivery: Delivery
+) => {
+  const items = (order.order_items ?? [])
+    .map(
+      (item) =>
+        `• ${item.product_name} × ${item.quantity} = ${(item.price * item.quantity).toLocaleString("ar-EG")} جنيه`
+    )
+    .join("\n")
 
-    return [
-      "السلام عليكم",
-      "",
-      "*طلب جديد - أولاد حكيم*",
-      `رقم الطلب: #${order.id}`,
-      "",
-      `العميل: ${order.customer_name}`,
-      `رقم العميل: ${order.phone}`,
-      `العنوان: ${order.address}`,
-      order.notes ? `ملاحظات: ${order.notes}` : "",
-      "",
-      "المنتجات:",
-      items || "• لا توجد منتجات مسجلة",
-      "",
-      `الإجمالي: ${Number(order.total).toLocaleString("ar-EG")} جنيه`,
-      `طريقة الدفع: ${order.payment_method}`,
-      "",
-      `الدليفري المسؤول: ${delivery.name}`,
-      "من فضلك راجع بيانات الطلب وابدأ التوصيل.",
-    ]
-      .filter(Boolean)
-      .join("\n")
-  }
+  const location =
+    order.latitude !== null &&
+    order.longitude !== null
+      ? `📍 موقع العميل:\nhttps://www.google.com/maps?q=${order.latitude},${order.longitude}`
+      : "📍 موقع العميل: لم يتم تحديد الموقع"
+
+  return [
+    "السلام عليكم 👋",
+    "",
+    "*طلب جديد - أولاد حكيم*",
+    `📦 رقم الطلب: #${order.id}`,
+    "",
+    `👤 العميل: ${order.customer_name}`,
+    `📞 رقم العميل: ${order.phone}`,
+    `🏠 العنوان: ${order.address}`,
+    "",
+    location,
+    order.notes ? `📝 ملاحظات: ${order.notes}` : "",
+    "",
+    "🛒 المنتجات:",
+    items || "• لا توجد منتجات مسجلة",
+    "",
+    `💰 الإجمالي: ${Number(order.total).toLocaleString("ar-EG")} جنيه`,
+    `💳 طريقة الدفع: ${order.payment_method}`,
+    "",
+    `🚚 الدليفري المسؤول: ${delivery.name}`,
+    "",
+    "من فضلك راجع بيانات الطلب وابدأ التوصيل.",
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
 
   const handleConfirmOrder = (orderId: number) => {
     const order = orders.find((item) => item.id === orderId)
@@ -693,6 +708,8 @@ const orderDate = order.created_at
   const getStatusLabel = (
     status: string
   ) => {
+    if (status === "pending_approval") status = "pending"
+
     switch (status) {
       case "confirmed":
         return "مؤكد"
@@ -711,6 +728,8 @@ const orderDate = order.created_at
   const getStatusClass = (
     status: string
   ) => {
+    if (status === "pending_approval") status = "pending"
+
     switch (status) {
       case "confirmed":
         return "bg-emerald-50 text-emerald-700 ring-emerald-200"

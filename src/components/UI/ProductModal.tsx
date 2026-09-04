@@ -10,6 +10,9 @@ interface Product {
   unit: string;
   image: string;
   stock: number;
+  sale_type?: "piece" | "weight" | "both";
+  piece_price?: number | null;
+  weight_price?: number | null;
 }
 
 interface ProductModalProps {
@@ -46,6 +49,15 @@ const ProductModal = ({
     category: editingProduct?.category || "",
     price: editingProduct?.price?.toString() || "",
     unit: editingProduct?.unit || "",
+    saleType: editingProduct?.sale_type || "piece",
+    piecePrice:
+      editingProduct?.piece_price != null
+        ? editingProduct.piece_price.toString()
+        : editingProduct?.price?.toString() || "",
+    weightPrice:
+      editingProduct?.weight_price != null
+        ? editingProduct.weight_price.toString()
+        : "",
     image: editingProduct?.image || "",
     stock: editingProduct?.stock?.toString() || "0",
   });
@@ -128,6 +140,15 @@ const ProductModal = ({
         "",
       price: editingProduct?.price?.toString() || "",
       unit: editingProduct?.unit || "",
+      saleType: editingProduct?.sale_type || "piece",
+      piecePrice:
+        editingProduct?.piece_price != null
+          ? editingProduct.piece_price.toString()
+          : editingProduct?.price?.toString() || "",
+      weightPrice:
+        editingProduct?.weight_price != null
+          ? editingProduct.weight_price.toString()
+          : "",
       image: editingProduct?.image || "",
       stock: editingProduct?.stock?.toString() || "0",
     });
@@ -201,23 +222,43 @@ const ProductModal = ({
       return;
     }
 
-    if (!form.price) {
-      toast.error("اكتب سعر المنتج");
-      return;
-    }
-
     if (!form.unit.trim()) {
       toast.error("اكتب وحدة المنتج");
       return;
     }
 
-    const price = Number(form.price);
-    const stock = Number(form.stock);
+    const piecePrice =
+      form.saleType === "weight"
+        ? null
+        : Number(form.piecePrice);
 
-    if (isNaN(price) || price < 0) {
-      toast.error("السعر غير صحيح");
+    const weightPrice =
+      form.saleType === "piece"
+        ? null
+        : Number(form.weightPrice);
+
+    if (
+      form.saleType !== "weight" &&
+      (form.piecePrice === "" || isNaN(piecePrice!) || piecePrice! < 0)
+    ) {
+      toast.error("اكتب سعر القطعة بشكل صحيح");
       return;
     }
+
+    if (
+      form.saleType !== "piece" &&
+      (form.weightPrice === "" || isNaN(weightPrice!) || weightPrice! < 0)
+    ) {
+      toast.error("اكتب سعر الكيلو بشكل صحيح");
+      return;
+    }
+
+    const price =
+      form.saleType === "weight"
+        ? weightPrice!
+        : piecePrice!;
+
+    const stock = Number(form.stock);
 
     if (isNaN(stock) || stock < 0) {
       toast.error("المخزون غير صحيح");
@@ -227,6 +268,9 @@ const ProductModal = ({
     await onSave({
       ...form,
       price,
+      piecePrice,
+      weightPrice,
+      saleType: form.saleType,
       stock,
       imageFile: imageFile || undefined,
     });
@@ -241,6 +285,9 @@ const ProductModal = ({
       category: categories[mainCategory]?.[0] || "",
       price: "",
       unit: "",
+      saleType: "piece",
+      piecePrice: "",
+      weightPrice: "",
       image: "",
       stock: "0",
     });
@@ -371,34 +418,106 @@ const ProductModal = ({
           في خانة category الحالية بقاعدة البيانات.
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-black text-slate-700">
-              السعر
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={form.price}
-              onChange={(e) => setForm({ ...form, price: e.target.value })}
-              placeholder="0"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400"
-            />
+        <div>
+          <label className="mb-2 block text-sm font-black text-slate-700">
+            طريقة البيع
+          </label>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {[
+              { value: "piece", label: "بالقطعة", icon: "📦" },
+              { value: "weight", label: "بالوزن", icon: "⚖️" },
+              { value: "both", label: "قطعة + وزن", icon: "🔄" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                disabled={loading}
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    saleType: option.value as "piece" | "weight" | "both",
+                  }))
+                }
+                className={`rounded-xl border px-4 py-3 text-sm font-black transition ${
+                  form.saleType === option.value
+                    ? "border-indigo-600 bg-indigo-600 text-white shadow-md"
+                    : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50"
+                }`}
+              >
+                <span className="ml-2">{option.icon}</span>
+                {option.label}
+              </button>
+            ))}
           </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {form.saleType !== "weight" && (
+            <div>
+              <label className="mb-2 block text-sm font-black text-slate-700">
+                سعر القطعة
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.piecePrice}
+                onChange={(e) =>
+                  setForm({ ...form, piecePrice: e.target.value })
+                }
+                placeholder="مثال: 15"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400"
+              />
+            </div>
+          )}
+
+          {form.saleType !== "piece" && (
+            <div>
+              <label className="mb-2 block text-sm font-black text-slate-700">
+                سعر الكيلو
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.weightPrice}
+                onChange={(e) =>
+                  setForm({ ...form, weightPrice: e.target.value })
+                }
+                placeholder="مثال: 100"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400"
+              />
+            </div>
+          )}
 
           <div>
             <label className="mb-2 block text-sm font-black text-slate-700">
               المخزون
+              {form.saleType !== "piece" && (
+                <span className="mr-2 text-xs font-bold text-slate-400">
+                  (بالكيلو)
+                </span>
+              )}
             </label>
             <input
               type="number"
               min="0"
+              step={form.saleType === "piece" ? "1" : "0.001"}
               value={form.stock}
               onChange={(e) => setForm({ ...form, stock: e.target.value })}
               placeholder="0"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400"
             />
           </div>
+        </div>
+
+        <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-bold leading-6 text-emerald-700">
+          {form.saleType === "piece"
+            ? "📦 العميل يشتري بالقطعة، ويتم حساب السعر = عدد القطع × سعر القطعة."
+            : form.saleType === "weight"
+            ? "⚖️ العميل يحدد الوزن الذي يريده، ويتم حساب السعر = الوزن × سعر الكيلو."
+            : "🔄 العميل يختار بين القطعة والوزن، ولكل طريقة سعرها الخاص."}
         </div>
 
         <div>

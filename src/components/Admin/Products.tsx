@@ -11,6 +11,9 @@ export interface IProduct {
   unit: string;
   image: string;
   stock: number;
+  sale_type?: "piece" | "weight" | "both";
+  piece_price?: number | null;
+  weight_price?: number | null;
   created_at?: string;
 }
 
@@ -210,7 +213,7 @@ const Products = ({ products, setProducts }: ProductsProps) => {
 
     const token = localStorage.getItem("auth_token");
     const response = await fetch(
-     ` ${import.meta.env.VITE_API_URL}/products/upload-image`,
+     `${import.meta.env.VITE_API_URL}/products/upload-image`,
       {
         method: "POST",
         headers: {
@@ -247,6 +250,9 @@ const Products = ({ products, setProducts }: ProductsProps) => {
         image,
         stock,
         imageFile,
+        saleType,
+        piecePrice,
+        weightPrice,
       } = formData;
 
       if (!name.trim()) {
@@ -264,28 +270,58 @@ const Products = ({ products, setProducts }: ProductsProps) => {
         return;
       }
 
-      if (!price) {
-        toast.error("اكتب سعر المنتج");
-        return;
-      }
-
       if (!unit.trim()) {
         toast.error("اكتب وحدة المنتج");
         return;
       }
 
-      const priceNum = Number(price);
-      const stockNum = Number(stock);
+      const normalizedSaleType =
+        saleType === "weight" || saleType === "both"
+          ? saleType
+          : "piece";
 
-      if (isNaN(priceNum) || priceNum < 0) {
-        toast.error("السعر غير صحيح");
+      const piecePriceNum =
+        piecePrice === "" || piecePrice == null
+          ? null
+          : Number(piecePrice);
+
+      const weightPriceNum =
+        weightPrice === "" || weightPrice == null
+          ? null
+          : Number(weightPrice);
+
+      if (
+        normalizedSaleType !== "weight" &&
+        (piecePriceNum === null ||
+          Number.isNaN(piecePriceNum) ||
+          piecePriceNum < 0)
+      ) {
+        toast.error("اكتب سعر القطعة بشكل صحيح");
         return;
       }
 
-      if (isNaN(stockNum) || stockNum < 0) {
+      if (
+        normalizedSaleType !== "piece" &&
+        (weightPriceNum === null ||
+          Number.isNaN(weightPriceNum) ||
+          weightPriceNum < 0)
+      ) {
+        toast.error("اكتب سعر الكيلو بشكل صحيح");
+        return;
+      }
+
+      const stockNum = Number(stock);
+
+      if (Number.isNaN(stockNum) || stockNum < 0) {
         toast.error("المخزون غير صحيح");
         return;
       }
+
+      // Keep the old price column compatible with old products/API.
+      const priceNum =
+        normalizedSaleType === "weight"
+          ? weightPriceNum!
+          : piecePriceNum!;
 
       setSaving(true);
 
@@ -322,6 +358,11 @@ const Products = ({ products, setProducts }: ProductsProps) => {
           unit: unit.trim(),
           image: imageUrl,
           stock: stockNum,
+
+          // New selling system
+          sale_type: normalizedSaleType,
+          piece_price: piecePriceNum,
+          weight_price: weightPriceNum,
         };
 
         if (editingProduct) {
