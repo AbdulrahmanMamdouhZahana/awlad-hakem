@@ -1,5 +1,17 @@
 import { supabase } from "../lib/supabase"
 
+// =====================================================
+// API CONFIG
+// =====================================================
+
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://awlad-hakem-backend.onrender.com/api"
+
+// =====================================================
+// Types
+// =====================================================
+
 export interface OrderItemInput {
   productId: number
   productName: string
@@ -22,79 +34,95 @@ export interface CreateOrderInput {
   status?: string
 }
 
+// =====================================================
+// Create Order
+// =====================================================
+//
+// الطلب بيتعمل من Laravel وليس مباشرة من Supabase.
+//
+// Laravel بيحدد العميل من:
+// Authorization: Bearer customer_token
+//
+// وبالتالي customer_id لا يأتي من الـ frontend.
+// =====================================================
+
 export const createOrder = async (
   order: CreateOrderInput
 ) => {
+  const token = localStorage.getItem("customer_token")
 
-  // =========================
-  // Create Order
-  // =========================
-
-  const { data: orderData, error: orderError } =
-    await supabase
-      .from("orders")
-      .insert({
-        customer_name: order.customerName,
-        phone: order.phone,
-        address: order.address,
-        notes: order.notes,
-        payment_method: order.paymentMethod,
-        total: order.total,
-        latitude: order.latitude,
-        longitude: order.longitude,
-
-        // كل الطلبات تبدأ بنفس الحالة
-        // سواء كاش أو دفع إلكتروني
-        status: "pending",
-
-        // بيانات الدفع الإلكتروني
-        // تفضل محفوظة داخل الطلب
-        transfer_image: order.transferImage || null,
-        bank_account_id: order.bankAccountId || null,
-
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
-  if (orderError) {
-    console.error("CREATE ORDER ERROR:", orderError)
-    throw orderError
+  if (!token) {
+    throw new Error(
+      "يجب تسجيل الدخول إلى حسابك أولاً لإنشاء الطلب"
+    )
   }
 
-  // =========================
-  // Create Order Items
-  // =========================
+  try {
+    const response = await fetch(
+      `${API_URL}/customer/orders`,
+      {
+        method: "POST",
 
-  const items = order.items.map((item) => ({
-    order_id: orderData.id,
-    product_id: item.productId,
-    product_name: item.productName,
-    price: item.price,
-    quantity: item.quantity,
-  }))
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
 
-  const { error: itemsError } =
-    await supabase
-      .from("order_items")
-      .insert(items)
+        body: JSON.stringify({
+          customerName: order.customerName,
+          phone: order.phone,
+          address: order.address,
+          notes: order.notes,
+          paymentMethod: order.paymentMethod,
+          total: order.total,
+          latitude: order.latitude,
+          longitude: order.longitude,
 
-  if (itemsError) {
-    console.error(
-      "CREATE ORDER ITEMS ERROR:",
-      itemsError
+          transferImage:
+            order.transferImage || null,
+
+          bankAccountId:
+            order.bankAccountId || null,
+
+          // الحالة التي تم إرسالها من Checkout
+          status:
+            order.status || "pending",
+
+          items: order.items.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            price: item.price,
+            quantity: item.quantity,
+          })),
+        }),
+      }
     )
 
-    // Rollback order if items failed
-    await supabase
-      .from("orders")
-      .delete()
-      .eq("id", orderData.id)
+    const data = await response.json()
 
-    throw itemsError
+    if (!response.ok) {
+      console.error(
+        "CREATE ORDER API ERROR:",
+        data
+      )
+
+      throw new Error(
+        data?.message ||
+          data?.error ||
+          "فشل إنشاء الطلب"
+      )
+    }
+
+    return data?.order || data
+  } catch (error) {
+    console.error(
+      "CREATE ORDER ERROR:",
+      error
+    )
+
+    throw error
   }
-
-  return orderData
 }
 
 // =====================================================
@@ -111,29 +139,32 @@ export interface BankAccount {
   created_at?: string
 }
 
-export const getBankAccounts = async (): Promise<BankAccount[]> => {
-  try {
-    const { data, error } = await supabase
-      .from("bank_accounts")
-      .select("*")
-      .eq("is_active", true)
-      .order("bank_name")
+export const getBankAccounts =
+  async (): Promise<BankAccount[]> => {
+    try {
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("bank_accounts")
+        .select("*")
+        .eq("is_active", true)
+        .order("bank_name")
 
-    if (error) {
-      throw error
+      if (error) {
+        throw error
+      }
+
+      return data || []
+    } catch (error) {
+      console.error(
+        "GET BANK ACCOUNTS ERROR:",
+        error
+      )
+
+      return []
     }
-
-    return data || []
-
-  } catch (error) {
-    console.error(
-      "GET BANK ACCOUNTS ERROR:",
-      error
-    )
-
-    return []
   }
-}
 
 // =====================================================
 // Upload Transfer Image
@@ -142,17 +173,23 @@ export const getBankAccounts = async (): Promise<BankAccount[]> => {
 export const uploadTransferImage = async (
   file: File
 ): Promise<string> => {
+  const fileExt =
+    file.name.split(".").pop()
 
-  const fileExt = file.name.split(".").pop()
+  const fileName =
+    `transfer_${Date.now()}.${fileExt}`
 
-  const fileName = `transfer_${Date.now()}.${fileExt}`
+  const filePath =
+    `transfer_images/${fileName}`
 
-  const filePath = `transfer_images/${fileName}`
-
-  const { error: uploadError } =
-    await supabase.storage
-      .from("transfer-images")
-      .upload(filePath, file)
+  const {
+    error: uploadError,
+  } = await supabase.storage
+    .from("transfer-images")
+    .upload(
+      filePath,
+      file
+    )
 
   if (uploadError) {
     console.error(
@@ -165,7 +202,9 @@ export const uploadTransferImage = async (
     )
   }
 
-  const { data: urlData } =
+  const {
+    data: urlData,
+  } =
     supabase.storage
       .from("transfer-images")
       .getPublicUrl(filePath)
@@ -180,17 +219,24 @@ export const uploadTransferImage = async (
 export const getOrderStatusLabel = (
   status: string
 ): string => {
-
-  const statusMap: Record<string, string> = {
+  const statusMap: Record<
+    string,
+    string
+  > = {
     pending: "قيد الانتظار",
+    pending_approval: "قيد مراجعة الدفع",
     confirmed: "تم التأكيد",
     assigned: "تم التعيين",
-    out_for_delivery: "خارج للتوصيل",
+    out_for_delivery:
+      "خارج للتوصيل",
     delivered: "تم التوصيل",
     cancelled: "ملغي",
   }
 
-  return statusMap[status] || status
+  return (
+    statusMap[status] ||
+    status
+  )
 }
 
 // =====================================================
@@ -200,10 +246,15 @@ export const getOrderStatusLabel = (
 export const getOrderStatusColor = (
   status: string
 ): string => {
-
-  const colorMap: Record<string, string> = {
+  const colorMap: Record<
+    string,
+    string
+  > = {
     pending:
       "bg-amber-100 text-amber-700",
+
+    pending_approval:
+      "bg-orange-100 text-orange-700",
 
     confirmed:
       "bg-emerald-100 text-emerald-700",
@@ -234,15 +285,27 @@ export const getOrderStatusColor = (
 export const getOrderStatusEmoji = (
   status: string
 ): string => {
-
-  const emojiMap: Record<string, string> = {
+  const emojiMap: Record<
+    string,
+    string
+  > = {
     pending: "⏳",
+
+    pending_approval: "💳",
+
     confirmed: "✅",
+
     assigned: "🚚",
+
     out_for_delivery: "🚚",
+
     delivered: "📦",
+
     cancelled: "❌",
   }
 
-  return emojiMap[status] || "📋"
+  return (
+    emojiMap[status] ||
+    "📋"
+  )
 }

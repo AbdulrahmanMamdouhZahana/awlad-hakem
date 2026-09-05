@@ -631,108 +631,81 @@ const Navbar = ({
 
             {/* =========================
                 CUSTOMER ACCOUNT - DESKTOP
-            ========================= */}
-
-            {isCustomerLoggedIn ? (
-              <Link
-                to="/profile"
-                className="
-                  hidden
-                  h-9
-                  items-center
-                  gap-2
-                  rounded-xl
-                  bg-gradient-to-r
-                  from-[#17656b]
-                  to-[#0f4a4f]
-                  px-3
-                  text-xs
-                  font-bold
-                  text-white
-                  shadow-md
-                  shadow-[#17656b]/30
-                  transition-all
-                  duration-300
-                  hover:shadow-lg
-                  hover:shadow-[#17656b]/40
-                  hover:scale-105
-                  active:scale-95
-                  sm:flex
-                  sm:h-10
-                  sm:px-4
-                  lg:h-11
-                  lg:px-5
-                  lg:text-sm
-
-                "
-              >
-
-
-                
-                  <svg
-                  className="h-4 w-4 lg:h-5 lg:w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.8}
-                    d="
-                      M15 21v-2
-                      a4 4 0 0 0-4-4H7
-                      a4 4 0 0 0-4 4v2
-                      M9 11
-                      a4 4 0 1 0 0-8
-                      a4 4 0 0 0 0 8Z
-                    "
-                  />
-                </svg>
-
-                <span className="hidden md:inline">
-                  حسابي
-                </span>
-             
-                
-
-                {customerName && (
-                  <span className="hidden lg:inline max-w-[100px] truncate text-white/80">
-                    {customerName}
-                  </span>
-                )}
-
-
-                   <button
-                  type="button"
-                  onClick={handleLogout}
+            ========================= */}            {isCustomerLoggedIn ? (
+              <>
+                <Link
+                  to="/profile"
                   className="
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-xl
-                    px-4
-                    py-3
-                    text-right
-                    text-sm
-                    font-bold
-                    text-red-600
-                    transition-all
-                    duration-300
-                    hover:bg-red-50
-                    hover:scale-[1.02]
-                    active:scale-95
+                    hidden h-9 items-center gap-2 rounded-xl
+                    bg-gradient-to-r from-[#17656b] to-[#0f4a4f]
+                    px-3 text-xs font-bold text-white
+                    shadow-md shadow-[#17656b]/30
+                    transition-all duration-300 hover:shadow-lg
+                    hover:shadow-[#17656b]/40 hover:scale-105 active:scale-95
+                    sm:flex sm:h-10 sm:px-4 lg:h-11 lg:px-5 lg:text-sm
                   "
                 >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  <svg className="h-4 w-4 lg:h-5 lg:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.8}
+                      d="M15 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
+                    />
                   </svg>
-                  تسجيل الخروج
+
+                  <span className="hidden md:inline">حسابي</span>
+
+                  {customerName && (
+                    <span className="hidden lg:inline max-w-[100px] truncate text-white/80">
+                      {customerName}
+                    </span>
+                  )}
+                </Link>
+
+                <Link
+                  to="/customer/orders"
+                  aria-label="طلباتي"
+                  title="طلباتي"
+                  className="
+                    hidden h-9 w-9 items-center justify-center rounded-full
+                    bg-slate-50 text-slate-600 transition-all duration-300
+                    hover:bg-[#17656b]/10 hover:text-[#17656b] hover:scale-110
+                    active:scale-95 sm:flex sm:h-10 sm:w-10 lg:h-11 lg:w-11
+                  "
+                >
+                  <svg className="h-4 w-4 lg:h-5 lg:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.8}
+                      d="M4 5h16v14H4zM8 9h8M8 13h5"
+                    />
+                  </svg>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  aria-label="تسجيل الخروج"
+                  title="تسجيل الخروج"
+                  className="
+                    hidden h-9 w-9 items-center justify-center rounded-full
+                    bg-red-50 text-red-600 transition-all duration-300
+                    hover:bg-red-100 hover:text-red-700 hover:scale-110
+                    active:scale-95 sm:flex sm:h-10 sm:w-10 lg:h-11 lg:w-11
+                  "
+                >
+                  <svg className="h-4 w-4 lg:h-5 lg:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.8}
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"
+                    />
+                  </svg>
                 </button>
-              </Link>
-              
-              
+              </>
             ) : (
               <Link
                 to="/customer/login"
@@ -1213,6 +1186,27 @@ const Navbar = ({
                       {customerName}
                     </span>
                   )}
+                </Link>
+
+                <Link
+                  to="/customer/orders"
+                  onClick={closeMobileMenu}
+                  className="
+                    flex items-center gap-3 rounded-xl px-4 py-3
+                    text-sm font-bold text-slate-700 transition-all duration-300
+                    hover:bg-[#17656b]/5 hover:text-[#17656b]
+                    hover:scale-[1.02] active:scale-95
+                  "
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.8}
+                      d="M4 5h16v14H4zM8 9h8M8 13h5"
+                    />
+                  </svg>
+                  طلباتي
                 </Link>
 
                 <button

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import toast, { Toaster } from "react-hot-toast"
 import { Navigate, Outlet, Routes, Route, useLocation, useNavigate } from "react-router-dom"
+import CustomerOrders from "./pages/CustomerOrders"
 
 import Navbar from "./components/Navbar"
 import Hero from "./components/Hero"
@@ -1674,20 +1675,25 @@ useEffect(() => {
             CUSTOMER LOGIN
         ========================= */}
 
-        <Route
-          path="/customer/login"
-          element={<CustomerLogin />}
-        />
+      <Route
+  path="/customer/login"
+  element={<CustomerLogin />}
+/>
 
-        <Route
-          path="/customer/register"
-          element={<CustomerRegister />}
-        />
+<Route
+  path="/customer/register"
+  element={<CustomerRegister />}
+/>
 
-        <Route
-          path="/profile"
-          element={<CustomerProfile />}
-        />
+<Route
+  path="/profile"
+  element={<CustomerProfile />}
+/>
+
+<Route
+  path="/customer/orders"
+  element={<CustomerOrders />}
+/>
 
         {/* =========================
             ADMIN LOGIN
