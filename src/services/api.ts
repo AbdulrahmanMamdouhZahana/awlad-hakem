@@ -39,15 +39,6 @@ export async function apiFetch(
 
   const finalUrl = `${API_URL}${cleanEndpoint}`
 
-  console.log("========== API REQUEST ==========")
-  console.log("RAW_API_URL:", RAW_API_URL)
-  console.log("API_URL:", API_URL)
-  console.log("FINAL URL:", finalUrl)
-  console.log("Endpoint:", endpoint)
-  console.log("Token exists:", !!token)
-  console.log("Is FormData:", isFormData)
-  console.log("=================================")
-
   try {
     const response = await fetch(finalUrl, {
       ...options,
@@ -56,34 +47,57 @@ export async function apiFetch(
 
     const data = await response.json().catch(() => null)
 
-    console.log("========== API RESPONSE ==========")
-    console.log("Status:", response.status)
-    console.log("OK:", response.ok)
-    console.log("Data:", data)
-    console.log("==================================")
+    const isAuthEndpoint =
+      cleanEndpoint.includes("/login") ||
+      cleanEndpoint.includes("/register") ||
+      cleanEndpoint.includes("/forgot-password") ||
+      cleanEndpoint.includes("/reset-password")
 
     if (response.status === 401) {
+      if (isAuthEndpoint) {
+        const errorMsg =
+          data?.message ||
+          data?.error ||
+          (data?.errors && typeof data.errors === "object"
+            ? Object.values(data.errors).flat().join(" - ")
+            : null) ||
+          "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+
+        throw new Error(errorMsg)
+      }
+
       if (isCustomerRequest) {
         localStorage.removeItem("customer_token")
         localStorage.removeItem("customer_user")
 
-        window.location.href = "/customer/login"
+        if (window.location.pathname !== "/customer/login") {
+          window.location.href = "/customer/login"
+        }
       } else {
         localStorage.removeItem("staff_token")
         localStorage.removeItem("staff_user")
 
-        window.location.href = "/admin/login"
+        if (
+          window.location.pathname !== "/admin/login" &&
+          window.location.pathname !== "/login"
+        ) {
+          window.location.href = "/admin/login"
+        }
       }
 
       throw new Error("انتهت جلسة تسجيل الدخول")
     }
 
     if (!response.ok) {
-      throw new Error(
+      const errorMsg =
         data?.message ||
         data?.error ||
+        (data?.errors && typeof data.errors === "object"
+          ? Object.values(data.errors).flat().join(" - ")
+          : null) ||
         "حدث خطأ في الاتصال بالخادم"
-      )
+
+      throw new Error(errorMsg)
     }
 
     return data

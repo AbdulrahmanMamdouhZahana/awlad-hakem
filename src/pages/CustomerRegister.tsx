@@ -34,7 +34,7 @@ export default function CustomerRegister() {
   const [passwordConfirmation, setPasswordConfirmation] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  
+
   // Verification modal states
   const [showVerificationModal, setShowVerificationModal] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState("")
@@ -43,7 +43,7 @@ export default function CustomerRegister() {
   const [verificationError, setVerificationError] = useState("")
   const [verificationSuccess, setVerificationSuccess] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
-  
+
   // Store registration data for verification
   const [registrationData, setRegistrationData] = useState({
     name: "",
@@ -105,7 +105,7 @@ export default function CustomerRegister() {
       // Show verification modal
       setVerificationEmail(email.trim())
       setShowVerificationModal(true)
-      
+
     } catch (error) {
       setError(
         error instanceof Error
@@ -154,7 +154,7 @@ export default function CustomerRegister() {
       localStorage.removeItem("auth_user")
 
       setVerificationSuccess(true)
-      
+
       // Navigate to store after short delay
       setTimeout(() => {
         setShowVerificationModal(false)
@@ -202,7 +202,7 @@ export default function CustomerRegister() {
 
       // Clear any previous errors
       setVerificationError("")
-      
+
     } catch (error) {
       setVerificationError(
         error instanceof Error
@@ -250,12 +250,12 @@ export default function CustomerRegister() {
       {/* Decorative floating elements */}
       <div className="absolute top-10 left-10 text-white/10 text-8xl hidden lg:block animate-bounce">
         <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" />
         </svg>
       </div>
       <div className="absolute bottom-10 right-10 text-white/10 text-8xl hidden lg:block animate-pulse">
         <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" />
         </svg>
       </div>
 
@@ -292,7 +292,7 @@ export default function CustomerRegister() {
               bg-[radial-gradient(circle_at_20%_30%,_white_1px,_transparent_1px)]
               bg-[length:20px_20px]
             "></div>
-            
+
             <div className="relative z-10">
               <div className="
                 mx-auto
@@ -318,7 +318,7 @@ export default function CustomerRegister() {
               </div>
 
               <h1 className="text-3xl font-black tracking-tight">
-                إنشاء حساب جديد 
+                إنشاء حساب جديد
               </h1>
               <p className="mt-1 text-sm font-medium text-white/80">
                 أنشئ حسابك وابدأ التسوق بسهولة
@@ -754,7 +754,7 @@ export default function CustomerRegister() {
                   backdrop-blur-sm
                   text-xs
                   font-semibold
-                  text-white
+                  text-black
                   border
                   border-white/30
                   transition-all
@@ -803,7 +803,7 @@ export default function CustomerRegister() {
                 bg-[radial-gradient(circle_at_20%_30%,_white_1px,_transparent_1px)]
                 bg-[length:20px_20px]
               "></div>
-              
+
               <div className="relative z-10">
                 <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
                   <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">

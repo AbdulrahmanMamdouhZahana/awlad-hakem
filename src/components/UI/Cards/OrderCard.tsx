@@ -25,6 +25,8 @@ export interface OrderItem {
   product_name: string
   price: number
   quantity: number
+  sale_type?: "piece" | "weight" | "both" | string
+  weight?: number | null
 }
 
 export interface Order {
@@ -404,22 +406,31 @@ const OrderCard = ({
             <p className="mb-2 text-sm font-bold text-slate-700">المنتجات</p>
 
             <div className="space-y-2">
-              {order.order_items?.slice(0, 2).map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between border-b border-slate-100 pb-2 text-sm last:border-0"
-                >
-                  <span className="text-slate-700">
-                    {item.product_name}{" "}
-                    <span className="font-bold">× {item.quantity}</span>
-                  </span>
+              {order.order_items?.slice(0, 2).map((item) => {
+                const isWeight = item.sale_type === "weight"
+                const amount = isWeight
+                  ? Number(item.weight || item.quantity)
+                  : Number(item.quantity)
+                const itemTotal = Number(item.price) * amount
 
-                  <span className="font-semibold text-slate-900">
-                    {Number(item.price * item.quantity).toLocaleString("ar-EG")}{" "}
-                    ج.م
-                  </span>
-                </div>
-              ))}
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between border-b border-slate-100 pb-2 text-sm last:border-0"
+                  >
+                    <span className="text-slate-700">
+                      {item.product_name}{" "}
+                      <span className="font-bold">
+                        × {amount} {isWeight ? "كجم" : ""}
+                      </span>
+                    </span>
+
+                    <span className="font-semibold text-slate-900">
+                      {itemTotal.toLocaleString("ar-EG")} ج.م
+                    </span>
+                  </div>
+                )
+              })}
 
               {order.order_items && order.order_items.length > 2 && (
                 <p className="pt-1 text-xs text-slate-400">
@@ -717,30 +728,35 @@ const OrderCard = ({
           <p className="mb-3 text-sm font-black text-slate-800">المنتجات</p>
 
           <div className="space-y-2">
-            {order.order_items?.slice(0, 3).map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2.5"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-slate-700">
-                    {item.product_name}
-                  </p>
+            {order.order_items?.slice(0, 3).map((item) => {
+              const isWeight = item.sale_type === "weight"
+              const amount = isWeight
+                ? Number(item.weight || item.quantity)
+                : Number(item.quantity)
+              const itemTotal = Number(item.price) * amount
 
-                  <p className="text-[11px] text-slate-400">
-                    {item.quantity} ×{" "}
-                    {Number(item.price).toLocaleString("ar-EG")} ج.م
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-700">
+                      {item.product_name}
+                    </p>
+
+                    <p className="text-[11px] text-slate-400">
+                      {isWeight ? `${amount} كجم` : amount} ×{" "}
+                      {Number(item.price).toLocaleString("ar-EG")} ج.م
+                    </p>
+                  </div>
+
+                  <p className="mr-3 shrink-0 text-sm font-black text-slate-800">
+                    {itemTotal.toLocaleString("ar-EG")} ج.م
                   </p>
                 </div>
-
-                <p className="mr-3 shrink-0 text-sm font-black text-slate-800">
-                  {(
-                    Number(item.price) * Number(item.quantity)
-                  ).toLocaleString("ar-EG")}{" "}
-                  ج.م
-                </p>
-              </div>
-            ))}
+              )
+            })}
 
             {order.order_items && order.order_items.length > 3 && (
               <p className="pt-1 text-center text-xs font-bold text-slate-400">

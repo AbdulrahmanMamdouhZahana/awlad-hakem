@@ -600,32 +600,46 @@ const Navbar = ({
               </button>
 
               {cartOpen && (
-                <div
-                  className="
-                    fixed
-                    left-2
-                    right-2
-                    top-[66px]
-                    z-[9999]
-                    animate-slide-down
-                    sm:left-auto
-                    sm:right-4
-                    sm:top-[74px]
-                    sm:w-[380px]
-                    lg:right-8
-                    lg:w-[390px]
-                  "
-                >
-                  <Cart
-                    cart={cart}
-                    onIncrease={onIncrease}
-                    onDecrease={onDecrease}
-                    onRemove={onRemove}
-                    onClose={() => setCartOpen(false)}
-                    onCheckout={onCheckout}
-                    mode="dropdown"
+                <>
+                  {/* Backdrop to close on click outside */}
+                  <div
+                    className="fixed inset-0 z-[9990]"
+                    onClick={() => setCartOpen(false)}
+                    aria-hidden="true"
                   />
-                </div>
+
+                  {/* Cart Dropdown */}
+                  <div
+                    className="
+                      fixed
+                      left-3
+                      right-3
+                      top-[66px]
+                      z-[9999]
+                      animate-slide-down
+                      sm:absolute
+                      sm:left-0
+                      sm:right-auto
+                      sm:top-full
+                      sm:mt-2.5
+                      sm:w-[380px]
+                      sm:max-w-[calc(100vw-2rem)]
+                    "
+                  >
+                    <Cart
+                      cart={cart}
+                      onIncrease={onIncrease}
+                      onDecrease={onDecrease}
+                      onRemove={onRemove}
+                      onClose={() => setCartOpen(false)}
+                      onCheckout={() => {
+                        setCartOpen(false)
+                        onCheckout()
+                      }}
+                      mode="dropdown"
+                    />
+                  </div>
+                </>
               )}
             </div>
 

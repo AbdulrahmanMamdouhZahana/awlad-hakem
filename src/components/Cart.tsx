@@ -91,13 +91,7 @@ const Cart = ({
         <div
           dir="rtl"
           className="
-            absolute
-            right-0
-            top-full
-            z-[200]
-            mt-3
-            w-[340px]
-            max-w-[calc(100vw-2rem)]
+            w-full
             rounded-2xl
             border
             border-slate-200
@@ -283,15 +277,7 @@ const Cart = ({
       <div
         dir="rtl"
         className="
-          absolute
-          sm-100
-          md:right-100
-          lg:right-140
-          top-full
-          z-[200]
-          mt-3
-          w-[390px]
-          max-w-[calc(100vw-2rem)]
+          w-full
           overflow-hidden
           rounded-2xl
           border

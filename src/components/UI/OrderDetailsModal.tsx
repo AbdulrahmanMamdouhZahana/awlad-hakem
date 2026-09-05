@@ -7,6 +7,8 @@ interface OrderItem {
   product_name: string;
   price: number;
   quantity: number;
+  sale_type?: "piece" | "weight" | "both" | string;
+  weight?: number | null;
 }
 
 interface BankAccount {
@@ -85,6 +87,8 @@ const OrderDetailsModal = ({
   const statusColors: Record<string, string> = {
     pending: "bg-amber-100 text-amber-700",
     confirmed: "bg-emerald-100 text-emerald-700",
+    assigned: "bg-indigo-100 text-indigo-700",
+    out_for_delivery: "bg-violet-100 text-violet-700",
     cancelled: "bg-red-100 text-red-700",
     delivered: "bg-blue-100 text-blue-700",
   };
@@ -92,6 +96,8 @@ const OrderDetailsModal = ({
   const statusLabels: Record<string, string> = {
     pending: "🟡 قيد الانتظار",
     confirmed: "🟢 مؤكد",
+    assigned: "🚚 تم التعيين",
+    out_for_delivery: "🚚 قيد التوصيل",
     cancelled: "🔴 ملغي",
     delivered: "🔵 تم التوصيل",
   };
@@ -154,6 +160,15 @@ const OrderDetailsModal = ({
               </button>
             )}
           </div>
+        ) : normalizedStatus === "delivered" && onCancel ? (
+          <button
+            type="button"
+            disabled={cancelling}
+            onClick={() => onCancel(order.id)}
+            className="w-full rounded-xl bg-red-600 py-3.5 text-sm font-black text-white shadow-lg transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {cancelling ? "جاري الحذف..." : "🗑 حذف الطلب"}
+          </button>
         ) : undefined
       }
     >
@@ -176,6 +191,27 @@ const OrderDetailsModal = ({
             {statusLabels[normalizedStatus] || order.status}
           </span>
         </div>
+
+        {(normalizedStatus === "confirmed" ||
+          normalizedStatus === "assigned" ||
+          normalizedStatus === "out_for_delivery") && (
+          <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4 text-center">
+            <p className="text-sm font-black text-indigo-800">
+              🚚 الطلب قيد التوصيل
+            </p>
+            <p className="mt-1 text-xs font-semibold text-indigo-600">
+              تم تأكيد الطلب وتعيين الدليفري
+            </p>
+          </div>
+        )}
+
+        {normalizedStatus === "cancelled" && (
+          <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-center">
+            <p className="text-sm font-black text-red-800">
+              🔴 هذا الطلب ملغي
+            </p>
+          </div>
+        )}
 
         {/* Customer Info */}
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -307,38 +343,59 @@ const OrderDetailsModal = ({
 
           <div className="space-y-3">
             {order.order_items && order.order_items.length > 0 ? (
-              order.order_items.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="font-black text-slate-900">
-                        {item.product_name}
-                      </p>
+              order.order_items.map((item) => {
+                const isWeight = item.sale_type === "weight";
+                const amount = isWeight
+                  ? Number(item.weight ?? item.quantity)
+                  : Number(item.quantity);
+                const itemTotal = Number(item.price) * amount;
 
-                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-slate-500">
-                        <span>الكمية: {item.quantity}</span>
-                        <span>سعر الوحدة: {formatMoney(item.price)} ج.م</span>
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="font-black text-slate-900">
+                          {item.product_name}
+                        </p>
 
-                        {item.product_id !== undefined && (
-                          <span>رقم المنتج: #{item.product_id}</span>
-                        )}
+                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-slate-500">
+                          {isWeight ? (
+                            <>
+                              <span>بالكيلو • الوزن: {amount} كجم</span>
+                              <span>
+                                سعر الكيلو: {formatMoney(item.price)} ج.م
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span>الكمية: {amount}</span>
+                              <span>
+                                سعر الوحدة: {formatMoney(item.price)} ج.م
+                              </span>
+                            </>
+                          )}
+
+                          {item.product_id !== undefined && (
+                            <span>رقم المنتج: #{item.product_id}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 rounded-xl bg-white px-4 py-2 text-left shadow-sm">
+                        <p className="text-[11px] font-bold text-slate-400">
+                          الإجمالي
+                        </p>
+                        <p className="font-black text-indigo-600">
+                          {formatMoney(itemTotal)} ج.م
+                        </p>
                       </div>
                     </div>
-
-                    <div className="shrink-0 rounded-xl bg-white px-4 py-2 text-left shadow-sm">
-                      <p className="text-[11px] font-bold text-slate-400">
-                        الإجمالي
-                      </p>
-                      <p className="font-black text-indigo-600">
-                        {formatMoney(item.price * item.quantity)} ج.م
-                      </p>
-                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="rounded-xl bg-slate-50 p-5 text-center text-sm font-bold text-slate-400">
                 لا توجد منتجات مسجلة لهذا الطلب
