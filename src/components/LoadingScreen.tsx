@@ -58,7 +58,7 @@ const LoadingScreen = ({ isLoading }: LoadingScreenProps) => {
         >
           <img
             src="/main_logo.png"
-            alt="أولاد حكيم"
+            alt="أولاد الحكيم"
             className="h-20 w-20 object-contain"
           />
         </div>

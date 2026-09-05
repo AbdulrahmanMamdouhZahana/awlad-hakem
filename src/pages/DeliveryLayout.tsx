@@ -169,7 +169,7 @@ export default function DeliveryLayout() {
               </svg>
             </button>
             <div className="flex items-center gap-3">
-              <span className="text-sm font-bold text-indigo-600">أولاد حكيم</span>
+              <span className="text-sm font-bold text-indigo-600">أولاد الحكيم</span>
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
                 {user?.name?.charAt(0) || "D"}
               </div>

@@ -1,7 +1,7 @@
-import { useState } from "react"
+import { useState, useMemo, memo } from "react"
 import { createPortal } from "react-dom"
 
-interface iProducts {
+export interface iProducts {
   id: number
   name: string
   category: string
@@ -15,7 +15,9 @@ interface iProducts {
   created_at?: string
 }
 
-interface IProps {
+export type IProduct = iProducts
+
+export interface IProps {
   product: iProducts
   onDelete?: (id: number) => void
   onEdit?: (product: iProducts) => void
@@ -26,6 +28,9 @@ interface IProps {
       weight?: number
     }
   ) => void
+  isDeleting?: boolean
+  categoryGroups?: Record<string, string[]>
+  className?: string
 }
 
 const CATEGORY_GROUPS: Record<string, string[]> = {
@@ -52,26 +57,97 @@ const CATEGORY_GROUPS: Record<string, string[]> = {
   ],
 }
 
-const getCategoryInfo = (category: string) => {
-  for (const [mainCategory, subCategories] of Object.entries(CATEGORY_GROUPS)) {
-    if (subCategories.includes(category)) {
-      return { mainCategory, subCategory: category }
+// Fast pre-computed map for default categories (O(1) lookup)
+const DEFAULT_CATEGORY_MAP = new Map<string, string>()
+for (const [mainCat, subs] of Object.entries(CATEGORY_GROUPS)) {
+  for (const sub of subs) {
+    DEFAULT_CATEGORY_MAP.set(sub, mainCat)
+  }
+}
+
+const getCategoryInfo = (
+  category: string,
+  customGroups?: Record<string, string[]>
+) => {
+  if (customGroups) {
+    for (const [mainCategory, subCategories] of Object.entries(customGroups)) {
+      if (subCategories.includes(category)) {
+        return { mainCategory, subCategory: category }
+      }
     }
+  }
+
+  const mappedMain = DEFAULT_CATEGORY_MAP.get(category)
+  if (mappedMain) {
+    return { mainCategory: mappedMain, subCategory: category }
   }
 
   return {
     mainCategory: "🛒 السوبر ماركت",
-    subCategory: category,
+    subCategory: category || "عام",
   }
 }
 
 const FAVORITES_KEY = "favorite_products"
+
+const searchEnginePages = [
+  "google.com/search",
+  "google.com/imgres",
+  "yahoo.com/search",
+  "bing.com/search",
+  "duckduckgo.com/",
+  "yandex.com/search",
+]
+
+const getImageUrl = (image?: string | null): string => {
+  const rawImage = String(image ?? "").trim()
+
+  if (!rawImage || rawImage.startsWith("data:image/")) {
+    return "/main_logo.png"
+  }
+
+  if (searchEnginePages.some((engine) => rawImage.includes(engine))) {
+    return "/main_logo.png"
+  }
+
+  if (/^https?:\/\//i.test(rawImage)) {
+    return rawImage
+  }
+
+  const backendUrl = String(
+    import.meta.env.VITE_API_URL ||
+    "https://awlad-hakem-backend.onrender.com/api"
+  )
+    .replace(/\/+$/, "")
+    .replace(/\/api$/, "")
+
+  if (rawImage.startsWith("/storage/")) {
+    return `${backendUrl}${rawImage}`
+  }
+
+  if (rawImage.startsWith("storage/")) {
+    return `${backendUrl}/${rawImage}`
+  }
+
+  if (rawImage.startsWith("products/")) {
+    return `${backendUrl}/storage/${rawImage}`
+  }
+
+  if (rawImage.startsWith("/")) {
+    return `${backendUrl}${rawImage}`
+  }
+
+  return `${backendUrl}/${rawImage}`
+}
 
 const ProductCard = ({
   product,
   onDelete,
   onEdit,
   onAddToCart,
+  isDeleting = false,
+  categoryGroups,
+  className = "",
 }: IProps) => {
   const isAdmin = Boolean(onDelete || onEdit)
   const isAvailable = Number(product.stock) > 0
@@ -89,6 +165,24 @@ const ProductCard = ({
     saleType === "weight" ? "weight" : "piece"
   )
   const [selectedWeight, setSelectedWeight] = useState("0.25")
+
+  const stockStatus = useMemo(() => {
+    const stockNum = Number(product.stock)
+    if (stockNum <= 0) {
+      return { text: "نفد المخزون", className: "bg-red-100 text-red-700" }
+    }
+    if (stockNum <= 10) {
+      return { text: "مخزون منخفض", className: "bg-amber-100 text-amber-700" }
+    }
+    return { text: "متوفر", className: "bg-emerald-100 text-emerald-700" }
+  }, [product.stock])
+
+  const { mainCategory, subCategory } = useMemo(
+    () => getCategoryInfo(product.category, categoryGroups),
+    [product.category, categoryGroups]
+  )
+
+  const imageUrl = useMemo(() => getImageUrl(product.image), [product.image])
 
   const openAddOptions = () => {
     if (!onAddToCart || !isAvailable) return
@@ -137,7 +231,9 @@ const ProductCard = ({
     setShowSaleOptions(false)
   }
 
+  // Optimize: Skip localStorage read when rendering in admin mode
   const [isFavorite, setIsFavorite] = useState(() => {
+    if (isAdmin) return false
     try {
       const favorites = JSON.parse(
         localStorage.getItem(FAVORITES_KEY) || "[]"
@@ -195,30 +291,30 @@ const ProductCard = ({
 
   return (
     <article
-      className="
+      className={`
         group
         relative
         flex
         h-full
         flex-col
         overflow-hidden
-        rounded-xl
+        rounded-2xl
         border
         border-slate-200
         bg-white
         transition-all
-        duration-200
-        hover:-translate-y-0.5
-        hover:shadow-md
-      "
+        duration-300
+        hover:-translate-y-1
+        hover:shadow-lg
+        ${className}
+      `}
     >
-
       <div className="relative h-44 overflow-hidden bg-[#eef3f3] sm:h-48">
-
         <img
-          src={product.image}
+          src={imageUrl}
           alt={product.name}
           loading="lazy"
+          decoding="async"
           className="
             h-full
             w-full
@@ -229,11 +325,14 @@ const ProductCard = ({
             group-hover:scale-105
           "
           onError={(e) => {
-            e.currentTarget.src =
-              "https://via.placeholder.com/400x300?text=Product"
+            e.currentTarget.onerror = null
+            e.currentTarget.src = "/main_logo.png"
+            e.currentTarget.className =
+              "h-full w-full object-contain p-10"
           }}
         />
 
+        {/* Stock badge */}
         <span
           className={`
             absolute
@@ -244,18 +343,18 @@ const ProductCard = ({
             py-1
             text-[10px]
             font-black
-            ${
-              isAvailable
-                ? "bg-amber-300 text-slate-900"
-                : "bg-red-100 text-red-600"
-            }
+            ${stockStatus.className}
           `}
         >
-          {isAvailable
-            ? "متوفر"
-            : "غير متوفر"}
+          {stockStatus.text}
         </span>
 
+        {/* Category badge */}
+        <span className="absolute left-2 top-2 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-600 shadow-sm backdrop-blur">
+          {subCategory}
+        </span>
+
+        {/* Customer favorite button */}
         {!isAdmin && (
           <button
             type="button"
@@ -273,7 +372,7 @@ const ProductCard = ({
             className={`
               absolute
               left-2
-              top-2
+              bottom-2
               flex
               h-8
               w-8
@@ -285,10 +384,9 @@ const ProductCard = ({
               transition-all
               duration-200
               hover:scale-105
-              ${
-                isFavorite
-                  ? "text-red-500"
-                  : "text-slate-500 hover:text-red-500"
+              ${isFavorite
+                ? "text-red-500"
+                : "text-slate-500 hover:text-red-500"
               }
             `}
           >
@@ -311,113 +409,16 @@ const ProductCard = ({
             </svg>
           </button>
         )}
-
-        {isAdmin && (
-          <div className="absolute bottom-2 left-2 flex gap-1.5">
-
-            {onEdit && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onEdit(product)
-                }}
-                className="
-                  flex
-                  h-8
-                  w-8
-                  items-center
-                  justify-center
-                  rounded-lg
-                  bg-indigo-600
-                  text-white
-                  shadow-md
-                  transition
-                  hover:bg-indigo-500
-                "
-                title="تعديل المنتج"
-              >
-                <svg
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15.232 5.232 18.768 8.768M4 20h4l10.5-10.5a2.121 2.121 0 0 0-3-3L5 17v3Z"
-                  />
-                </svg>
-              </button>
-            )}
-
-            {onDelete && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDelete(product.id)
-                }}
-                className="
-                  flex
-                  h-8
-                  w-8
-                  items-center
-                  justify-center
-                  rounded-lg
-                  bg-red-500
-                  text-white
-                  shadow-md
-                  transition
-                  hover:bg-red-600
-                "
-                title="حذف المنتج"
-              >
-                <svg
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18 18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            )}
-
-          </div>
-        )}
-
       </div>
 
-      <div className="flex flex-1 flex-col px-3 py-3">
-
-        {(() => {
-          const { mainCategory, subCategory } = getCategoryInfo(product.category)
-
-          return (
-            <div className="mb-2 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-500">
-                  {mainCategory}
-                </span>
-              </div>
-
-              <p
-                className="mt-1 truncate text-[10px] font-bold text-[#17656b]"
-                title={subCategory}
-              >
-                {subCategory}
-              </p>
-            </div>
-          )
-        })()}
+      <div className="flex flex-1 flex-col px-4 py-3.5">
+        <div className="mb-2 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="shrink-0 rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-bold text-indigo-600">
+              {mainCategory}
+            </span>
+          </div>
+        </div>
 
         <h3
           className="
@@ -426,7 +427,7 @@ const ProductCard = ({
             text-xs
             font-black
             leading-5
-            text-slate-800
+            text-slate-900
             sm:text-sm
           "
           title={product.name}
@@ -434,29 +435,25 @@ const ProductCard = ({
           {product.name}
         </h3>
 
-        <div className="mt-1 flex items-center gap-1">
+        <div className="mt-1 flex items-center justify-between gap-1">
           <div className="flex text-[10px] text-amber-400">
             ★★★★★
           </div>
 
-          <span className="text-[9px] font-medium text-slate-400">
+          <span className="text-[10px] font-bold text-slate-400">
             {saleType === "weight"
-              ? `متوفر ${Number(product.stock).toFixed(2)} كجم`
-              : `متوفر ${Number(product.stock).toFixed(0)} قطعة`}
+              ? `المخزون: ${Number(product.stock).toFixed(1)} كجم`
+              : `المخزون: ${Number(product.stock).toFixed(0)} ${product.unit || "قطعة"}`}
           </span>
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-2">
-
           <div className="min-w-0">
             {saleType === "weight" ? (
               weightPrice > 0 ? (
                 <div>
                   <div className="text-sm font-black text-slate-900 sm:text-base">
-                    {weightPrice.toFixed(2)} جنية / كجم
-                  </div>
-                  <div className="mt-0.5 text-[9px] font-medium text-slate-400">
-                    متوفر {Number(product.stock).toFixed(2)} كجم
+                    {weightPrice.toFixed(2)} ج.م / كجم
                   </div>
                 </div>
               ) : (
@@ -467,23 +464,20 @@ const ProductCard = ({
             ) : saleType === "both" ? (
               <div className="space-y-0.5">
                 <div className="text-[11px] font-black text-slate-900">
-                  قطعة: {piecePrice.toFixed(2)} جنيه
+                  قطعة: {piecePrice.toFixed(2)} ج.م
                 </div>
                 <div className="text-[11px] font-black text-slate-900">
-                  كيلو: {weightPrice.toFixed(2)} جنيه
-                </div>
-                <div className="text-[9px] font-medium text-slate-400">
-                  متوفر: {Number(product.stock).toFixed(2)}
+                  كيلو: {weightPrice.toFixed(2)} ج.م
                 </div>
               </div>
             ) : (
               piecePrice > 0 ? (
                 <div className="flex items-baseline gap-1">
                   <span className="text-sm font-black text-slate-900 sm:text-base">
-                    {piecePrice.toFixed(2)} جنية مصري
+                    {piecePrice.toFixed(2)} ج.م
                   </span>
                   {product.unit && (
-                    <span className="truncate text-[9px] font-medium text-slate-400">
+                    <span className="truncate text-[10px] font-bold text-slate-400">
                       / {product.unit}
                     </span>
                   )}
@@ -506,13 +500,13 @@ const ProductCard = ({
                 shrink-0
                 items-center
                 gap-1
-                rounded-md
+                rounded-lg
                 border
                 border-slate-300
                 bg-white
-                px-2
+                px-2.5
                 py-1.5
-                text-[9px]
+                text-[10px]
                 font-bold
                 text-slate-700
                 transition
@@ -542,14 +536,42 @@ const ProductCard = ({
               <span>أضف للسلة</span>
             </button>
           )}
-
         </div>
 
+        {/* Admin Action Buttons */}
+        {isAdmin && (
+          <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit(product)
+                }}
+                className="flex-1 rounded-xl border border-indigo-100 bg-indigo-50 py-2.5 text-xs font-black text-indigo-700 transition hover:bg-indigo-100 hover:shadow-sm"
+              >
+                تعديل
+              </button>
+            )}
+
+            {onDelete && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(product.id)
+                }}
+                disabled={isDeleting}
+                className="flex-1 rounded-xl border border-red-100 bg-red-50 py-2.5 text-xs font-black text-red-600 transition hover:bg-red-100 hover:shadow-sm disabled:opacity-50"
+              >
+                {isDeleting ? "جاري..." : "حذف"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* =========================
-          Modal باستخدام createPortal - تم الإصلاح
-      ========================= */}
+      {/* Sale Options Modal (Weight/Piece selection) for customer */}
       {showSaleOptions && createPortal(
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
@@ -578,11 +600,10 @@ const ProductCard = ({
                 <button
                   type="button"
                   onClick={() => setSelectedSaleType("piece")}
-                  className={`rounded-xl border p-3 text-sm font-black ${
-                    selectedSaleType === "piece"
-                      ? "border-[#17656b] bg-[#17656b] text-white"
-                      : "border-slate-200 bg-slate-50 text-slate-700"
-                  }`}
+                  className={`rounded-xl border p-3 text-sm font-black ${selectedSaleType === "piece"
+                    ? "border-[#17656b] bg-[#17656b] text-white"
+                    : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
                 >
                   بالقطعة
                   <div className="mt-1 text-xs opacity-80">
@@ -593,11 +614,10 @@ const ProductCard = ({
                 <button
                   type="button"
                   onClick={() => setSelectedSaleType("weight")}
-                  className={`rounded-xl border p-3 text-sm font-black ${
-                    selectedSaleType === "weight"
-                      ? "border-[#17656b] bg-[#17656b] text-white"
-                      : "border-slate-200 bg-slate-50 text-slate-700"
-                  }`}
+                  className={`rounded-xl border p-3 text-sm font-black ${selectedSaleType === "weight"
+                    ? "border-[#17656b] bg-[#17656b] text-white"
+                    : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
                 >
                   بالوزن
                   <div className="mt-1 text-xs opacity-80">
@@ -665,9 +685,8 @@ const ProductCard = ({
         </div>,
         document.body
       )}
-
     </article>
   )
 }
 
-export default ProductCard
+export default memo(ProductCard)

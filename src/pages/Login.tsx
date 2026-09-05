@@ -111,13 +111,13 @@ export default function Login() {
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 shadow-sm transition hover:scale-105">
               <img
                 src="/main_logo.png"
-                alt="أولاد حكيم"
+                alt="أولاد الحكيم"
                 className="h-16 w-16 object-contain"
               />
             </div>
 
             <h1 className="text-2xl font-black text-slate-900">
-              أولاد حكيم
+              أولاد الحكيم
             </h1>
 
             <p className="mt-1 text-sm font-medium text-slate-500">
@@ -265,7 +265,7 @@ export default function Login() {
         </div>
 
         <p className="mt-5 text-center text-xs font-bold text-slate-400">
-          لوحة تحكم أولاد حكيم • جميع الحقوق محفوظة
+          لوحة تحكم أولاد الحكيم • جميع الحقوق محفوظة
         </p>
       </div>
     </div>

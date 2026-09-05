@@ -38,7 +38,7 @@ const Footer = () => {
           <div className="space-y-4 text-right">
             <div>
               <h2 className="text-xl font-black text-white">
-                أولاد حكيم
+                أولاد الحكيم
               </h2>
 
               <p className="mt-3 max-w-sm text-sm leading-7 text-white/75">
@@ -77,7 +77,7 @@ const Footer = () => {
         <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-center gap-2 text-center">
             <p className="text-xs text-white/60">
-              © {currentYear} أولاد حكيم. جميع الحقوق محفوظة.
+              © {currentYear} أولاد الحكيم. جميع الحقوق محفوظة.
             </p>
 
             <p className="text-[11px] text-white/40">

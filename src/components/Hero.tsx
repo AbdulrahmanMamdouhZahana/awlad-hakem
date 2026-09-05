@@ -101,7 +101,7 @@ const Hero = ({}: IProps) => {
       >
         <img
           src="/preson.png"
-          alt="أولاد حكيم"
+          alt="أولاد الحكيم"
           className="
             h-[85%]
             w-auto

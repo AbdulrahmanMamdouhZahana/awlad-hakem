@@ -377,7 +377,7 @@ const buildDeliveryWhatsAppMessage = (
   return [
     "السلام عليكم 👋",
     "",
-    "*طلب جديد - أولاد حكيم*",
+    "*طلب جديد - أولاد الحكيم*",
     `📦 رقم الطلب: #${order.id}`,
     "",
     `👤 العميل: ${order.customer_name}`,

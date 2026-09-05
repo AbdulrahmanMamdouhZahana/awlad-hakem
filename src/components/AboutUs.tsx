@@ -20,14 +20,14 @@ const AboutUs = () => {
             </span>
 
             <h2 className="text-3xl font-black leading-tight tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
-              أولاد حكيم
+              أولاد الحكيم
               <span className="block text-indigo-600">
                 كل احتياجاتك في مكان واحد
               </span>
             </h2>
 
             <p className="mt-6 text-base leading-8 text-slate-600 sm:text-lg">
-              في أولاد حكيم بنسعى إننا نوفرلك تجربة تسوق سهلة
+              في أولاد الحكيم بنسعى إننا نوفرلك تجربة تسوق سهلة
               ومريحة، من خلال مجموعة متنوعة من المنتجات اللي
               تناسب احتياجات البيت اليومية.
             </p>
@@ -81,7 +81,7 @@ const AboutUs = () => {
 
               <img
                 src="/egypt.jpeg"
-                alt="أولاد حكيم"
+                alt="أولاد الحكيم"
                 className="h-[420px] w-full object-cover"
               />
 

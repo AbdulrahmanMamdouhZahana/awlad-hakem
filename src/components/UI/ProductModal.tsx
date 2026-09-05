@@ -48,7 +48,7 @@ const ProductModal = ({
       : mainCategories[0] || "",
     category: editingProduct?.category || "",
     price: editingProduct?.price?.toString() || "",
-    unit: editingProduct?.unit || "",
+    unit: editingProduct?.unit || (editingProduct?.sale_type === "weight" ? "كيلو" : "قطعة"),
     saleType: editingProduct?.sale_type || "piece",
     piecePrice:
       editingProduct?.piece_price != null
@@ -139,7 +139,7 @@ const ProductModal = ({
         categories[mainCategory]?.[0] ||
         "",
       price: editingProduct?.price?.toString() || "",
-      unit: editingProduct?.unit || "",
+      unit: editingProduct?.unit || (editingProduct?.sale_type === "weight" ? "كيلو" : "قطعة"),
       saleType: editingProduct?.sale_type || "piece",
       piecePrice:
         editingProduct?.piece_price != null
@@ -190,8 +190,30 @@ const ProductModal = ({
     setForm((prev) => ({ ...prev, image: "" }));
   };
 
-  const handleImageUrlPreview = () => {
-    const url = form.image.trim();
+  const cleanImageUrl = (raw: string): string => {
+    let url = String(raw ?? "").trim();
+    if (!url) return "";
+    try {
+      if (url.includes("google.") && url.includes("imgurl=")) {
+        const parsed = new URL(url);
+        const extracted = parsed.searchParams.get("imgurl");
+        if (extracted) return decodeURIComponent(extracted);
+      }
+      if (url.includes("imgurl=")) {
+        const match = url.match(/imgurl=([^&]+)/);
+        if (match && match[1]) return decodeURIComponent(match[1]);
+      }
+    } catch {
+      // ignore
+    }
+    if (url.startsWith("//")) {
+      url = `https:${url}`;
+    }
+    return url;
+  };
+
+  const handleImageUrlPreview = (targetUrl?: string) => {
+    const url = cleanImageUrl(targetUrl ?? form.image);
 
     if (!url) {
       toast.error("الرجاء إدخال رابط الصورة");
@@ -199,8 +221,13 @@ const ProductModal = ({
     }
 
     try {
-      new URL(url);
-      setImagePreview(url);
+      if (/^https?:\/\//i.test(url) || url.startsWith("/")) {
+        setImagePreview(url);
+      } else {
+        const fullUrl = `https://${url}`;
+        setImagePreview(fullUrl);
+        setForm((prev) => ({ ...prev, image: fullUrl }));
+      }
     } catch {
       toast.error("الرجاء إدخال رابط صحيح");
     }
@@ -222,10 +249,13 @@ const ProductModal = ({
       return;
     }
 
-    if (!form.unit.trim()) {
-      toast.error("اكتب وحدة المنتج");
-      return;
-    }
+    const resolvedUnit =
+      form.unit.trim() ||
+      (form.saleType === "weight"
+        ? "كيلو"
+        : form.saleType === "both"
+          ? "قطعة / كيلو"
+          : "قطعة");
 
     const piecePrice =
       form.saleType === "weight"
@@ -265,12 +295,19 @@ const ProductModal = ({
       return;
     }
 
+    const finalSaleType = form.saleType || "piece";
+
     await onSave({
       ...form,
+      unit: resolvedUnit,
+      image: imageMode === "file" ? "" : cleanImageUrl(form.image),
       price,
       piecePrice,
       weightPrice,
-      saleType: form.saleType,
+      saleType: finalSaleType,
+      sale_type: finalSaleType,
+      piece_price: piecePrice,
+      weight_price: weightPrice,
       stock,
       imageFile: imageFile || undefined,
     });
@@ -284,7 +321,7 @@ const ProductModal = ({
       mainCategory,
       category: categories[mainCategory]?.[0] || "",
       price: "",
-      unit: "",
+      unit: "قطعة",
       saleType: "piece",
       piecePrice: "",
       weightPrice: "",
@@ -337,8 +374,8 @@ const ProductModal = ({
             {loading
               ? "جاري الحفظ..."
               : editingProduct
-              ? "حفظ التعديلات"
-              : "إضافة المنتج"}
+                ? "حفظ التعديلات"
+                : "إضافة المنتج"}
           </button>
         </div>
       }
@@ -437,13 +474,20 @@ const ProductModal = ({
                   setForm((prev) => ({
                     ...prev,
                     saleType: option.value as "piece" | "weight" | "both",
+                    unit:
+                      !prev.unit || prev.unit === "قطعة" || prev.unit === "كيلو" || prev.unit === "قطعة / كيلو"
+                        ? option.value === "weight"
+                          ? "كيلو"
+                          : option.value === "both"
+                            ? "قطعة / كيلو"
+                            : "قطعة"
+                        : prev.unit,
                   }))
                 }
-                className={`rounded-xl border px-4 py-3 text-sm font-black transition ${
-                  form.saleType === option.value
-                    ? "border-indigo-600 bg-indigo-600 text-white shadow-md"
-                    : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50"
-                }`}
+                className={`rounded-xl border px-4 py-3 text-sm font-black transition ${form.saleType === option.value
+                  ? "border-indigo-600 bg-indigo-600 text-white shadow-md"
+                  : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50"
+                  }`}
               >
                 <span className="ml-2">{option.icon}</span>
                 {option.label}
@@ -493,6 +537,37 @@ const ProductModal = ({
 
           <div>
             <label className="mb-2 block text-sm font-black text-slate-700">
+              وحدة المنتج
+            </label>
+            <input
+              type="text"
+              value={form.unit}
+              onChange={(e) => setForm({ ...form, unit: e.target.value })}
+              placeholder={form.saleType === "weight" ? "مثال: كيلو" : "مثال: قطعة، كيس، علبة"}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400"
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {(form.saleType === "weight"
+                ? ["كيلو", "نصف كيلو", "ربع كيلو", "جرام"]
+                : ["قطعة", "علبة", "كيس", "زجاجة", "برطمان", "كرتونة", "رول", "كيلو", "نصف كيلو", "ربع كيلو", "جرام"]
+              ).map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, unit: preset }))}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${form.unit === preset
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-black text-slate-700">
               المخزون
               {form.saleType !== "piece" && (
                 <span className="mr-2 text-xs font-bold text-slate-400">
@@ -516,8 +591,8 @@ const ProductModal = ({
           {form.saleType === "piece"
             ? "📦 العميل يشتري بالقطعة، ويتم حساب السعر = عدد القطع × سعر القطعة."
             : form.saleType === "weight"
-            ? "⚖️ العميل يحدد الوزن الذي يريده، ويتم حساب السعر = الوزن × سعر الكيلو."
-            : "🔄 العميل يختار بين القطعة والوزن، ولكل طريقة سعرها الخاص."}
+              ? "⚖️ العميل يحدد الوزن الذي يريده، ويتم حساب السعر = الوزن × سعر الكيلو."
+              : "🔄 العميل يختار بين القطعة والوزن، ولكل طريقة سعرها الخاص."}
         </div>
 
         <div>
@@ -533,11 +608,10 @@ const ProductModal = ({
                 setImageFile(null);
                 setImagePreview("");
               }}
-              className={`rounded-xl px-4 py-2 text-xs font-black transition ${
-                imageMode === "url"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+              className={`rounded-xl px-4 py-2 text-xs font-black transition ${imageMode === "url"
+                ? "bg-indigo-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
             >
               رابط الصورة
             </button>
@@ -548,11 +622,10 @@ const ProductModal = ({
                 setImageMode("file");
                 setImagePreview("");
               }}
-              className={`rounded-xl px-4 py-2 text-xs font-black transition ${
-                imageMode === "file"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+              className={`rounded-xl px-4 py-2 text-xs font-black transition ${imageMode === "file"
+                ? "bg-indigo-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
             >
               من الجهاز
             </button>
@@ -563,21 +636,35 @@ const ProductModal = ({
               <input
                 type="text"
                 value={form.image}
-                onChange={(e) => setForm({ ...form, image: e.target.value })}
-                placeholder="https://example.com/image.jpg"
+                onChange={(e) => {
+                  const cleaned = cleanImageUrl(e.target.value);
+                  setForm((prev) => ({ ...prev, image: cleaned }));
+                  if (cleaned && (/^https?:\/\//i.test(cleaned) || cleaned.startsWith("/"))) {
+                    setImagePreview(cleaned);
+                  }
+                }}
+                placeholder="الصق رابط الصورة هنا (مثال: https://...)"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-indigo-400"
               />
 
               <button
                 type="button"
-                onClick={handleImageUrlPreview}
+                onClick={() => handleImageUrlPreview()}
                 className="rounded-xl bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
               >
                 معاينة الصورة
               </button>
 
-              <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-700">
-                📷 الصق رابط الصورة ثم اضغط على "معاينة الصورة" لعرضها
+              {form.image.includes("google.com/search") && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-800">
+                  ⚠️ <strong>تنبيه:</strong> هذا رابط صفحة بحث جوجل وليس رابط الصورة المباشر.
+                  <br />
+                  💡 <strong>طريقة نسخ رابط الصورة الصحيح:</strong> في جوجل، اضغط مطولاً على الصورة (أو كليك يمين) واختر <u>"نسخ عنوان الصورة / Copy image address"</u> ثم الصقه هنا، أو قم بحفظ الصورة على جهازك واختيارها من تبويب <strong>"من الجهاز"</strong>.
+                </div>
+              )}
+
+              <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-5 text-slate-600">
+                📷 الصق رابط الصورة المباشر ثم اضغط على "معاينة الصورة" للتأكد من ظهورها
               </div>
             </div>
           ) : (

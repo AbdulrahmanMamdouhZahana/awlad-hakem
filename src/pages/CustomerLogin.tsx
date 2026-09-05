@@ -151,7 +151,7 @@ navigate("/")
               ">
                 <img
                   src="/main_logo.png"
-                  alt="أولاد حكيم"
+                  alt="أولاد الحكيم"
                   className="h-full w-full object-contain "
                 />
               </div>

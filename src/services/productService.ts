@@ -1,6 +1,7 @@
 // src/services/productService.ts
 
 import { apiFetch } from "./api"
+import { supabase } from "../lib/supabase"
 
 export interface iProducts {
   id: number
@@ -10,6 +11,9 @@ export interface iProducts {
   unit: string
   image: string
   stock: number
+  sale_type?: "piece" | "weight" | "both"
+  piece_price?: number | null
+  weight_price?: number | null
   created_at?: string
 }
 
@@ -206,87 +210,66 @@ export const deleteProduct = async (
 // Upload Product Image
 // =====================================
 
+// =====================================
+// Upload Product Image
+// =====================================
+
 export const uploadProductImage = async (
   file: File
 ): Promise<string> => {
+  if (!(file instanceof File)) {
+    throw new Error("ملف الصورة غير صحيح")
+  }
 
-  const formData =
-    new FormData()
+  // 1. Primary: Direct upload to Supabase Storage
+  try {
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg"
+    const fileName = `products/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${ext}`
 
-  formData.append(
-    "image",
-    file
-  )
+    const { error: supabaseError } = await supabase.storage
+      .from("product-images")
+      .upload(fileName, file, {
+        contentType: file.type || "image/jpeg",
+        upsert: true,
+      })
 
-  const token =
-    localStorage.getItem(
-      "auth_token"
-    )
+    if (!supabaseError) {
+      const { data: urlData } = supabase.storage
+        .from("product-images")
+        .getPublicUrl(fileName)
 
-  const response =
-    await fetch(
-      `${import.meta.env.VITE_API_URL}/products/upload-image`,
-      {
-        method: "POST",
-
-        headers: {
-          Accept:
-            "application/json",
-
-          ...(token
-            ? {
-                Authorization:
-                  `Bearer ${token}`,
-              }
-            : {}),
-        },
-
-        body: formData,
+      if (urlData?.publicUrl) {
+        console.log("✅ Supabase Image Upload Success:", urlData.publicUrl)
+        return urlData.publicUrl
       }
-    )
-
-  const data =
-    await response
-      .json()
-      .catch(() => null)
-
-  // ---------------------------------
-  // Authentication error
-  // ---------------------------------
-
-  if (response.status === 401) {
-
-    localStorage.removeItem(
-      "auth_token"
-    )
-
-    localStorage.removeItem(
-      "auth_user"
-    )
-
-    window.location.href =
-      "/login"
-
-    throw new Error(
-      "انتهت جلسة تسجيل الدخول"
-    )
+    } else {
+      console.warn("⚠️ Supabase storage upload error:", supabaseError)
+    }
+  } catch (err) {
+    console.warn("⚠️ Supabase upload threw exception, falling back to backend:", err)
   }
 
-  // ---------------------------------
-  // Other errors
-  // ---------------------------------
+  // 2. Fallback: Backend /products/upload-image
+  const formData = new FormData()
+  formData.append("image", file)
 
-  if (!response.ok) {
-    throw new Error(
-      data?.message ||
-        "فشل رفع الصورة"
-    )
-  }
-
-  return (
-    data?.url ||
-    data?.data?.url ||
-    data?.image_url ||
-    ""
+  const response = await apiFetch(
+    "/products/upload-image",
+    {
+      method: "POST",
+      body: formData,
+    }
   )
+
+  const imageUrl =
+    response?.url ||
+    response?.data?.url ||
+    response?.image_url ||
+    ""
+
+  if (!imageUrl) {
+    throw new Error("لم يتم الحصول على رابط الصورة")
+  }
+
+  return imageUrl
 }

@@ -1,6 +1,5 @@
-import { Fragment } from "react";
 import type { ReactNode } from "react";
-import { Dialog, Transition } from "@headlessui/react";
+import { Dialog } from "@headlessui/react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
 interface ModalProps {
@@ -28,7 +27,7 @@ const Modal = ({
   icon,
   className = "",
 }: ModalProps) => {
-  const sizeClasses = {
+  const sizeClasses: Record<NonNullable<ModalProps["size"]>, string> = {
     sm: "max-w-md",
     md: "max-w-lg",
     lg: "max-w-2xl",
@@ -36,84 +35,86 @@ const Modal = ({
     full: "max-w-6xl",
   };
 
+  if (!isOpen) {
+    return null;
+  }
+
+  const handleClose = () => {
+    if (!loading) {
+      onClose();
+    }
+  };
+
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={() => !loading && onClose()}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" />
-        </Transition.Child>
+    <Dialog
+      open={isOpen}
+      onClose={handleClose}
+      className="relative z-50"
+    >
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
+        aria-hidden="true"
+      />
 
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <Dialog.Panel
-                className={`w-full ${sizeClasses[size]} transform overflow-hidden rounded-3xl bg-white p-0 text-right shadow-2xl transition-all ${className}`}
-                dir="rtl"
-              >
-                {/* Header */}
-                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-6 py-5">
-                  <div className="flex items-center gap-3">
-                    {icon && (
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
-                        {icon}
-                      </span>
-                    )}
-                    <div>
-                      {subtitle && (
-                        <p className="text-xs font-black text-indigo-600">
-                          {subtitle}
-                        </p>
-                      )}
-                      <Dialog.Title
-                        as="h2"
-                        className="text-xl font-black text-slate-950"
-                      >
-                        {title}
-                      </Dialog.Title>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={onClose}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl text-slate-500 transition hover:bg-slate-200 disabled:opacity-50"
-                  >
-                    <XMarkIcon className="h-6 w-6" />
-                  </button>
-                </div>
-
-                {/* Content */}
-                <div className="px-6 py-6">{children}</div>
-
-                {/* Actions */}
-                {actions && (
-                  <div className="sticky bottom-0 border-t border-slate-100 bg-white px-6 py-4">
-                    {actions}
-                  </div>
+      {/* Modal container */}
+      <div className="fixed inset-0 overflow-y-auto">
+        <div className="flex min-h-full items-center justify-center p-4">
+          <Dialog.Panel
+            dir="rtl"
+            className={`w-full ${sizeClasses[size]} overflow-hidden rounded-3xl bg-white text-right shadow-2xl ${className}`}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-5">
+              <div className="flex items-center gap-3">
+                {icon && (
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                    {icon}
+                  </span>
                 )}
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
+
+                <div>
+                  {subtitle && (
+                    <p className="text-xs font-black text-indigo-600">
+                      {subtitle}
+                    </p>
+                  )}
+
+                  <Dialog.Title
+                    as="h2"
+                    className="text-xl font-black text-slate-950"
+                  >
+                    {title}
+                  </Dialog.Title>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleClose}
+                aria-label="إغلاق"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-6">
+              {children}
+            </div>
+
+            {/* Actions */}
+            {actions && (
+              <div className="border-t border-slate-100 bg-white px-6 py-4">
+                {actions}
+              </div>
+            )}
+          </Dialog.Panel>
         </div>
-      </Dialog>
-    </Transition>
+      </div>
+    </Dialog>
   );
 };
 

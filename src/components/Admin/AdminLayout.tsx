@@ -363,7 +363,7 @@ const AdminLayout = ({
             <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-200">
               <img
                 src="/main_logo.png"
-                alt="أولاد حكيم"
+                alt="أولاد الحكيم"
                 className="h-full w-full object-contain p-1"
               />
             </div>
@@ -424,14 +424,14 @@ const AdminLayout = ({
             <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white">
               <img
                 src="/main_logo.png"
-                alt="أولاد حكيم"
+                alt="أولاد الحكيم"
                 className="h-full w-full object-contain"
               />
             </div>
 
             <div>
               <h1 className="text-lg font-black text-slate-950">
-                أولاد حكيم
+                أولاد الحكيم
               </h1>
 
               <p className="mt-1 text-[10px] font-bold text-slate-400">

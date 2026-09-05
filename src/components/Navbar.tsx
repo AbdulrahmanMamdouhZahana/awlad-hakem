@@ -228,7 +228,7 @@ const Navbar = ({
           <Link
             ref={logoRef}
             to="/"
-            aria-label="أولاد حكيم - الرئيسية"
+            aria-label="أولاد الحكيم - الرئيسية"
             onClick={closeMobileMenu}
             className={`
               group
@@ -264,7 +264,7 @@ const Navbar = ({
             >
               <img
                 src="/main_logo.png"
-                alt="أولاد حكيم"
+                alt="أولاد الحكيم"
                 className="
                   h-full
                   w-full

@@ -875,7 +875,7 @@ function Store({
               >
                 <img
                   src="/main_logo.png"
-                  alt="أولاد حكيم"
+                  alt="أولاد الحكيم"
                   className="h-full w-full object-contain"
                 />
               </div>
@@ -884,7 +884,7 @@ function Store({
             {/* Text */}
             <div className="mt-5 text-center">
               <h2 className="text-2xl font-black text-slate-900">
-                أهلاً بيك في أولاد حكيم 👋
+                أهلاً بيك في أولاد الحكيم 👋
               </h2>
 
               <p className="mt-3 text-sm leading-7 text-slate-500">
@@ -1104,7 +1104,7 @@ function Store({
 
               <img
                 src="/main_logo.png"
-                alt="أولاد حكيم"
+                alt="أولاد الحكيم"
                 className="
                   h-full
                   w-full
@@ -1144,7 +1144,7 @@ function Store({
                 text-slate-900
               "
             >
-              أولاد حكيم
+              أولاد الحكيم
             </h1>
 
             <p

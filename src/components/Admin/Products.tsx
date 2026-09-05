@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { apiFetch } from "../../services/api";
 import { ProductModal } from "../UI";
+import ProductCard from "../Products";
+import { supabase } from "../../lib/supabase";
 
 export interface IProduct {
   id: number;
@@ -26,20 +28,20 @@ export const CATEGORY_GROUPS: Record<string, string[]> = {
   "السوبر ماركت":
     ["فيبا", "تايجر", "غسيل اطباق", "مخلل", "الضحى", "جهينه", "نسله", "مستورد",
       "ونستون", "مستود", "جلاش", "لببتون", "رجب", "بسبوسه", "العاب اطفال كبيره",
-      "مصر كافيه",  "زيت وسمنه", "هيلس", "ايزيس", "مجموعه مقاات", "فاخر",
+      "مصر كافيه", "زيت وسمنه", "هيلس", "ايزيس", "مجموعه مقاات", "فاخر",
       "ريحانه", "ايمن افندى", "حبوبه", "بيض شكلاته", "شامبو", "كولا", "فلاش", "بيبسى",
       "لينو", "هديا", "كبيات", "بمبرز", "هاينز", "دريم", "بسكوت", "بطاطس", "ارز", "ريش باك",
       "جلاكسى", "كابرى", "عصير", "المرعي عصير", "حجاره", "اوكسى", "شبسى", "الملكه", "برافو شيبسى",
       "مستخدمات حريمي", "المراعى", "ماكنة حلاق", "دريا", "صوص", "المصريه", "ربيع", "نسكافيه", "AMR",
       "السوبر ماركت", "ماكنة حلاق6974824289153", "مزارع دينا", "فتراك", "مشروب مصرى", "السنبله", "برسيل",
-      "كرونا", "بنجور", "نظافه", "البوادى", "اندومي", "شكلاته", "احمدتي", "ملابورو", "شهد", "مستوردات", "سكر", 
+      "كرونا", "بنجور", "نظافه", "البوادى", "اندومي", "شكلاته", "احمدتي", "ملابورو", "شهد", "مستوردات", "سكر",
       "الرشيدي", "بسمه", "ماجى", "كلوركس", "ايس كريم", "اريال", "كيك", "سنبله الفرات", "جبه سايبه", "سديم",
       "كاتل كهراء", "مولتو", "العروسة", "حوا", "بسكويت شاي"], "المكتبة": ["كرسات وكشكيل", "لزق", "وصلات وشوحن",
-    "اعياد ميلاد"],
-  
-  
-  "المحمصة": [ "المقلاة", "بن العروبه", "المناخلي", "هيلس", "فاخر", "ريحانه", "ايمن افندى",
-      "حبوبه", "فحم", "بن شاهين"]
+        "اعياد ميلاد"],
+
+
+  "المحمصة": ["المقلاة", "بن العروبه", "المناخلي", "هيلس", "فاخر", "ريحانه", "ايمن افندى",
+    "حبوبه", "فحم", "بن شاهين"]
 };
 
 const CATEGORY_STORAGE_KEY = "awlad_hakem_category_groups";
@@ -78,6 +80,130 @@ const getMainCategory = (
   groups: Record<string, string[]> = CATEGORY_GROUPS
 ) => getMainCategoryFromGroups(category, groups);
 
+// ============================================================
+// Helper: Clean and extract real image URL
+// (Handles Google Images imgurl params, whitespace, protocol-relative)
+// ============================================================
+export const cleanAndExtractImageUrl = (url: string): string => {
+  let trimmed = String(url ?? "").trim();
+  if (!trimmed) return "";
+
+  try {
+    // If user copied a Google Images search URL containing imgurl parameter:
+    if (trimmed.includes("google.") && trimmed.includes("imgurl=")) {
+      const parsed = new URL(trimmed);
+      const extracted = parsed.searchParams.get("imgurl");
+      if (extracted) return decodeURIComponent(extracted);
+    }
+    if (trimmed.includes("imgurl=")) {
+      const match = trimmed.match(/imgurl=([^&]+)/);
+      if (match && match[1]) return decodeURIComponent(match[1]);
+    }
+  } catch {
+    // ignore parsing failure and use trimmed
+  }
+
+  // Prepend https: to protocol-relative URLs (e.g., //cdn.example.com/...)
+  if (trimmed.startsWith("//")) {
+    trimmed = `https:${trimmed}`;
+  }
+
+  return trimmed;
+};
+
+// ============================================================
+// Helper: Validate image URLs
+// ============================================================
+export const isValidImageUrl = (url: string): boolean => {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = cleanAndExtractImageUrl(url);
+  if (!trimmed) return false;
+
+  if (trimmed.length > 2048) return false;
+
+  // Local/relative paths
+  if (
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("products/") ||
+    trimmed.startsWith("storage/")
+  ) {
+    return true;
+  }
+
+  // Reject search engine result HTML pages (unless extracted above)
+  const searchEnginePages = [
+    "google.com/search",
+    "google.com/imgres",
+    "yahoo.com/search",
+    "bing.com/search",
+    "duckduckgo.com/",
+    "yandex.com/search",
+  ];
+  if (searchEnginePages.some((engine) => trimmed.includes(engine))) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+// ============================================================
+// Helper: Get final normalized image URL with safe fallback
+// ============================================================
+export const normalizeProductImageUrl = (image?: string | null): string => {
+  const raw = cleanAndExtractImageUrl(String(image ?? ""));
+
+  if (!raw || raw.startsWith("data:image/") || raw.startsWith("blob:")) {
+    return "/main_logo.png";
+  }
+
+  // If the database has a search engine webpage URL instead of an image, fallback gracefully
+  const searchEnginePages = [
+    "google.com/search",
+    "google.com/imgres",
+    "yahoo.com/search",
+    "bing.com/search",
+    "duckduckgo.com/",
+    "yandex.com/search",
+  ];
+  if (searchEnginePages.some((engine) => raw.includes(engine))) {
+    return "/main_logo.png";
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+
+  const apiBase = String(
+    import.meta.env.VITE_API_URL ||
+    "https://awlad-hakem-backend.onrender.com/api"
+  )
+    .replace(/\/+$/, "")
+    .replace(/\/api$/i, "");
+
+  if (raw.startsWith("/storage/")) {
+    return `${apiBase}${raw}`;
+  }
+
+  if (raw.startsWith("storage/")) {
+    return `${apiBase}/${raw}`;
+  }
+
+  if (raw.startsWith("/")) {
+    return `${apiBase}${raw}`;
+  }
+
+  if (raw.startsWith("products/")) {
+    return `${apiBase}/storage/${raw}`;
+  }
+
+  return `${apiBase}/${raw}`;
+};
+
 const Products = ({ products, setProducts }: ProductsProps) => {
   const [search, setSearch] = useState("");
   const [mainCategory, setMainCategory] = useState("الكل");
@@ -107,34 +233,40 @@ const Products = ({ products, setProducts }: ProductsProps) => {
     return categoryGroups[mainCategory] ?? [];
   }, [mainCategory, categoryGroups]);
 
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        setLoadingProducts(true);
-        const response = await apiFetch("/products");
-        const loadedProducts =
-          (response?.products ?? response?.data ?? response) as IProduct[];
+  // IMPORTANT:
+  // Always reload products from the backend when this page mounts.
+  // Do NOT depend on the existing `products` state/localStorage here,
+  // otherwise an old product object can survive a browser refresh and
+  // hide the latest image saved in the database.
+  const loadProducts = useCallback(async () => {
+    try {
+      setLoadingProducts(true);
 
-        if (Array.isArray(loadedProducts)) {
-          setProducts(loadedProducts);
-        } else {
-          console.error("Invalid products response:", response);
-          toast.error("فشل تحميل المنتجات");
-        }
-      } catch (error) {
-        console.error("LOAD PRODUCTS ERROR:", error);
-        toast.error(
-          error instanceof Error ? error.message : "فشل تحميل المنتجات"
-        );
-      } finally {
-        setLoadingProducts(false);
+      const response = await apiFetch("/products");
+      const loadedProducts =
+        (response?.products ?? response?.data ?? response) as IProduct[];
+
+      if (Array.isArray(loadedProducts)) {
+        console.log("🔄 PRODUCTS LOADED FROM BACKEND:", loadedProducts);
+        setProducts(loadedProducts);
+      } else {
+        console.error("❌ INVALID PRODUCTS RESPONSE:", response);
+        toast.error("فشل تحميل المنتجات");
       }
-    };
-
-    if (products.length === 0) {
-      loadProducts();
+    } catch (error) {
+      console.error("❌ LOAD PRODUCTS ERROR:", error);
+      toast.error(
+        error instanceof Error ? error.message : "فشل تحميل المنتجات"
+      );
+    } finally {
+      setLoadingProducts(false);
     }
-  }, [setProducts, products.length]);
+  }, [setProducts]);
+
+  useEffect(() => {
+    // Always fetch the latest database state after refresh/navigation.
+    loadProducts();
+  }, [loadProducts]);
 
   const filteredProducts = useMemo(() => {
     const searchValue = search.trim().toLowerCase();
@@ -208,35 +340,150 @@ const Products = ({ products, setProducts }: ProductsProps) => {
   }, [saving]);
 
   const uploadImage = useCallback(async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("image", file);
+    if (!(file instanceof File)) {
+      throw new Error("ملف الصورة غير صحيح");
+    }
 
-    const token = localStorage.getItem("auth_token");
-    const response = await fetch(
-     `${import.meta.env.VITE_API_URL}/products/upload-image`,
-      {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: formData,
+    if (!file.type.startsWith("image/")) {
+      throw new Error("الملف المختار ليس صورة");
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error("حجم الصورة يجب ألا يتجاوز 5MB");
+    }
+
+    // =========================================================
+    // 1) Primary Strategy: Direct upload to Supabase Storage
+    //    (Matches the product-images bucket where existing products live)
+    // =========================================================
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const fileName = `products/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${ext}`;
+
+      console.log("📤 UPLOADING TO SUPABASE STORAGE:", fileName);
+      const { error: supabaseError } = await supabase.storage
+        .from("product-images")
+        .upload(fileName, file, {
+          contentType: file.type || "image/jpeg",
+          upsert: true,
+        });
+
+      if (!supabaseError) {
+        const { data: urlData } = supabase.storage
+          .from("product-images")
+          .getPublicUrl(fileName);
+
+        if (urlData?.publicUrl) {
+          console.log("✅ SUPABASE STORAGE SUCCESS:", urlData.publicUrl);
+          return urlData.publicUrl;
+        }
+      } else {
+        console.warn("⚠️ Supabase Storage failed, trying backend upload fallback:", supabaseError);
       }
+    } catch (supabaseErr) {
+      console.warn("⚠️ Supabase Storage threw error, trying backend fallback:", supabaseErr);
+    }
+
+    // =========================================================
+    // 2) Fallback Strategy: Backend Laravel upload-image endpoint
+    // =========================================================
+    const formData = new FormData();
+    formData.append("image", file, file.name);
+
+    const tokenKeys = [
+      "staff_token",
+      "auth_token",
+      "token",
+      "admin_token",
+    ];
+
+    const tokens = tokenKeys
+      .map((key) => ({
+        key,
+        value: localStorage.getItem(key)?.trim() || "",
+      }))
+      .filter(
+        (item, index, array) =>
+          item.value &&
+          array.findIndex((candidate) => candidate.value === item.value) === index
+      );
+
+    const rawApiUrl = String(
+      import.meta.env.VITE_API_URL ||
+      "https://awlad-hakem-backend.onrender.com/api"
+    )
+      .trim()
+      .replace(/\/+$/, "");
+
+    const apiBase = /\/api$/i.test(rawApiUrl)
+      ? rawApiUrl
+      : `${rawApiUrl}/api`;
+
+    const uploadUrl = `${apiBase}/products/upload-image`;
+
+    console.log("📤 TRYING BACKEND UPLOAD FALLBACK:", {
+      name: file.name,
+      uploadUrl,
+      tokensAvailable: tokens.length,
+    });
+
+    let lastError = "Unauthenticated.";
+
+    for (const candidate of tokens) {
+      try {
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${candidate.value}`,
+          },
+          body: formData,
+        });
+
+        let data: any = null;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+
+        if (response.status === 401) {
+          lastError = data?.message || "Unauthenticated.";
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            data?.message ||
+            data?.error ||
+            "فشل رفع الصورة"
+          );
+        }
+
+        const rawUrl =
+          data?.url ??
+          data?.data?.url ??
+          data?.image_url ??
+          data?.data?.image_url ??
+          "";
+
+        const url = String(rawUrl).trim();
+        if (url) {
+          console.log("✅ BACKEND IMAGE URL:", url);
+          return url;
+        }
+      } catch (fetchErr: any) {
+        if (fetchErr.message && !fetchErr.message.includes("Unauthenticated")) {
+          throw fetchErr;
+        }
+      }
+    }
+
+    throw new Error(
+      lastError.includes("Unauthenticated")
+        ? "انتهت جلسة تسجيل الدخول للوحة الإدارة. سجّل الدخول مرة أخرى."
+        : "فشل رفع الصورة. يرجى المحاولة مرة أخرى."
     );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data?.message || "فشل رفع الصورة");
-    }
-
-    const url = data?.url ?? data?.data?.url ?? "";
-
-    if (!url) {
-      throw new Error("لم يتم إرجاع رابط الصورة من الخادم");
-    }
-
-    return url;
   }, []);
 
   const handleSaveProduct = useCallback(
@@ -270,15 +517,18 @@ const Products = ({ products, setProducts }: ProductsProps) => {
         return;
       }
 
-      if (!unit.trim()) {
-        toast.error("اكتب وحدة المنتج");
-        return;
-      }
-
       const normalizedSaleType =
         saleType === "weight" || saleType === "both"
           ? saleType
           : "piece";
+
+      const resolvedUnit =
+        String(unit ?? "").trim() ||
+        (normalizedSaleType === "weight"
+          ? "كيلو"
+          : normalizedSaleType === "both"
+          ? "قطعة / كيلو"
+          : "قطعة");
 
       const piecePriceNum =
         piecePrice === "" || piecePrice == null
@@ -328,44 +578,89 @@ const Products = ({ products, setProducts }: ProductsProps) => {
       try {
         let imageUrl = "";
 
-        if (imageFile) {
+        // =========================================================
+        // 1) Upload the selected File first.
+        //    We NEVER save blob:/data:image URLs in the database.
+        // =========================================================
+        if (imageFile instanceof File) {
           const toastId = toast.loading("جاري رفع الصورة...");
+
           try {
             imageUrl = await uploadImage(imageFile);
           } finally {
             toast.dismiss(toastId);
           }
-        } else if (image.trim()) {
-          imageUrl = image.trim();
-        } else if (editingProduct?.image) {
-          imageUrl = editingProduct.image;
+
+          console.log("🟢 STEP 1 - IMAGE UPLOADED:", imageUrl);
+        } else {
+          const rawUrl = cleanAndExtractImageUrl(String(image ?? ""));
+
+          if (rawUrl.startsWith("data:image/")) {
+            if (editingProduct?.image) {
+              imageUrl = String(editingProduct.image).trim();
+            } else {
+              throw new Error("اختار صورة من الجهاز لرفعها");
+            }
+          } else if (rawUrl && !rawUrl.startsWith("blob:")) {
+            imageUrl = rawUrl;
+          } else if (editingProduct?.image) {
+            imageUrl = String(editingProduct.image).trim();
+          }
         }
 
+        // =========================================================
+        // 2) Validate the final permanent image URL.
+        // =========================================================
         if (!imageUrl) {
-          toast.error("اختر صورة أو ضع رابط الصورة");
-          setSaving(false);
-          return;
+          throw new Error("اختر صورة للمنتج أو أدخل رابط صورة صحيح");
         }
 
-        // مهم:
-        // قاعدة البيانات الحالية عندك فيها category فقط.
-        // لذلك نخزن القسم الفرعي في category،
-        // والقسم الكبير يتم استنتاجه من CATEGORY_GROUPS.
+        if (imageUrl.startsWith("blob:")) {
+          throw new Error("الصورة ما زالت محلية ولم يتم رفعها للخادم");
+        }
+
+        if (imageUrl.startsWith("data:image/")) {
+          throw new Error("لا يمكن حفظ صورة Base64 في قاعدة البيانات");
+        }
+
+        if (imageUrl.length > 2048) {
+          throw new Error("رابط الصورة طويل جدًا");
+        }
+
+        // Validate image URL
+        if (!isValidImageUrl(imageUrl)) {
+          console.error("❌ INVALID IMAGE URL DETECTED:", {
+            imageUrl,
+            productName: name,
+          });
+          throw new Error("رابط الصورة غير صالح. يرجى التأكد من الرابط أو رفع صورة من جهازك.");
+        }
+
+        console.log("🟢 STEP 2 - FINAL IMAGE URL:", imageUrl);
+
+        // =========================================================
+        // 3) Build the product payload.
+        // =========================================================
         const productData = {
           name: name.trim(),
           category,
           price: priceNum,
-          unit: unit.trim(),
+          unit: resolvedUnit,
           image: imageUrl,
           stock: stockNum,
-
-          // New selling system
           sale_type: normalizedSaleType,
           piece_price: piecePriceNum,
           weight_price: weightPriceNum,
         };
 
+        console.log("🟢 STEP 3 - PRODUCT PAYLOAD:", productData);
+
+        // =========================================================
+        // 4) Save the product ONLY after image upload succeeds.
+        // =========================================================
         if (editingProduct) {
+          console.log("🚀 STEP 4 - UPDATE PRODUCT:", editingProduct.id);
+
           const response = await apiFetch(
             `/products/${editingProduct.id}`,
             {
@@ -374,26 +669,41 @@ const Products = ({ products, setProducts }: ProductsProps) => {
             }
           );
 
+          console.log("🟢 STEP 5 - UPDATE RESPONSE:", response);
+
           const updatedProduct =
             (response?.data ?? response?.product ?? response) as IProduct;
 
-          setProducts((prev) =>
-            prev.map((p) =>
-              p.id === updatedProduct.id ? updatedProduct : p
-            )
-          );
+          if (!updatedProduct?.id) {
+            throw new Error("الخادم لم يرجع بيانات المنتج بعد التعديل");
+          }
+
+          // Re-fetch the products list from the backend so the UI is
+          // synchronized with the actual database value.
+          await loadProducts();
 
           toast.success("تم تعديل المنتج بنجاح");
         } else {
+          console.log("🚀 STEP 4 - CREATE PRODUCT");
+
           const response = await apiFetch("/products", {
             method: "POST",
             body: JSON.stringify(productData),
           });
 
+          console.log("🟢 STEP 5 - CREATE RESPONSE:", response);
+
           const newProduct =
             (response?.data ?? response?.product ?? response) as IProduct;
 
-          setProducts((prev) => [newProduct, ...prev]);
+          if (!newProduct?.id) {
+            throw new Error("الخادم لم يرجع بيانات المنتج بعد الحفظ");
+          }
+
+          // Re-fetch from the backend so the displayed product is
+          // exactly what was persisted in the database.
+          await loadProducts();
+
           setCurrentPage(1);
           toast.success("تم إضافة المنتج بنجاح");
         }
@@ -401,11 +711,22 @@ const Products = ({ products, setProducts }: ProductsProps) => {
         closeModal();
       } catch (error) {
         console.error("PRODUCT SAVE ERROR:", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "حدث خطأ أثناء حفظ المنتج"
-        );
+        const msg = error instanceof Error ? error.message : "حدث خطأ أثناء حفظ المنتج";
+
+        if (
+          msg.includes("انتهت جلسة") ||
+          msg.toLowerCase().includes("unauthenticated") ||
+          msg.includes("401")
+        ) {
+          toast.error("انتهت جلسة لوحة الإدارة! يرجى تسجيل الدخول مرة أخرى لحفظ التعديلات", {
+            duration: 6000,
+          });
+          setTimeout(() => {
+            window.location.href = "/admin/login";
+          }, 1500);
+        } else {
+          toast.error(msg);
+        }
       } finally {
         setSaving(false);
       }
@@ -413,6 +734,7 @@ const Products = ({ products, setProducts }: ProductsProps) => {
     [
       editingProduct,
       uploadImage,
+      loadProducts,
       setProducts,
       closeModal,
       categoryGroups,
@@ -590,11 +912,10 @@ const Filters = ({
               key={item}
               type="button"
               onClick={() => onMainCategoryChange(item)}
-              className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-black transition ${
-                mainCategory === item
-                  ? "bg-indigo-600 text-white shadow-md"
-                  : "bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
-              }`}
+              className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-black transition ${mainCategory === item
+                ? "bg-indigo-600 text-white shadow-md"
+                : "bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+                }`}
             >
               {item}
             </button>
@@ -613,11 +934,10 @@ const Filters = ({
                 key={item}
                 type="button"
                 onClick={() => onCategoryChange(item)}
-                className={`shrink-0 rounded-xl px-4 py-2.5 text-xs font-black transition ${
-                  category === item
-                    ? "bg-emerald-600 text-white shadow-md"
-                    : "bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
-                }`}
+                className={`shrink-0 rounded-xl px-4 py-2.5 text-xs font-black transition ${category === item
+                  ? "bg-emerald-600 text-white shadow-md"
+                  : "bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                  }`}
               >
                 {item}
               </button>
@@ -753,11 +1073,10 @@ const Pagination = ({
               key={page}
               type="button"
               onClick={() => onPageChange(page)}
-              className={`min-w-[42px] rounded-xl px-3 py-2.5 text-sm font-black transition ${
-                currentPage === page
-                  ? "bg-indigo-600 text-white shadow-md"
-                  : "border border-slate-200 bg-white text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
-              }`}
+              className={`min-w-[42px] rounded-xl px-3 py-2.5 text-sm font-black transition ${currentPage === page
+                ? "bg-indigo-600 text-white shadow-md"
+                : "border border-slate-200 bg-white text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                }`}
             >
               {page}
             </button>
@@ -803,97 +1122,5 @@ const ProductGrid = ({
     ))}
   </div>
 );
-
-const ProductCard = ({
-  product,
-  onEdit,
-  onDelete,
-  isDeleting,
-  categoryGroups,
-}: {
-  product: IProduct;
-  onEdit: (product: IProduct) => void;
-  onDelete: (id: number) => void;
-  isDeleting: boolean;
-  categoryGroups: Record<string, string[]>;
-}) => {
-  const stockStatus =
-    product.stock <= 0
-      ? { text: "نفد المخزون", className: "bg-red-100 text-red-700" }
-      : product.stock <= 10
-      ? { text: "مخزون منخفض", className: "bg-amber-100 text-amber-700" }
-      : { text: "متوفر", className: "bg-emerald-100 text-emerald-700" };
-
-  const mainCategory = getMainCategory(product.category, categoryGroups);
-
-  return (
-    <article className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-      <div className="relative aspect-square overflow-hidden bg-slate-100">
-        <img
-          src={product.image}
-          alt={product.name}
-          className="h-full w-full object-contain transition duration-500 group-hover:scale-105"
-          onError={(e) => {
-            e.currentTarget.src = "/main_logo.png";
-            e.currentTarget.className = "h-full w-full object-contain p-10";
-          }}
-        />
-
-        <span className="absolute right-3 top-3 rounded-full bg-indigo-100 px-3 py-1.5 text-[10px] font-black text-indigo-700">
-          {mainCategory}
-        </span>
-
-        <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-[10px] font-black text-slate-600 shadow-sm backdrop-blur">
-          {product.category}
-        </span>
-
-        <span
-          className={`absolute bottom-3 right-3 rounded-full px-3 py-1.5 text-[10px] font-black ${stockStatus.className}`}
-        >
-          {stockStatus.text}
-        </span>
-      </div>
-
-      <div className="p-5">
-        <h3 className="truncate text-lg font-black text-slate-950">
-          {product.name}
-        </h3>
-
-        <p className="mt-1 text-sm font-bold text-slate-400">{product.unit}</p>
-
-        <div className="mt-4 flex items-end justify-between">
-          <p className="text-2xl font-black text-indigo-600">
-            {Number(product.price).toLocaleString("ar-EG")}
-            <span className="mr-1 text-xs">ج.م</span>
-          </p>
-
-          <div className="text-left">
-            <p className="text-[10px] font-bold text-slate-400">المخزون</p>
-            <p className="text-sm font-black text-slate-800">{product.stock}</p>
-          </div>
-        </div>
-
-        <div className="mt-5 flex gap-2">
-          <button
-            type="button"
-            onClick={() => onEdit(product)}
-            className="flex-1 rounded-xl border border-indigo-100 bg-indigo-50 py-3 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
-          >
-            تعديل
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onDelete(product.id)}
-            disabled={isDeleting}
-            className="flex-1 rounded-xl border border-red-100 bg-red-50 py-3 text-xs font-black text-red-600 transition hover:bg-red-100 disabled:opacity-50"
-          >
-            {isDeleting ? "جاري..." : "حذف"}
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-};
 
 export default Products;

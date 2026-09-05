@@ -24,7 +24,7 @@ const CTA = () => {
             </h2>
 
             <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-indigo-100 sm:text-base">
-              اكتشف مجموعة متنوعة من منتجات أولاد حكيم
+              اكتشف مجموعة متنوعة من منتجات أولاد الحكيم
               واختر كل اللي محتاجه بسهولة.
             </p>
 

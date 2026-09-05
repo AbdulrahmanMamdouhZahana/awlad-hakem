@@ -286,7 +286,7 @@ export default function Profile() {
           </h1>
 
           <p className="mt-1 text-sm font-medium text-slate-500">
-            إدارة بيانات حسابك في لوحة تحكم أولاد حكيم
+            إدارة بيانات حسابك في لوحة تحكم أولاد الحكيم
           </p>
         </div>
 

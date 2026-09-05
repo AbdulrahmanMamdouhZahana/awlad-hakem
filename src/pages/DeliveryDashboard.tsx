@@ -622,7 +622,7 @@ export default function DeliveryDashboard() {
       `الإجمالي: ${formatMoney(order.total || 0)} جنيه`,
       `العنوان: ${order.address || "-"}`,
       "",
-      "شكراً لطلبك من أولاد حكيم ❤️",
+      "شكراً لطلبك من أولاد الحكيم ❤️",
     ].join("\n")
 
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`

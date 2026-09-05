@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 
 import type { Dispatch, SetStateAction } from "react"
 import toast from "react-hot-toast"
@@ -30,6 +30,9 @@ interface iProducts {
   unit: string
   image: string
   stock: number
+  sale_type?: "piece" | "weight" | "both"
+  piece_price?: number | null
+  weight_price?: number | null
   created_at?: string
 }
 
@@ -716,7 +719,7 @@ const buildDeliveryWhatsAppMessage = (
   return [
     "السلام عليكم 👋",
     "",
-    "*طلب جديد - أولاد حكيم*",
+    "*طلب جديد - أولاد الحكيم*",
     `📦 رقم الطلب: #${order.id}`,
     "",
     `👤 العميل: ${order.customer_name}`,
@@ -968,6 +971,9 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
     stock: number
     imageFile?: File
     image: string
+    saleType?: "piece" | "weight" | "both"
+    piecePrice?: number | null
+    weightPrice?: number | null
   }) => {
     try {
       setSavingProduct(true)
@@ -979,24 +985,44 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
         toast.loading("جاري رفع الصورة...", { id: "upload-image" })
         imageUrl = await uploadProductImage(data.imageFile)
         toast.dismiss("upload-image")
-      } else if (data.image.trim()) {
+      } else if (data.image && data.image.trim()) {
         imageUrl = data.image.trim()
+      } else if (editingProduct?.image) {
+        imageUrl = editingProduct.image
       } else {
         imageUrl = await resolveDashboardImageUrl(data.name, "")
       }
 
       if (!imageUrl) {
-        toast.error("لم أجد صورة مطابقة في public/ أو رابط الصورة غير صحيح")
+        toast.error("يرجى اختيار صورة للمنتج أو إدخال رابط صحيح")
         return
       }
+
+      const normalizedSaleType: "piece" | "weight" | "both" =
+        data.saleType === "weight" || data.saleType === "both"
+          ? data.saleType
+          : "piece"
+
+      const piecePriceNum =
+        normalizedSaleType === "weight"
+          ? null
+          : (data.piecePrice != null ? Number(data.piecePrice) : Number(data.price))
+
+      const weightPriceNum =
+        normalizedSaleType === "piece"
+          ? null
+          : (data.weightPrice != null ? Number(data.weightPrice) : null)
 
       const productData = {
         name: data.name.trim(),
         category: data.category, // Use sub-category as the main category field
         price: data.price,
-        unit: data.unit.trim(),
+        unit: String(data.unit ?? "").trim() || (normalizedSaleType === "weight" ? "كيلو" : "قطعة"),
         image: imageUrl,
         stock: data.stock,
+        sale_type: normalizedSaleType,
+        piece_price: piecePriceNum,
+        weight_price: weightPriceNum,
       }
 
       if (editingProduct) {
@@ -1026,6 +1052,7 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
         error instanceof Error ? error.message : "حدث خطأ أثناء حفظ المنتج"
       )
     } finally {
+      toast.dismiss("upload-image")
       setSavingProduct(false)
     }
   }
@@ -1035,11 +1062,11 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
   // =====================================================
 
   const handleSaveProduct = async () => {
+    const resolvedUnit = String(newProduct.unit ?? "").trim() || "قطعة";
 
     if (
       !newProduct.name.trim() ||
-      !newProduct.price ||
-      !newProduct.unit.trim()
+      !newProduct.price
     ) {
 
       toast.error(
@@ -1142,13 +1169,15 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
 
         price,
 
-        unit:
-          newProduct.unit.trim(),
+        unit: resolvedUnit,
 
         image:
           imageUrl,
 
         stock,
+        sale_type: editingProduct?.sale_type || "piece",
+        piece_price: price,
+        weight_price: null,
       }
 
 
@@ -1249,114 +1278,74 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
   // Delete Product
   // =====================================================
 
-  const handleDeleteProduct = async (
-    productId: number
-  ) => {
+  const handleDeleteProduct = useCallback(
+    async (productId: number) => {
+      const product = products.find((p) => p.id === productId)
+      if (!product) return
 
-    const product =
-      products.find(
-        (p) => p.id === productId
-      )
-
-    if (!product) return
-
-
-    const confirmed =
-      window.confirm(
+      const confirmed = window.confirm(
         `هل أنت متأكد من حذف "${product.name}"؟`
       )
+      if (!confirmed) return
 
+      try {
+        await deleteProduct(productId)
 
-    if (!confirmed) return
-
-
-    try {
-
-      await deleteProduct(
-        productId
-      )
-
-
-      setProducts((prev) =>
-        prev.filter(
-          (product) =>
-            product.id !== productId
+        setProducts((prev) =>
+          prev.filter((product) => product.id !== productId)
         )
-      )
 
-
-      toast.success(
-        "تم حذف المنتج بنجاح"
-      )
-
-    } catch (error) {
-
-      console.error(
-        "SUPABASE DELETE ERROR:",
-        error
-      )
-
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "حدث خطأ أثناء حذف المنتج"
-      )
-
-    }
-  }
-
+        toast.success("تم حذف المنتج بنجاح")
+      } catch (error) {
+        console.error("SUPABASE DELETE ERROR:", error)
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "حدث خطأ أثناء حذف المنتج"
+        )
+      }
+    },
+    [products]
+  )
 
   // =====================================================
   // Open Add Modal
   // =====================================================
 
   const handleOpenModal = () => {
-
     setEditingProduct(null)
-
     setImageFile(null)
-
     setNewProduct({
       name: "",
-      category:
-        "السوبر ماركت",
+      category: "السوبر ماركت",
       price: "",
       unit: "",
       image: "",
       stock: "0",
     })
-
     setShowModal(true)
   }
-
 
   // =====================================================
   // Open Edit Modal
   // =====================================================
 
-  const handleEditProduct = (
-    product: iProducts
-  ) => {
-
-    setEditingProduct(product)
-
-    setImageFile(null)
-
-    setNewProduct({
-      name: product.name,
-      category: product.category,
-      price: String(
-        product.price
-      ),
-      unit: product.unit,
-      image: product.image,
-      stock: String(
-        product.stock
-      ),
-    })
-
-    setShowModal(true)
-  }
+  const handleEditProduct = useCallback(
+    (product: iProducts) => {
+      setEditingProduct(product)
+      setImageFile(null)
+      setNewProduct({
+        name: product.name,
+        category: product.category,
+        price: String(product.price),
+        unit: product.unit,
+        image: product.image,
+        stock: String(product.stock),
+      })
+      setShowModal(true)
+    },
+    []
+  )
 
 
   // =====================================================
@@ -1444,7 +1433,7 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                   <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
                     <div>
                       <p className="mb-2 text-sm font-semibold text-indigo-100">مرحباً بك 👋</p>
-                      <h1 className="text-2xl font-black sm:text-3xl">أهلاً بك في لوحة أولاد حكيم</h1>
+                      <h1 className="text-2xl font-black sm:text-3xl">أهلاً بك في لوحة أولاد الحكيم</h1>
                       <p className="mt-2 max-w-2xl text-sm leading-7 text-indigo-100 sm:text-base">
                         تابع الطلبات، أدِر المنتجات، وراقب حالة المتجر من مكان واحد.
                       </p>
