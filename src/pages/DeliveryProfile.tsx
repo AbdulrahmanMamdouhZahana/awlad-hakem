@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import { useOutletContext, useNavigate } from "react-router-dom"
 import { apiFetch } from "../services/api"
+import { confirmAction } from "../utils/alerts"
 
 interface DeliveryUser {
   id: number
@@ -92,7 +93,15 @@ export default function DeliveryProfile() {
   }
 
   const logout = async () => {
-    const confirmed = window.confirm("هل أنت متأكد من تسجيل الخروج؟")
+    const confirmed = await confirmAction(
+      "تسجيل الخروج",
+      "هل أنت متأكد من تسجيل الخروج؟",
+      {
+        confirmText: "نعم، خروج",
+        confirmColor: "#ef4444",
+        icon: "warning",
+      }
+    )
     if (!confirmed) return
 
     try {

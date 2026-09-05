@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import toast from "react-hot-toast"
 import { apiFetch } from "../../services/api"
 import { OrderCard, OrderDetailsModal } from "../UI"
+import { confirmDelete } from "../../utils/alerts"
 
 import type {
   Order as OrderCardOrder,
@@ -544,8 +545,9 @@ const buildDeliveryWhatsAppMessage = (
 
     const actionText = isDelivered ? "حذف" : "إلغاء وحذف"
 
-    const confirmed = window.confirm(
-      `هل أنت متأكد من ${actionText} الطلب #${order.id}؟\\n\\nسيتم حذف الطلب نهائياً ولا يمكن استرجاعه.`
+    const confirmed = await confirmDelete(
+      `${actionText} الطلب #${order.id}`,
+      "سيتم حذف هذا الطلب نهائياً ولا يمكن استرجاعه."
     )
 
     if (!confirmed) return

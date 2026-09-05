@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Modal from "./Modal";
 import toast from "react-hot-toast";
+import { promptText } from "../../utils/alerts";
 
 interface Product {
   id: number;
@@ -69,12 +70,10 @@ const ProductModal = ({
 
   const subCategories = categories[form.mainCategory] ?? [];
 
-  const addMainCategory = () => {
+  const addMainCategory = async () => {
     if (!onCategoriesChange) return;
 
-    const name = window.prompt("اكتب اسم القسم الرئيسي الجديد:");
-    const trimmed = name?.trim();
-
+    const trimmed = await promptText("إضافة قسم رئيسي جديد", "اكتب اسم القسم الرئيسي الجديد...");
     if (!trimmed) return;
 
     if (categories[trimmed]) {
@@ -96,14 +95,13 @@ const ProductModal = ({
     toast.success("تم إضافة القسم الرئيسي");
   };
 
-  const addSubCategory = () => {
+  const addSubCategory = async () => {
     if (!onCategoriesChange || !form.mainCategory) return;
 
-    const name = window.prompt(
-      `اكتب اسم القسم الفرعي الجديد داخل "${form.mainCategory}":`
+    const trimmed = await promptText(
+      `إضافة قسم فرعي داخل "${form.mainCategory}"`,
+      "اكتب اسم القسم الفرعي الجديد..."
     );
-    const trimmed = name?.trim();
-
     if (!trimmed) return;
 
     const currentSubCategories = categories[form.mainCategory] ?? [];

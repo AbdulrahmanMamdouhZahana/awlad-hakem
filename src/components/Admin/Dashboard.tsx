@@ -17,6 +17,7 @@ import { supabase } from "../../lib/supabase"
 import { apiFetch } from "../../services/api"
 import { OrderCard, OrderDetailsModal, ProductModal } from "../UI"
 import type { Order as OrderCardOrder } from "../UI/Cards/OrderCard"
+import { confirmDelete } from "../../utils/alerts"
 
 // =====================================================
 // Product
@@ -549,8 +550,9 @@ const loadOrders = async () => {
     const delivery = deliveries.find((d) => d.id === deliveryId)
     if (!delivery) return
 
-    const confirmed = window.confirm(
-      `هل أنت متأكد من حذف "${delivery.name}"؟`
+    const confirmed = await confirmDelete(
+      `حذف "${delivery.name}"`,
+      `هل أنت متأكد من حذف مندوب التوصيل "${delivery.name}"؟`
     )
 
     if (!confirmed) return
@@ -914,8 +916,9 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
 
     const actionText = isDelivered ? "حذف" : "إلغاء وحذف"
 
-    const confirmed = window.confirm(
-      `هل أنت متأكد من ${actionText} الطلب #${order.id}؟\nسيتم حذف الطلب نهائيًا ولا يمكن التراجع عنه.`
+    const confirmed = await confirmDelete(
+      `${actionText} الطلب #${order.id}`,
+      `هل أنت متأكد من ${actionText} الطلب #${order.id}؟ لا يمكن التراجع عن هذه الخطوة.`
     )
 
     if (!confirmed) return
@@ -1283,8 +1286,9 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
       const product = products.find((p) => p.id === productId)
       if (!product) return
 
-      const confirmed = window.confirm(
-        `هل أنت متأكد من حذف "${product.name}"؟`
+      const confirmed = await confirmDelete(
+        `حذف "${product.name}"`,
+        `هل أنت متأكد من حذف المنتج "${product.name}"؟`
       )
       if (!confirmed) return
 

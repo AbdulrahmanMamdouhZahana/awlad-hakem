@@ -3,6 +3,7 @@ import toast from "react-hot-toast"
 import { supabase } from "../lib/supabase"
 import { useOutletContext } from "react-router-dom"
 import { apiFetch } from "../services/api"
+import { confirmDelete } from "../utils/alerts"
 
 // =====================================================
 // Types
@@ -357,7 +358,11 @@ export default function DeliveryDashboard() {
   // =====================================
 
   const deleteOrder = useCallback(async (orderId: number) => {
-    if (!window.confirm(`هل أنت متأكد من حذف الطلب #${orderId}؟\nهذا الإجراء لا يمكن التراجع عنه.`)) {
+    const confirmed = await confirmDelete(
+      `حذف الطلب #${orderId}`,
+      `هل أنت متأكد من حذف الطلب #${orderId}؟ هذا الإجراء لا يمكن التراجع عنه.`
+    )
+    if (!confirmed) {
       return
     }
 

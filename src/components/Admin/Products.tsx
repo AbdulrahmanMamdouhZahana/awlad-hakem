@@ -4,6 +4,7 @@ import { apiFetch } from "../../services/api";
 import { ProductModal } from "../UI";
 import ProductCard from "../Products";
 import { supabase } from "../../lib/supabase";
+import { confirmDelete } from "../../utils/alerts";
 
 export interface IProduct {
   id: number;
@@ -746,7 +747,12 @@ const Products = ({ products, setProducts }: ProductsProps) => {
       const product = products.find((p) => p.id === id);
       if (!product) return;
 
-      if (!window.confirm(`هل أنت متأكد من حذف "${product.name}"؟`)) {
+      const confirmed = await confirmDelete(
+        `حذف منتج "${product.name}"`,
+        "هل أنت متأكد من حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء."
+      );
+
+      if (!confirmed) {
         return;
       }
 
