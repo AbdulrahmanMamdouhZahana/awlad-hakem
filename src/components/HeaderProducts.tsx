@@ -102,9 +102,9 @@ const HeaderProducts = ({
     <section
       id="products"
       dir="rtl"
-      className="bg-[#fafafc] py-10 sm:py-12"
+      className="bg-[#fafafc] py-6 sm:py-12"
     >
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-2 sm:px-6 lg:px-8">
 
         {/* =====================================
             Main Categories
@@ -248,7 +248,7 @@ const HeaderProducts = ({
             Products Header
         ===================================== */}
 
-        <div className="mb-5 flex items-center justify-between">
+        <div className="mb-4 sm:mb-5 flex items-center justify-between px-1 sm:px-0">
 
           <div>
 
@@ -277,9 +277,11 @@ const HeaderProducts = ({
           <div
             className="
               grid
-              grid-cols-2
-              gap-3
+              grid-cols-3
+              gap-2
               sm:gap-4
+              md:gap-5
+              lg:grid-cols-4
             "
           >
 
