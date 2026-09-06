@@ -333,8 +333,8 @@ const ProductCard = ({
         hover:-translate-y-1.5
         ${
           offer
-            ? "border-red-500/90 bg-gradient-to-b from-red-50/30 via-white to-white shadow-[0_4px_18px_-4px_rgba(239,68,68,0.18)] ring-1 ring-red-400/30 hover:border-red-600 hover:ring-2 hover:ring-red-500/40 hover:shadow-[0_14px_32px_-6px_rgba(239,68,68,0.28)]"
-            : "border-slate-200/90 shadow-[0_2px_8px_-2px_rgba(15,23,42,0.06)] hover:border-[#17656b] hover:ring-2 hover:ring-[#17656b]/20 hover:shadow-[0_12px_28px_-6px_rgba(23,101,107,0.2)]"
+            ? "border-red-500 ring-1 ring-red-400/40 bg-gradient-to-b from-red-50/30 via-white to-white shadow-[0_4px_18px_-4px_rgba(239,68,68,0.2)] hover:border-red-600 hover:ring-2 hover:ring-red-500/50 hover:shadow-[0_16px_34px_-6px_rgba(239,68,68,0.32)]"
+            : "border-[#17656b]/60 ring-1 ring-[#17656b]/20 shadow-[0_3px_12px_-2px_rgba(23,101,107,0.12)] hover:border-[#17656b] hover:ring-2 hover:ring-[#17656b]/40 hover:shadow-[0_16px_32px_-6px_rgba(23,101,107,0.24)]"
         }
         ${className}
       `}

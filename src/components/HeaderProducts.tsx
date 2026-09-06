@@ -315,7 +315,7 @@ const HeaderProducts = ({
 
               <div
                 key={product.id}
-                className="min-w-0 h-full"
+                className="min-w-0 h-full flex flex-col"
               >
 
                 <Products
