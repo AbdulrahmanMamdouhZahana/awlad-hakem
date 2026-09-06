@@ -5,12 +5,7 @@ import { ProductModal } from "../UI";
 import ProductCard from "../Products";
 import { supabase } from "../../lib/supabase";
 import { confirmDelete } from "../../utils/alerts";
-import {
-  getProductOffer,
-  setProductOffer,
-  removeProductOffer,
-  OFFERS_CHANGED_EVENT,
-} from "../../services/offerService";
+import { isOfferActive } from "../../services/offerService";
 
 export interface IProduct {
   id: number;
@@ -29,6 +24,7 @@ export interface IProduct {
   original_price?: number | null;
   discount_percentage?: number | null;
   offer_badge?: string | null;
+  offer_expires_at?: string | null;
 }
 
 interface ProductsProps {
@@ -221,7 +217,6 @@ const Products = ({ products, setProducts }: ProductsProps) => {
   const [mainCategory, setMainCategory] = useState("الكل");
   const [category, setCategory] = useState("الكل");
   const [onlyOffers, setOnlyOffers] = useState(false);
-  const [offersVersion, setOffersVersion] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -232,14 +227,6 @@ const Products = ({ products, setProducts }: ProductsProps) => {
     useState<Record<string, string[]>>(CATEGORY_GROUPS);
 
   const mainCategories = useMemo(() => Object.keys(categoryGroups), [categoryGroups]);
-
-  useEffect(() => {
-    const handleOffersChanged = () => {
-      setOffersVersion((v) => v + 1);
-    };
-    window.addEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged);
-    return () => window.removeEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged);
-  }, []);
 
   useEffect(() => {
     const savedGroups = loadCategoryGroups();
@@ -294,7 +281,7 @@ const Products = ({ products, setProducts }: ProductsProps) => {
     const searchValue = search.trim().toLowerCase();
 
     return products.filter((product) => {
-      const hasOffer = Boolean(getProductOffer(product.id) || product.is_offer);
+      const hasOffer = isOfferActive(product);
       if (onlyOffers && !hasOffer) {
         return false;
       }
@@ -316,7 +303,7 @@ const Products = ({ products, setProducts }: ProductsProps) => {
 
       return matchesSearch && matchesMainCategory && matchesCategory;
     });
-  }, [products, search, mainCategory, category, onlyOffers, categoryGroups, offersVersion]);
+  }, [products, search, mainCategory, category, onlyOffers, categoryGroups]);
 
   const totalPages = Math.max(
     1,
@@ -345,9 +332,9 @@ const Products = ({ products, setProducts }: ProductsProps) => {
       currentPageCount: paginatedProducts.length,
       lowStock: products.filter((p) => p.stock > 0 && p.stock <= 10).length,
       outOfStock: products.filter((p) => p.stock <= 0).length,
-      offersCount: products.filter((p) => Boolean(getProductOffer(p.id) || p.is_offer)).length,
+      offersCount: products.filter((p) => isOfferActive(p)).length,
     }),
-    [products, filteredProducts, paginatedProducts, offersVersion]
+    [products, filteredProducts, paginatedProducts]
   );
 
   const openAddModal = useCallback(() => {
@@ -667,8 +654,25 @@ const Products = ({ products, setProducts }: ProductsProps) => {
         console.log("🟢 STEP 2 - FINAL IMAGE URL:", imageUrl);
 
         // =========================================================
-        // 3) Build the product payload.
+        // 3) Build the product payload with offer fields.
         // =========================================================
+        const offerPriceNum =
+          formData.isOffer && formData.offerPrice
+            ? Number(formData.offerPrice)
+            : null;
+
+        const originalPriceNum = priceNum;
+
+        const discountPercentageNum =
+          formData.isOffer &&
+          offerPriceNum !== null &&
+          originalPriceNum > 0 &&
+          offerPriceNum < originalPriceNum
+            ? Math.round(
+                ((originalPriceNum - offerPriceNum) / originalPriceNum) * 100
+              )
+            : null;
+
         const productData = {
           name: name.trim(),
           category,
@@ -679,6 +683,19 @@ const Products = ({ products, setProducts }: ProductsProps) => {
           sale_type: normalizedSaleType,
           piece_price: piecePriceNum,
           weight_price: weightPriceNum,
+
+          is_offer: Boolean(formData.isOffer && offerPriceNum),
+          offer_price: offerPriceNum,
+          original_price: formData.isOffer ? originalPriceNum : null,
+          discount_percentage: discountPercentageNum,
+          offer_badge:
+            formData.isOffer && offerPriceNum
+              ? String(formData.offerBadge || "").trim() || "عرض خاص 🔥"
+              : null,
+          offer_expires_at:
+            formData.isOffer && formData.offer_expires_at
+              ? formData.offer_expires_at
+              : null,
         };
 
         console.log("🟢 STEP 3 - PRODUCT PAYLOAD:", productData);
@@ -706,19 +723,6 @@ const Products = ({ products, setProducts }: ProductsProps) => {
             throw new Error("الخادم لم يرجع بيانات المنتج بعد التعديل");
           }
 
-          // Offer handling
-          if (formData.isOffer && formData.offerPrice) {
-            setProductOffer(editingProduct.id, {
-              originalPrice: priceNum,
-              offerPrice: Number(formData.offerPrice),
-              discountPercentage: formData.discountPercentage ? Number(formData.discountPercentage) : undefined,
-              offerBadge: formData.offerBadge,
-              isOffer: true,
-            });
-          } else {
-            removeProductOffer(editingProduct.id);
-          }
-
           // Re-fetch the products list from the backend so the UI is
           // synchronized with the actual database value.
           await loadProducts();
@@ -739,17 +743,6 @@ const Products = ({ products, setProducts }: ProductsProps) => {
 
           if (!newProduct?.id) {
             throw new Error("الخادم لم يرجع بيانات المنتج بعد الحفظ");
-          }
-
-          // Offer handling for new product
-          if (formData.isOffer && formData.offerPrice) {
-            setProductOffer(newProduct.id, {
-              originalPrice: priceNum,
-              offerPrice: Number(formData.offerPrice),
-              discountPercentage: formData.discountPercentage ? Number(formData.discountPercentage) : undefined,
-              offerBadge: formData.offerBadge,
-              isOffer: true,
-            });
           }
 
           // Re-fetch from the backend so the displayed product is

@@ -1,9 +1,6 @@
-import { useState, useMemo, useEffect, memo } from "react"
+import { useState, useMemo, memo } from "react"
 import { createPortal } from "react-dom"
-import {
-  getProductOffer,
-  OFFERS_CHANGED_EVENT,
-} from "../services/offerService"
+import { getActiveOffer } from "../services/offerService"
 
 export interface iProducts {
   id: number
@@ -22,6 +19,7 @@ export interface iProducts {
   original_price?: number | null
   discount_percentage?: number | null
   offer_badge?: string | null
+  offer_expires_at?: string | null
 }
 
 export type IProduct = iProducts
@@ -174,33 +172,9 @@ const ProductCard = ({
     saleType === "weight" ? "weight" : "piece"
   )
   const [selectedWeight, setSelectedWeight] = useState("0.25")
-  const [offersVersion, setOffersVersion] = useState(0)
-
-  useEffect(() => {
-    const handleOffersChanged = () => setOffersVersion((v) => v + 1)
-    window.addEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
-    return () => window.removeEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
-  }, [])
-
   const offer = useMemo(() => {
-    const localOffer = getProductOffer(product.id)
-    if (localOffer && localOffer.isOffer && localOffer.offerPrice > 0) {
-      return localOffer
-    }
-    if (product.is_offer && product.offer_price && Number(product.offer_price) > 0) {
-      const orig = product.original_price ?? product.price
-      return {
-        isOffer: true,
-        originalPrice: orig,
-        offerPrice: Number(product.offer_price),
-        discountPercentage:
-          product.discount_percentage ??
-          (orig > 0 ? Math.round(((orig - Number(product.offer_price)) / orig) * 100) : undefined),
-        offerBadge: product.offer_badge || "عرض خاص 🔥",
-      }
-    }
-    return null
-  }, [product, offersVersion])
+    return getActiveOffer(product)
+  }, [product])
 
   const effectiveProduct = useMemo(() => {
     if (!offer) return product
@@ -208,6 +182,7 @@ const ProductCard = ({
       ...product,
       price: offer.offerPrice,
       piece_price: product.piece_price != null ? offer.offerPrice : product.piece_price,
+      weight_price: product.sale_type === "weight" ? offer.offerPrice : product.weight_price,
       is_offer: true,
       offer_price: offer.offerPrice,
       original_price: offer.originalPrice,

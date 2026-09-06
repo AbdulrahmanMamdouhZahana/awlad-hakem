@@ -1,10 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from "react"
 import { Link } from "react-router-dom"
 import Products from "../components/Products"
-import {
-  getProductOffer,
-  OFFERS_CHANGED_EVENT,
-} from "../services/offerService"
+import { isOfferActive } from "../services/offerService"
 
 interface iProducts {
   id: number
@@ -20,6 +17,7 @@ interface iProducts {
   original_price?: number | null
   discount_percentage?: number | null
   offer_badge?: string | null
+  offer_expires_at?: string | null
 }
 
 interface IProps {
@@ -47,13 +45,7 @@ const ProductsPage = ({
   const [selectedSubCategory, setSelectedSubCategory] = useState("الكل")
   const [currentPage, setCurrentPage] = useState(1)
   const [sortBy, setSortBy] = useState<"newest" | "price-low" | "price-high" | "name">("newest")
-  const [offersVersion, setOffersVersion] = useState(0)
 
-  useEffect(() => {
-    const handleOffersChanged = () => setOffersVersion((v) => v + 1)
-    window.addEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
-    return () => window.removeEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
-  }, [])
 
   const productsPerPage = 24
 
@@ -131,7 +123,7 @@ const ProductsPage = ({
       let matchesMainCategory = selectedMainCategory === "الكل"
 
       if (selectedMainCategory === "العروض") {
-        matchesMainCategory = Boolean(getProductOffer(product.id) || product.is_offer)
+        matchesMainCategory = isOfferActive(product)
       } else if (!matchesMainCategory) {
         const productMainCategory = getMainCategory(productCategory)
         matchesMainCategory = productMainCategory === selectedMainCategory
@@ -176,7 +168,7 @@ const ProductsPage = ({
 
     return result
 
-  }, [products, searchQuery, selectedMainCategory, selectedSubCategory, sortBy, offersVersion])
+  }, [products, searchQuery, selectedMainCategory, selectedSubCategory, sortBy])
 
   // =========================
   // Pagination

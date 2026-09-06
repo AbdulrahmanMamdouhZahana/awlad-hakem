@@ -13,12 +13,7 @@ import {
   uploadProductImage,
 } from "../../services/productService"
 
-import {
-  getProductOffer,
-  setProductOffer,
-  removeProductOffer,
-  OFFERS_CHANGED_EVENT,
-} from "../../services/offerService"
+import { isOfferActive } from "../../services/offerService"
 
 import { supabase } from "../../lib/supabase"
 import { apiFetch } from "../../services/api"
@@ -47,6 +42,7 @@ interface iProducts {
   original_price?: number | null
   discount_percentage?: number | null
   offer_badge?: string | null
+  offer_expires_at?: string | null
 }
 
 
@@ -246,17 +242,7 @@ const Dashboard = ({
     "المقلاة": ["المقلاة"],
   })
 
-  const [, setOffersVersion] = useState(0)
-
-  useEffect(() => {
-    const handleOffersChanged = () => setOffersVersion((v) => v + 1)
-    window.addEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
-    return () => window.removeEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
-  }, [])
-
-  const activeOffersCount = products.filter(
-    (p) => Boolean(getProductOffer(p.id) || p.is_offer)
-  ).length
+  const activeOffersCount = products.filter(isOfferActive).length
 
   // =====================================================
   // Orders State
@@ -1014,6 +1000,7 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
     offerPrice?: string | number
     discountPercentage?: string | number
     offerBadge?: string
+    offerExpiresAt?: string | null
   }) => {
     try {
       setSavingProduct(true)
@@ -1053,6 +1040,21 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
           ? null
           : (data.weightPrice != null ? Number(data.weightPrice) : null)
 
+      const offerPriceNum =
+        data.isOffer && data.offerPrice
+          ? Number(data.offerPrice)
+          : null
+
+      const originalPriceNum = data.price
+
+      const discountPercentageNum =
+        data.isOffer &&
+        offerPriceNum !== null &&
+        originalPriceNum > 0 &&
+        offerPriceNum < originalPriceNum
+          ? Math.round(((originalPriceNum - offerPriceNum) / originalPriceNum) * 100)
+          : (data.discountPercentage != null && Number(data.discountPercentage) > 0 ? Number(data.discountPercentage) : null)
+
       const productData = {
         name: data.name.trim(),
         category: data.category, // Use sub-category as the main category field
@@ -1063,23 +1065,23 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
         sale_type: normalizedSaleType,
         piece_price: piecePriceNum,
         weight_price: weightPriceNum,
+
+        is_offer: Boolean(data.isOffer && offerPriceNum),
+        offer_price: offerPriceNum,
+        original_price: data.isOffer ? originalPriceNum : null,
+        discount_percentage: discountPercentageNum,
+        offer_badge:
+          data.isOffer && offerPriceNum
+            ? String(data.offerBadge || "").trim() || "عرض خاص 🔥"
+            : null,
+        offer_expires_at:
+          data.isOffer && offerPriceNum && data.offerExpiresAt
+            ? String(data.offerExpiresAt)
+            : null,
       }
 
       if (editingProduct) {
         const updatedProduct = await updateProduct(editingProduct.id, productData)
-
-        // Save or remove offer
-        if (data.isOffer && data.offerPrice) {
-          setProductOffer(editingProduct.id, {
-            originalPrice: data.price,
-            offerPrice: Number(data.offerPrice),
-            discountPercentage: data.discountPercentage ? Number(data.discountPercentage) : undefined,
-            offerBadge: data.offerBadge,
-            isOffer: true,
-          })
-        } else {
-          removeProductOffer(editingProduct.id)
-        }
 
         setProducts((prev) =>
           prev.map((product) =>
@@ -1090,17 +1092,6 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
         toast.success("تم تعديل المنتج بنجاح")
       } else {
         const product = await addProduct(productData)
-
-        // Save offer for new product
-        if (data.isOffer && data.offerPrice) {
-          setProductOffer(product.id, {
-            originalPrice: data.price,
-            offerPrice: Number(data.offerPrice),
-            discountPercentage: data.discountPercentage ? Number(data.discountPercentage) : undefined,
-            offerBadge: data.offerBadge,
-            isOffer: true,
-          })
-        }
 
         setProducts((prev) => [product, ...prev])
 
@@ -1355,7 +1346,6 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
 
       try {
         await deleteProduct(productId)
-        removeProductOffer(productId)
 
         setProducts((prev) =>
           prev.filter((product) => product.id !== productId)

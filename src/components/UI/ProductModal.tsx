@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import Modal from "./Modal";
 import toast from "react-hot-toast";
 import { promptText } from "../../utils/alerts";
-import { getProductOffer } from "../../services/offerService";
 
 interface Product {
   id: number;
@@ -20,6 +19,7 @@ interface Product {
   original_price?: number | null;
   discount_percentage?: number | null;
   offer_badge?: string | null;
+  offer_expires_at?: string | null;
 }
 
 interface ProductModalProps {
@@ -71,6 +71,7 @@ const ProductModal = ({
     offerPrice: "",
     discountPercentage: "",
     offerBadge: "عرض خاص 🔥",
+    offerExpiresAt: "",
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -139,28 +140,24 @@ const ProductModal = ({
       ? getMainCategoryForProduct(editingProduct.category)
       : mainCategories[0] || "";
 
-    const existingOffer = editingProduct ? getProductOffer(editingProduct.id) : null;
     const isOfferActive = Boolean(
-      existingOffer?.isOffer ||
       editingProduct?.is_offer ||
       (editingProduct?.offer_price && Number(editingProduct.offer_price) > 0)
     );
     const offerPriceVal =
-      existingOffer?.offerPrice != null
-        ? existingOffer.offerPrice.toString()
-        : editingProduct?.offer_price != null
-          ? editingProduct.offer_price.toString()
-          : "";
+      editingProduct?.offer_price != null
+        ? editingProduct.offer_price.toString()
+        : "";
     const discountVal =
-      existingOffer?.discountPercentage != null
-        ? existingOffer.discountPercentage.toString()
-        : editingProduct?.discount_percentage != null
-          ? editingProduct.discount_percentage.toString()
-          : "";
+      editingProduct?.discount_percentage != null
+        ? editingProduct.discount_percentage.toString()
+        : "";
     const badgeVal =
-      existingOffer?.offerBadge ||
       editingProduct?.offer_badge ||
       "عرض خاص 🔥";
+    const expiresVal = editingProduct?.offer_expires_at
+      ? editingProduct.offer_expires_at.substring(0, 16)
+      : "";
 
     setForm({
       name: editingProduct?.name || "",
@@ -186,6 +183,7 @@ const ProductModal = ({
       offerPrice: offerPriceVal,
       discountPercentage: discountVal,
       offerBadge: badgeVal,
+      offerExpiresAt: expiresVal,
     });
 
     setImageFile(null);
@@ -374,6 +372,8 @@ const ProductModal = ({
       discount_percentage: finalDiscountPercentage,
       offerBadge: form.isOffer ? form.offerBadge || "عرض خاص 🔥" : null,
       offer_badge: form.isOffer ? form.offerBadge || "عرض خاص 🔥" : null,
+      offer_expires_at: form.isOffer && form.offerExpiresAt ? form.offerExpiresAt : null,
+      offerExpiresAt: form.isOffer && form.offerExpiresAt ? form.offerExpiresAt : null,
     });
   };
 
@@ -395,6 +395,7 @@ const ProductModal = ({
       offerPrice: "",
       discountPercentage: "",
       offerBadge: "عرض خاص 🔥",
+      offerExpiresAt: "",
     });
 
     setImageFile(null);
@@ -720,16 +721,16 @@ const ProductModal = ({
 
           {form.isOffer && (
             <div className="mt-4 border-t border-amber-200/60 pt-4 space-y-4">
-              <div className="grid gap-3 sm:grid-cols-3">
-                {/* Offer Price */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Offer Price Input */}
                 <div>
                   <label className="mb-1.5 block text-xs font-black text-slate-800">
-                    سعر العرض بعد الخصم (ج.م) *
+                    سعر العرض (ج.م) *
                   </label>
                   <input
                     type="number"
-                    min="0"
                     step="0.01"
+                    min="0"
                     value={form.offerPrice}
                     onChange={(e) => {
                       const newOfferPrice = e.target.value;
@@ -795,6 +796,21 @@ const ProductModal = ({
                       setForm((prev) => ({ ...prev, offerBadge: e.target.value }))
                     }
                     placeholder="مثال: عرض خاص 🔥"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold outline-none transition focus:border-[#17656b]"
+                  />
+                </div>
+
+                {/* Offer Expiration Date */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-black text-slate-800">
+                    تاريخ انتهاء العرض (اختياري)
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={form.offerExpiresAt}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, offerExpiresAt: e.target.value }))
+                    }
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold outline-none transition focus:border-[#17656b]"
                   />
                 </div>

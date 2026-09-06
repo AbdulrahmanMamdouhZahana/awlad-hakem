@@ -20,6 +20,7 @@ export interface iProducts {
   original_price?: number | null
   discount_percentage?: number | null
   offer_badge?: string | null
+  offer_expires_at?: string | null
 }
 
 // =====================================

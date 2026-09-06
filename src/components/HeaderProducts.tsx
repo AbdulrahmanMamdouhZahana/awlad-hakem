@@ -1,10 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import Products from "./Products"
-import {
-  getProductOffer,
-  OFFERS_CHANGED_EVENT,
-} from "../services/offerService"
+import { isOfferActive } from "../services/offerService"
 
 // =====================================
 // Customer Categories
@@ -69,13 +66,6 @@ const HeaderProducts = ({
 
   const [selectedMainCategory, setSelectedMainCategory] = useState("الكل")
   const [selectedSubCategory, setSelectedSubCategory] = useState("الكل")
-  const [offersVersion, setOffersVersion] = useState(0)
-
-  useEffect(() => {
-    const handleOffersChanged = () => setOffersVersion((v) => v + 1)
-    window.addEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
-    return () => window.removeEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
-  }, [])
 
   const subCategories = useMemo(() => {
     if (selectedMainCategory === "الكل" || selectedMainCategory === "العروض") return []
@@ -90,9 +80,7 @@ const HeaderProducts = ({
     let result = products
 
     if (selectedMainCategory === "العروض") {
-      result = result.filter((product) =>
-        Boolean(getProductOffer(product.id) || product.is_offer)
-      )
+      result = result.filter(isOfferActive)
     } else if (selectedMainCategory !== "الكل") {
       const allowedSubCategories = CATEGORY_GROUPS[selectedMainCategory] ?? []
 
@@ -108,7 +96,7 @@ const HeaderProducts = ({
     }
 
     return result.slice(0, 8)
-  }, [products, selectedMainCategory, selectedSubCategory, offersVersion])
+  }, [products, selectedMainCategory, selectedSubCategory])
 
   // =====================================
   // Main Category Icon

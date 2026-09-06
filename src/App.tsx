@@ -47,7 +47,7 @@ import {
   saveCart,
 } from "./services/cartService"
 
-import { getProductOffer } from "./services/offerService"
+import { getActiveOffer } from "./services/offerService"
 
 // =====================================
 // Product Type
@@ -70,6 +70,7 @@ export interface iProducts {
   original_price?: number | null
   discount_percentage?: number | null
   offer_badge?: string | null
+  offer_expires_at?: string | null
 }
 
 // =====================================
@@ -1367,13 +1368,8 @@ useEffect(() => {
       options?.saleType ||
       (product.sale_type === "weight" ? "weight" : "piece")
 
-    const offer = getProductOffer(product.id)
-    const effectiveOfferPrice =
-      offer && offer.isOffer && offer.offerPrice > 0
-        ? offer.offerPrice
-        : product.is_offer && product.offer_price && Number(product.offer_price) > 0
-        ? Number(product.offer_price)
-        : null
+    const activeOffer = getActiveOffer(product)
+    const effectiveOfferPrice = activeOffer ? activeOffer.offerPrice : null
 
     const basePrice =
       saleType === "weight"
@@ -1406,8 +1402,9 @@ useEffect(() => {
       price: unitPrice,
       is_offer: Boolean(effectiveOfferPrice != null),
       offer_price: effectiveOfferPrice,
-      original_price: effectiveOfferPrice != null ? (offer?.originalPrice ?? (product.original_price ?? basePrice)) : undefined,
-      offer_badge: offer?.offerBadge ?? product.offer_badge,
+      original_price: effectiveOfferPrice != null ? (activeOffer?.originalPrice ?? (product.original_price ?? basePrice)) : undefined,
+      offer_badge: activeOffer?.offerBadge ?? product.offer_badge,
+      offer_expires_at: product.offer_expires_at,
     }
 
     const existingIndex = cart.findIndex(
