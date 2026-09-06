@@ -84,6 +84,21 @@ export interface CartItem {
 interface StoreProps {
   products: iProducts[]
   productsLoading: boolean
+  cart: CartItem[]
+  setCart: React.Dispatch<React.SetStateAction<CartItem[]>>
+  cartCount: number
+  addToCart: (
+    product: iProducts,
+    options?: {
+      saleType?: "piece" | "weight"
+      weight?: number
+    }
+  ) => void
+  increaseQuantity: (productId: number) => void
+  decreaseQuantity: (productId: number) => void
+  removeFromCart: (productId: number) => void
+  checkoutOpen: boolean
+  setCheckoutOpen: React.Dispatch<React.SetStateAction<boolean>>
 }
 
 // =====================================
@@ -135,6 +150,15 @@ const loadProductsOnce = async (): Promise<iProducts[]> => {
 function Store({
   products,
   productsLoading,
+  cart,
+  setCart,
+  cartCount,
+  addToCart,
+  increaseQuantity,
+  decreaseQuantity,
+  removeFromCart,
+  checkoutOpen,
+  setCheckoutOpen,
 }: StoreProps) {
 
   // =========================
@@ -165,62 +189,6 @@ function Store({
   // Floating splash logo
   const splashLogoRef =
     useRef<HTMLDivElement | null>(null)
-
-  // =========================
-  // Cart
-  // =========================
-
-  const [cart, setCart] =
-    useState<CartItem[]>(() => {
-      const stored = getCart() as Array<{
-        product: iProducts
-        quantity?: number
-        saleType?: "piece" | "weight"
-        weight?: number
-        unitPrice?: number
-      }>
-
-      return stored
-        .map((item) => {
-          const product = item.product
-          const saleType =
-            item.saleType ||
-            (product.sale_type === "weight"
-              ? "weight"
-              : "piece")
-
-          const unitPrice =
-            Number(
-              item.unitPrice ??
-                (saleType === "weight"
-                  ? product.weight_price ?? product.price
-                  : product.piece_price ?? product.price)
-            )
-
-          return {
-            product,
-            quantity: Number(item.quantity ?? 1),
-            saleType,
-            weight:
-              saleType === "weight"
-                ? Number(item.weight ?? 0)
-                : undefined,
-            unitPrice,
-          }
-        })
-        .filter(
-          (item) =>
-            item.saleType === "piece" ||
-            Number(item.weight || 0) > 0
-        )
-    })
-
-  // =========================
-  // Checkout
-  // =========================
-
-  const [checkoutOpen, setCheckoutOpen] =
-    useState(false)
 
   // =========================
   // Welcome Account Popup
@@ -321,313 +289,6 @@ function Store({
     }
 
   }, [splashPhase])
-
-  // =========================
-  // Validate Cart
-  // =========================
-
-  useEffect(() => {
-
-    if (products.length === 0) {
-      return
-    }
-
-    setCart((currentCart) => {
-
-      return currentCart.map((item) => {
-
-        const currentProduct =
-          products.find(
-            (product) =>
-              product.id === item.product.id
-          )
-
-        if (!currentProduct) {
-
-          return {
-            ...item,
-            product: {
-              ...item.product,
-              stock: 0,
-            },
-          }
-
-        }
-
-        return {
-          ...item,
-          product: currentProduct,
-        }
-
-      })
-
-    })
-
-  }, [products])
-
-  // =========================
-  // Save Cart
-  // =========================
-
-  useEffect(() => {
-    saveCart(cart)
-  }, [cart])
-
-  // =========================
-  // Add To Cart
-  // =========================
-
-  const addToCart = (
-    product: iProducts,
-    options?: {
-      saleType?: "piece" | "weight"
-      weight?: number
-    }
-  ) => {
-    if (product.stock <= 0) {
-      toast.error("هذا المنتج غير متوفر حالياً")
-      return
-    }
-
-    const saleType =
-      options?.saleType ||
-      (product.sale_type === "weight"
-        ? "weight"
-        : "piece")
-
-    const unitPrice =
-      saleType === "weight"
-        ? Number(product.weight_price ?? product.price)
-        : Number(product.piece_price ?? product.price)
-
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-      toast.error("سعر المنتج غير صحيح")
-      return
-    }
-
-    const selectedWeight =
-      Number(options?.weight ?? 0)
-
-    if (saleType === "weight") {
-      if (
-        !Number.isFinite(selectedWeight) ||
-        selectedWeight <= 0
-      ) {
-        toast.error("حدد وزن المنتج أولاً")
-        return
-      }
-
-      if (selectedWeight > Number(product.stock)) {
-        toast.error("الكمية المطلوبة أكبر من المخزون")
-        return
-      }
-    }
-
-    const existingIndex = cart.findIndex(
-      (item) =>
-        item.product.id === product.id &&
-        item.saleType === saleType
-    )
-
-    if (existingIndex >= 0) {
-      const existing = cart[existingIndex]
-
-      if (saleType === "weight") {
-        const nextWeight =
-          Number(existing.weight || 0) +
-          Number(selectedWeight || 0)
-
-        if (nextWeight > product.stock) {
-          toast.error("لا توجد كمية إضافية متاحة")
-          return
-        }
-
-        setCart((currentCart) =>
-          currentCart.map((item, index) =>
-            index === existingIndex
-              ? {
-                  ...item,
-                  weight: nextWeight,
-                  quantity: 1,
-                  unitPrice,
-                }
-              : item
-          )
-        )
-      } else {
-        if (existing.quantity + 1 > product.stock) {
-          toast.error("لا توجد كمية إضافية متاحة")
-          return
-        }
-
-        setCart((currentCart) =>
-          currentCart.map((item, index) =>
-            index === existingIndex
-              ? {
-                  ...item,
-                  quantity: item.quantity + 1,
-                  unitPrice,
-                }
-              : item
-          )
-        )
-      }
-
-      toast.success(`تمت إضافة ${product.name} إلى السلة`)
-      return
-    }
-
-    setCart((currentCart) => [
-      ...currentCart,
-      {
-        product,
-        quantity: saleType === "weight" ? 1 : 1,
-        saleType,
-        weight:
-          saleType === "weight"
-            ? selectedWeight
-            : undefined,
-        unitPrice,
-      },
-    ])
-
-    toast.success(`تمت إضافة ${product.name} إلى السلة`)
-  }
-
-  // =========================
-  // Increase Quantity / Weight
-  // =========================
-
-  const increaseQuantity = (
-    productId: number
-  ) => {
-    const item = cart.find(
-      (item) => item.product.id === productId
-    )
-
-    if (!item) return
-
-    if (item.product.stock <= 0) {
-      toast.error(`${item.product.name} غير متوفر حالياً`)
-      return
-    }
-
-    if (item.saleType === "weight") {
-      const currentWeight = Number(item.weight || 0)
-      const nextWeight =
-        Math.round((currentWeight + 0.25) * 1000) / 1000
-
-      if (nextWeight > item.product.stock) {
-        toast.error("لا توجد كمية إضافية متاحة")
-        return
-      }
-
-      setCart((currentCart) =>
-        currentCart.map((cartItem) =>
-          cartItem.product.id === productId
-            ? {
-                ...cartItem,
-                weight: nextWeight,
-              }
-            : cartItem
-        )
-      )
-
-      return
-    }
-
-    if (item.quantity >= item.product.stock) {
-      toast.error("لا توجد كمية إضافية متاحة")
-      return
-    }
-
-    setCart((currentCart) =>
-      currentCart.map((cartItem) =>
-        cartItem.product.id === productId
-          ? {
-              ...cartItem,
-              quantity: cartItem.quantity + 1,
-            }
-          : cartItem
-      )
-    )
-  }
-
-  // =========================
-  // Decrease Quantity / Weight
-  // =========================
-
-  const decreaseQuantity = (
-    productId: number
-  ) => {
-    setCart((currentCart) =>
-      currentCart
-        .map((item) => {
-          if (item.product.id !== productId) {
-            return item
-          }
-
-          if (item.saleType === "weight") {
-            const currentWeight = Number(item.weight || 0)
-            const nextWeight =
-              Math.round((currentWeight - 0.25) * 1000) / 1000
-
-            if (nextWeight <= 0) {
-              return null
-            }
-
-            return {
-              ...item,
-              weight: nextWeight,
-            }
-          }
-
-          return {
-            ...item,
-            quantity: item.quantity - 1,
-          }
-        })
-        .filter(
-          (
-            item
-          ): item is CartItem =>
-            item !== null &&
-            (item.saleType === "weight"
-              ? Number(item.weight || 0) > 0
-              : item.quantity > 0)
-        )
-    )
-  }
-
-  // =========================
-  // Remove From Cart
-  // =========================
-
-  const removeFromCart = (
-    productId: number
-  ) => {
-    setCart((currentCart) =>
-      currentCart.filter(
-        (item) =>
-          item.product.id !== productId
-      )
-    )
-
-    toast.success("تم حذف المنتج من السلة")
-  }
-
-  // =========================
-  // Cart Count
-  // =========================
-
-  const cartCount = cart.reduce(
-    (total, item) =>
-      total +
-      (item.saleType === "weight"
-        ? 1
-        : item.quantity),
-    0
-  )
 
   // =========================
   // Navbar
@@ -972,30 +633,6 @@ function Store({
             </p>
           </div>
         </div>
-      )}
-
-      {/* =====================================
-          Checkout
-          Opened from the Navbar cart quick view
-      ===================================== */}
-
-      {checkoutOpen && (
-
-        <Checkout
-          cart={cart}
-
-          onClose={() =>
-            setCheckoutOpen(false)
-          }
-
-          onSuccess={() => {
-
-            setCheckoutOpen(false)
-            setCart([])
-
-          }}
-        />
-
       )}
 
       {/* =====================================
@@ -1630,6 +1267,269 @@ useEffect(() => {
 
 }, [])
 
+  // =====================================
+  // Cart State (Global)
+  // =====================================
+
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    const stored = getCart() as Array<{
+      product: iProducts
+      quantity?: number
+      saleType?: "piece" | "weight"
+      weight?: number
+      unitPrice?: number
+    }>
+
+    return stored
+      .map((item) => {
+        const product = item.product
+        const saleType =
+          item.saleType ||
+          (product.sale_type === "weight" ? "weight" : "piece")
+
+        const unitPrice = Number(
+          item.unitPrice ??
+            (saleType === "weight"
+              ? product.weight_price ?? product.price
+              : product.piece_price ?? product.price)
+        )
+
+        return {
+          product,
+          quantity: Number(item.quantity ?? 1),
+          saleType,
+          weight:
+            saleType === "weight" ? Number(item.weight ?? 0) : undefined,
+          unitPrice,
+        }
+      })
+      .filter(
+        (item) =>
+          item.saleType === "piece" || Number(item.weight || 0) > 0
+      )
+  })
+
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+
+  // Save Cart to localStorage on every change
+  useEffect(() => {
+    saveCart(cart)
+  }, [cart])
+
+  // Validate Cart when products load
+  useEffect(() => {
+    if (products.length === 0) return
+
+    setCart((currentCart) => {
+      return currentCart.map((item) => {
+        const currentProduct = products.find(
+          (product) => product.id === item.product.id
+        )
+
+        if (!currentProduct) {
+          return {
+            ...item,
+            product: {
+              ...item.product,
+              stock: 0,
+            },
+          }
+        }
+
+        return {
+          ...item,
+          product: currentProduct,
+        }
+      })
+    })
+  }, [products])
+
+  const addToCart = (
+    product: iProducts,
+    options?: {
+      saleType?: "piece" | "weight"
+      weight?: number
+    }
+  ) => {
+    if (product.stock <= 0) {
+      toast.error("هذا المنتج غير متوفر حالياً")
+      return
+    }
+
+    const saleType =
+      options?.saleType ||
+      (product.sale_type === "weight" ? "weight" : "piece")
+
+    const unitPrice =
+      saleType === "weight"
+        ? Number(product.weight_price ?? product.price)
+        : Number(product.piece_price ?? product.price)
+
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      toast.error("سعر المنتج غير صحيح")
+      return
+    }
+
+    const selectedWeight = Number(options?.weight ?? 0)
+
+    if (saleType === "weight") {
+      if (!Number.isFinite(selectedWeight) || selectedWeight <= 0) {
+        toast.error("حدد وزن المنتج أولاً")
+        return
+      }
+
+      if (selectedWeight > Number(product.stock)) {
+        toast.error("الكمية المطلوبة أكبر من المخزون")
+        return
+      }
+    }
+
+    const existingIndex = cart.findIndex(
+      (item) =>
+        item.product.id === product.id && item.saleType === saleType
+    )
+
+    if (existingIndex >= 0) {
+      const existing = cart[existingIndex]
+
+      if (saleType === "weight") {
+        const nextWeight =
+          Number(existing.weight || 0) + Number(selectedWeight || 0)
+
+        if (nextWeight > product.stock) {
+          toast.error("لا توجد كمية إضافية متاحة")
+          return
+        }
+
+        setCart((currentCart) =>
+          currentCart.map((item, index) =>
+            index === existingIndex
+              ? {
+                  ...item,
+                  weight: nextWeight,
+                  quantity: 1,
+                  unitPrice,
+                }
+              : item
+          )
+        )
+      } else {
+        if (existing.quantity + 1 > product.stock) {
+          toast.error("لا توجد كمية إضافية متاحة")
+          return
+        }
+
+        setCart((currentCart) =>
+          currentCart.map((item, index) =>
+            index === existingIndex
+              ? {
+                  ...item,
+                  quantity: item.quantity + 1,
+                  unitPrice,
+                }
+              : item
+          )
+        )
+      }
+
+      toast.success(`تمت إضافة ${product.name} إلى السلة`)
+      return
+    }
+
+    setCart((currentCart) => [
+      ...currentCart,
+      {
+        product,
+        quantity: 1,
+        saleType,
+        weight: saleType === "weight" ? selectedWeight : undefined,
+        unitPrice,
+      },
+    ])
+
+    toast.success(`تمت إضافة ${product.name} إلى السلة`)
+  }
+
+  const increaseQuantity = (productId: number) => {
+    const item = cart.find((item) => item.product.id === productId)
+    if (!item) return
+
+    if (item.product.stock <= 0) {
+      toast.error(`${item.product.name} غير متوفر حالياً`)
+      return
+    }
+
+    if (item.saleType === "weight") {
+      const currentWeight = Number(item.weight || 0)
+      const nextWeight = Math.round((currentWeight + 0.25) * 1000) / 1000
+
+      if (nextWeight > item.product.stock) {
+        toast.error("لا توجد كمية إضافية متاحة")
+        return
+      }
+
+      setCart((currentCart) =>
+        currentCart.map((cartItem) =>
+          cartItem.product.id === productId
+            ? { ...cartItem, weight: nextWeight }
+            : cartItem
+        )
+      )
+      return
+    }
+
+    if (item.quantity >= item.product.stock) {
+      toast.error("لا توجد كمية إضافية متاحة")
+      return
+    }
+
+    setCart((currentCart) =>
+      currentCart.map((cartItem) =>
+        cartItem.product.id === productId
+          ? { ...cartItem, quantity: cartItem.quantity + 1 }
+          : cartItem
+      )
+    )
+  }
+
+  const decreaseQuantity = (productId: number) => {
+    setCart((currentCart) =>
+      currentCart
+        .map((item) => {
+          if (item.product.id !== productId) return item
+
+          if (item.saleType === "weight") {
+            const currentWeight = Number(item.weight || 0)
+            const nextWeight = Math.round((currentWeight - 0.25) * 1000) / 1000
+            if (nextWeight <= 0) return null
+            return { ...item, weight: nextWeight }
+          }
+
+          return { ...item, quantity: item.quantity - 1 }
+        })
+        .filter(
+          (item): item is CartItem =>
+            item !== null &&
+            (item.saleType === "weight"
+              ? Number(item.weight || 0) > 0
+              : item.quantity > 0)
+        )
+    )
+  }
+
+  const removeFromCart = (productId: number) => {
+    setCart((currentCart) =>
+      currentCart.filter((item) => item.product.id !== productId)
+    )
+    toast.success("تم حذف المنتج من السلة")
+  }
+
+  const cartCount = cart.reduce(
+    (total, item) =>
+      total + (item.saleType === "weight" ? 1 : item.quantity),
+    0
+  )
+
 
   return (
 
@@ -1685,15 +1585,49 @@ useEffect(() => {
   element={<CustomerRegister />}
 />
 
-<Route
-  path="/profile"
-  element={<CustomerProfile />}
-/>
+      <Route
+        path="/profile"
+        element={
+          <CustomerProfile
+            cart={cart}
+            cartCount={cartCount}
+            products={products}
+            onAddToCart={addToCart}
+            onIncrease={increaseQuantity}
+            onDecrease={decreaseQuantity}
+            onRemove={removeFromCart}
+            onCheckout={() => {
+              if (cart.length === 0) {
+                toast.error("السلة فارغة")
+                return
+              }
+              setCheckoutOpen(true)
+            }}
+          />
+        }
+      />
 
-<Route
-  path="/customer/orders"
-  element={<CustomerOrders />}
-/>
+      <Route
+        path="/customer/orders"
+        element={
+          <CustomerOrders
+            cart={cart}
+            cartCount={cartCount}
+            products={products}
+            onAddToCart={addToCart}
+            onIncrease={increaseQuantity}
+            onDecrease={decreaseQuantity}
+            onRemove={removeFromCart}
+            onCheckout={() => {
+              if (cart.length === 0) {
+                toast.error("السلة فارغة")
+                return
+              }
+              setCheckoutOpen(true)
+            }}
+          />
+        }
+      />
 
         {/* =========================
             ADMIN LOGIN
@@ -1784,11 +1718,32 @@ useEffect(() => {
             <Store
               products={products}
               productsLoading={productsLoading}
+              cart={cart}
+              setCart={setCart}
+              cartCount={cartCount}
+              addToCart={addToCart}
+              increaseQuantity={increaseQuantity}
+              decreaseQuantity={decreaseQuantity}
+              removeFromCart={removeFromCart}
+              checkoutOpen={checkoutOpen}
+              setCheckoutOpen={setCheckoutOpen}
             />
           }
         />
 
       </Routes>
+
+      {/* Global Checkout Modal */}
+      {checkoutOpen && (
+        <Checkout
+          cart={cart}
+          onClose={() => setCheckoutOpen(false)}
+          onSuccess={() => {
+            setCheckoutOpen(false)
+            setCart([])
+          }}
+        />
+      )}
 
     </>
   )

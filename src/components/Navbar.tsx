@@ -603,7 +603,7 @@ const Navbar = ({
                 <>
                   {/* Backdrop to close on click outside */}
                   <div
-                    className="fixed inset-0 z-[9990]"
+                    className="fixed inset-0 z-[9990] bg-black/25 backdrop-blur-[2px] transition-opacity"
                     onClick={() => setCartOpen(false)}
                     aria-hidden="true"
                   />
@@ -612,18 +612,19 @@ const Navbar = ({
                   <div
                     className="
                       fixed
-                      left-3
-                      right-3
-                      top-[66px]
+                      inset-x-2.5
+                      top-[64px]
                       z-[9999]
+                      max-h-[calc(100dvh-74px)]
                       animate-slide-down
+                      sm:inset-x-auto
                       sm:absolute
                       sm:left-0
                       sm:right-auto
                       sm:top-full
                       sm:mt-2.5
-                      sm:w-[380px]
-                      sm:max-w-[calc(100vw-2rem)]
+                      sm:w-[410px]
+                      sm:max-w-[calc(100vw-1.5rem)]
                     "
                   >
                     <Cart
