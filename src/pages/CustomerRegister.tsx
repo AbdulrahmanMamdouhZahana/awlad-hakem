@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { verifyCustomerEmail } from "../services/authService"
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -72,6 +73,7 @@ export default function CustomerRegister() {
     try {
       const response = await fetch(`${API_URL}/customer/register`, {
         method: "POST",
+        credentials: "include",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
@@ -124,34 +126,7 @@ export default function CustomerRegister() {
     setVerifying(true)
 
     try {
-      const response = await fetch(`${API_URL}/customer/verify-email`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: registrationData.email,
-          code: verificationCode.trim(),
-        }),
-      })
-
-      const data: VerifyResponse = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || "رمز التحقق غير صحيح.")
-      }
-
-      if (!data.token || !data.user) {
-        throw new Error("تم التحقق ولكن حدث خطأ في تسجيل الدخول.")
-      }
-
-      // Account is now created in the database
-      // Store customer session
-      localStorage.setItem("customer_token", data.token)
-      localStorage.setItem("customer_user", JSON.stringify(data.user))
-      localStorage.removeItem("auth_token")
-      localStorage.removeItem("auth_user")
+      await verifyCustomerEmail(verificationEmail, verificationCode.trim())
 
       setVerificationSuccess(true)
 
@@ -181,6 +156,7 @@ export default function CustomerRegister() {
       // Resend OTP using the registration endpoint again
       const response = await fetch(`${API_URL}/customer/register`, {
         method: "POST",
+        credentials: "include",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",

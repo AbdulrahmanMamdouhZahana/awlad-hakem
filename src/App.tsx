@@ -48,6 +48,7 @@ import {
 } from "./services/cartService"
 
 import { getActiveOffer } from "./services/offerService"
+import { cleanupLegacyCustomerTokens, getCurrentCustomer } from "./services/authService"
 
 // =====================================
 // Product Type
@@ -205,7 +206,39 @@ function Store({
   const [showWelcomePopup, setShowWelcomePopup] =
     useState(false)
 
+  const [customerLoggedIn, setCustomerLoggedIn] =
+    useState(false)
+
   const navigate = useNavigate()
+
+  useEffect(() => {
+    cleanupLegacyCustomerTokens()
+
+    const checkAuth = async () => {
+      const cached = localStorage.getItem("customer_user")
+      if (cached) {
+        try {
+          if (JSON.parse(cached)?.id) {
+            setCustomerLoggedIn(true)
+          }
+        } catch {}
+      }
+
+      const user = await getCurrentCustomer()
+      setCustomerLoggedIn(Boolean(user))
+    }
+
+    checkAuth()
+
+    const handleAuthChange = () => {
+      checkAuth()
+    }
+
+    window.addEventListener("customer-auth-changed", handleAuthChange)
+    return () => {
+      window.removeEventListener("customer-auth-changed", handleAuthChange)
+    }
+  }, [])
 
   // =========================
   // Product Loading / Splash
@@ -234,9 +267,7 @@ function Store({
       return
     }
 
-    const token = localStorage.getItem("customer_token")
-
-    if (token) {
+    if (customerLoggedIn) {
       setShowWelcomePopup(false)
       return
     }
@@ -251,7 +282,7 @@ function Store({
 
     // Show popup immediately after splash
     setShowWelcomePopup(true)
-  }, [showLoader])
+  }, [showLoader, customerLoggedIn])
 
   const closeWelcomePopup = () => {
     sessionStorage.setItem(
@@ -317,9 +348,7 @@ function Store({
         return
       }
 
-      const token = localStorage.getItem("customer_token")
-
-      if (!token) {
+      if (!customerLoggedIn) {
         setShowWelcomePopup(true)
         return
       }
@@ -433,10 +462,7 @@ function Store({
                   return
                 }
 
-                const token =
-                  localStorage.getItem("customer_token")
-
-                if (!token) {
+                if (!customerLoggedIn) {
                   setShowWelcomePopup(true)
                   return
                 }
@@ -1218,6 +1244,9 @@ function AdminOrderNotifier() {
 }
 
 function App() {
+  useEffect(() => {
+    cleanupLegacyCustomerTokens()
+  }, [])
 
   // =====================================
   // Current Route

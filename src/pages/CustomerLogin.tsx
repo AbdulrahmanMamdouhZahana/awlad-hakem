@@ -1,7 +1,6 @@
 import { type FormEvent, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-
-const API_URL = import.meta.env.VITE_API_URL
+import { loginCustomer } from "../services/authService"
 
 export default function CustomerLogin() {
   const navigate = useNavigate()
@@ -17,37 +16,8 @@ export default function CustomerLogin() {
     setLoading(true)
 
     try {
-      const response = await fetch(`${API_URL}/customer/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ login, password }),
-      })
-
-      const data = await response.json().catch(() => null)
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message || "البريد الإلكتروني أو رقم الهاتف أو كلمة المرور غير صحيحة."
-        )
-      }
-
-   
-localStorage.setItem("customer_token", data.token)
-localStorage.setItem(
-  "customer_user",
-  JSON.stringify(data.user)
-)
-
-// Notify Navbar that customer logged in
-window.dispatchEvent(
-  new Event("customer-auth-changed")
-)
-
-navigate("/")
-        
+      await loginCustomer(login, password)
+      navigate("/", { replace: true })
     } catch (error) {
       setError(
         error instanceof Error

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar"; 
 import type  { CartItem } from "../App"; 
+import { logoutCustomer } from "../services/authService"; 
 
 const API_URL =
   import.meta.env.VITE_API_URL 
@@ -120,30 +121,22 @@ export default function CustomerOrders({
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const loadOrders = async () => {
-    const token = localStorage.getItem("customer_token");
-
-    if (!token) {
-      navigate("/customer/login", { replace: true });
-      return;
-    }
-
     setLoading(true);
     setError("");
 
     try {
       const response = await fetch(`${API_URL}/customer/orders`, {
+        method: "GET",
+        credentials: "include",
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${token}`,
         },
       });
 
       const data = await response.json().catch(() => null);
 
       if (response.status === 401 || response.status === 403) {
-        localStorage.removeItem("customer_token");
-        localStorage.removeItem("customer_user");
-        window.dispatchEvent(new Event("customer-auth-changed"));
+        await logoutCustomer();
         navigate("/customer/login", { replace: true });
         return;
       }
@@ -214,14 +207,6 @@ export default function CustomerOrders({
   const handleCheckout = () => {
     if (cart.length === 0) {
       // toast.error("السلة فارغة");
-      return;
-    }
-
-    const token = localStorage.getItem("customer_token");
-
-    if (!token) {
-      // Show login popup or redirect
-      navigate("/customer/login");
       return;
     }
 

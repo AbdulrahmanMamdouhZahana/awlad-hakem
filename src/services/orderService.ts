@@ -41,7 +41,7 @@ export interface CreateOrderInput {
 // الطلب بيتعمل من Laravel وليس مباشرة من Supabase.
 //
 // Laravel بيحدد العميل من:
-// Authorization: Bearer customer_token
+// HttpOnly Session Cookie (credentials: 'include')
 //
 // وبالتالي customer_id لا يأتي من الـ frontend.
 // =====================================================
@@ -49,24 +49,15 @@ export interface CreateOrderInput {
 export const createOrder = async (
   order: CreateOrderInput
 ) => {
-  const token = localStorage.getItem("customer_token")
-
-  if (!token) {
-    throw new Error(
-      "يجب تسجيل الدخول إلى حسابك أولاً لإنشاء الطلب"
-    )
-  }
-
   try {
     const response = await fetch(
       `${API_URL}/customer/orders`,
       {
         method: "POST",
-
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          Authorization: `Bearer ${token}`,
         },
 
         body: JSON.stringify({

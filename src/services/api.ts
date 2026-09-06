@@ -28,16 +28,12 @@ export async function apiFetch(
 
 
   // ---------------------------------
-  // Get Authentication Tokens
+  // Get Staff Authentication Token (Admin/Delivery)
   // ---------------------------------
 
   const staffToken =
     localStorage.getItem("staff_token") ||
     localStorage.getItem("auth_token")
-
-  const customerToken =
-    localStorage.getItem("customer_token")
-
 
   // ---------------------------------
   // Determine Request Type
@@ -45,12 +41,6 @@ export async function apiFetch(
 
   const isCustomerRequest =
     cleanEndpoint.startsWith("/customer/")
-
-
-  const token = isCustomerRequest
-    ? customerToken
-    : staffToken
-
 
   // ---------------------------------
   // Prepare Headers
@@ -63,15 +53,16 @@ export async function apiFetch(
     "application/json"
   )
 
-
   // ---------------------------------
-  // Authentication
+  // Authentication:
+  // - Customers authenticate via HttpOnly cookie (Sanctum session)
+  // - Staff/Admin authenticate via staff_token Bearer header
   // ---------------------------------
 
-  if (token) {
+  if (!isCustomerRequest && staffToken) {
     headers.set(
       "Authorization",
-      `Bearer ${token}`
+      `Bearer ${staffToken}`
     )
   }
 
@@ -122,6 +113,7 @@ export async function apiFetch(
         finalUrl,
         {
           ...options,
+          credentials: "include",
           headers,
         }
       )
@@ -191,10 +183,13 @@ export async function apiFetch(
           "customer_user"
         )
 
+        window.dispatchEvent(
+          new Event("customer-auth-changed")
+        )
 
         if (
-          window.location.pathname !==
-          "/customer/login"
+          window.location.pathname !== "/customer/login" &&
+          (window.location.pathname === "/profile" || window.location.pathname.startsWith("/customer/"))
         ) {
 
           window.location.href =

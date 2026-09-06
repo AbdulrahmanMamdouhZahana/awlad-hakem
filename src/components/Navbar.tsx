@@ -2,6 +2,7 @@ import type { RefObject } from "react"
 import { useState, useEffect } from "react" // Added missing imports
 import { Link } from "react-router-dom"
 import Cart from "./Cart"
+import { getCurrentCustomer, logoutCustomer } from "../services/authService"
 
 interface iProducts {
   id: number
@@ -62,28 +63,31 @@ const Navbar = ({
   // CUSTOMER AUTH
   // =====================================================
 
-  const checkCustomerAuth = () => {
-    const token = localStorage.getItem("customer_token")
-    const user = localStorage.getItem("customer_user")
-
-    if (!token) {
-      setIsCustomerLoggedIn(false)
-      setCustomerName("")
-      return
+  const checkCustomerAuth = async () => {
+    // 1. Optimistic instant check from non-sensitive customer_user cache
+    const cachedUser = localStorage.getItem("customer_user")
+    if (cachedUser) {
+      try {
+        const parsed = JSON.parse(cachedUser)
+        if (parsed?.name) {
+          setIsCustomerLoggedIn(true)
+          setCustomerName(parsed.name)
+        }
+      } catch {}
     }
 
-    setIsCustomerLoggedIn(true)
-
-    if (!user) {
-      setCustomerName("")
-      return
-    }
-
+    // 2. Validate against server session
     try {
-      const parsedUser = JSON.parse(user)
-      setCustomerName(parsedUser?.name || "")
+      const user = await getCurrentCustomer()
+      if (user) {
+        setIsCustomerLoggedIn(true)
+        setCustomerName(user.name || "")
+      } else {
+        setIsCustomerLoggedIn(false)
+        setCustomerName("")
+      }
     } catch {
-      setCustomerName("")
+      // In case of network error, keep optimistic state or fallback
     }
   }
 
@@ -133,12 +137,10 @@ const Navbar = ({
     setMobileMenuOpen(false)
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("customer_token")
-    localStorage.removeItem("customer_user")
+  const handleLogout = async () => {
+    await logoutCustomer()
     setIsCustomerLoggedIn(false)
     setCustomerName("")
-    window.dispatchEvent(new Event("customer-auth-changed"))
     setMobileMenuOpen(false)
   }
 

@@ -2,18 +2,9 @@ import { type FormEvent, useEffect, useState, useCallback, useMemo } from "react
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar"; // Adjust path as needed
 import type { CartItem } from "../App"; // Adjust import path as needed
+import { getCurrentCustomer, logoutCustomer, type CustomerUser } from "../services/authService";
 
 const API_URL = import.meta.env.VITE_API_URL;
-
-interface Customer {
-  id: number;
-  name: string;
-  email: string;
-  phone?: string | null;
-  role?: string;
-  email_verified?: boolean;
-  email_verified_at?: string | null;
-}
 
 interface CustomerProfileProps {
   cart?: CartItem[];
@@ -42,7 +33,7 @@ export default function CustomerProfile({
   // STATE
   // =====================================
 
-  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customer, setCustomer] = useState<CustomerUser | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -72,81 +63,37 @@ export default function CustomerProfile({
   // AUTH HELPERS (memoized)
   // =====================================
 
-  const getToken = useCallback(() => localStorage.getItem("customer_token"), []);
-
-  const authHeaders = useCallback(() => {
-    const token = getToken();
-    return {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token ?? ""}`,
-    };
-  }, [getToken]);
-
   const logout = useCallback(async () => {
-    const token = getToken();
-    try {
-      if (token) {
-        await fetch(`${API_URL}/customer/logout`, {
-          method: "POST",
-          headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
-        });
-      }
-    } catch {
-      // Logout locally even if API fails
-    }
-    localStorage.removeItem("customer_token");
-    localStorage.removeItem("customer_user");
-    window.dispatchEvent(new Event("customer-auth-changed"));
+    await logoutCustomer();
     navigate("/customer/login", { replace: true });
-  }, [getToken, navigate]);
+  }, [navigate]);
 
   // =====================================
   // LOAD CUSTOMER
   // =====================================
 
   const loadCustomer = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
-      navigate("/customer/login", { replace: true });
-      return;
-    }
-
     try {
       setLoading(true);
       setError("");
 
-      const response = await fetch(`${API_URL}/customer/me`, {
-        method: "GET",
-        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
-      });
-
-      const data = await response.json();
-
-      if (response.status === 401) {
-        localStorage.removeItem("customer_token");
-        localStorage.removeItem("customer_user");
+      const user = await getCurrentCustomer();
+      if (!user) {
         navigate("/customer/login", { replace: true });
         return;
       }
 
-      if (!response.ok) {
-        throw new Error(data?.message || "فشل تحميل بيانات الحساب");
-      }
-
-      const user: Customer = data.user;
       setCustomer(user);
       setName(user.name || "");
       setEmail(user.email || "");
       setOriginalEmail(user.email || "");
       setPhone(user.phone || "");
-      localStorage.setItem("customer_user", JSON.stringify(user));
     } catch (error) {
       setError(error instanceof Error ? error.message : "حدث خطأ أثناء تحميل الحساب");
     } finally {
       setLoading(false);
     }
-  }, [getToken, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
     loadCustomer();
@@ -160,11 +107,15 @@ export default function CustomerProfile({
     async (emailToVerify: string) => {
       const response = await fetch(`${API_URL}/customer/verify-email/send`, {
         method: "POST",
-        headers: authHeaders(),
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ email: emailToVerify }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (response.status === 401) {
         await logout();
@@ -183,7 +134,7 @@ export default function CustomerProfile({
 
       return true;
     },
-    [authHeaders, logout]
+    [logout]
   );
 
   // =====================================
@@ -194,7 +145,11 @@ export default function CustomerProfile({
     async (profileEmail: string) => {
       const response = await fetch(`${API_URL}/customer/profile`, {
         method: "PATCH",
-        headers: authHeaders(),
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           name: name.trim(),
           email: profileEmail.trim(),
@@ -202,7 +157,7 @@ export default function CustomerProfile({
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (response.status === 401) {
         await logout();
@@ -221,7 +176,7 @@ export default function CustomerProfile({
 
       return data;
     },
-    [authHeaders, logout, name, phone]
+    [logout, name, phone]
   );
 
   // =====================================
@@ -231,12 +186,6 @@ export default function CustomerProfile({
   const handleProfileSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-
-      const token = getToken();
-      if (!token) {
-        navigate("/customer/login", { replace: true });
-        return;
-      }
 
       const phoneDigits = phone.replace(/\D/g, "");
       if (phoneDigits.length > 0 && phoneDigits.length !== 11) {
@@ -266,13 +215,15 @@ export default function CustomerProfile({
         }
 
         const data = await updateProfile(currentEmail);
-        const updatedUser: Customer = data.user;
+        const updatedUser: CustomerUser = data.user;
         setCustomer(updatedUser);
         setName(updatedUser.name || "");
         setEmail(updatedUser.email || "");
         setOriginalEmail(updatedUser.email || "");
         setPhone(updatedUser.phone || "");
-        localStorage.setItem("customer_user", JSON.stringify(updatedUser));
+        try {
+          localStorage.setItem("customer_user", JSON.stringify(updatedUser));
+        } catch {}
         window.dispatchEvent(new Event("customer-auth-changed"));
         setProfileMessage("تم تحديث بيانات حسابك بنجاح ✓");
       } catch (error) {
@@ -281,7 +232,7 @@ export default function CustomerProfile({
         setSavingProfile(false);
       }
     },
-    [getToken, navigate, phone, email, originalEmail, sendVerificationOTP, updateProfile]
+    [phone, email, originalEmail, sendVerificationOTP, updateProfile]
   );
 
   // =====================================
@@ -302,26 +253,24 @@ export default function CustomerProfile({
         return;
       }
 
-      const token = getToken();
-      if (!token) {
-        await logout();
-        return;
-      }
-
       setVerificationError("");
       setVerifying(true);
 
       try {
         const response = await fetch(`${API_URL}/customer/verify-profile-email`, {
           method: "POST",
-          headers: authHeaders(),
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             email: pendingEmail,
             code: verificationCode.trim(),
           }),
         });
 
-        const data = await response.json();
+        const data = await response.json().catch(() => null);
 
         if (response.status === 401) {
           await logout();
@@ -338,16 +287,15 @@ export default function CustomerProfile({
           throw new Error(data?.message || "رمز التحقق غير صحيح.");
         }
 
-        const updatedUser: Customer = data.user;
+        const updatedUser: CustomerUser = data.user;
         setCustomer(updatedUser);
         setName(updatedUser.name || "");
         setEmail(updatedUser.email || "");
         setOriginalEmail(updatedUser.email || "");
         setPhone(updatedUser.phone || "");
-        localStorage.setItem("customer_user", JSON.stringify(updatedUser));
-        if (data.token) {
-          localStorage.setItem("customer_token", data.token);
-        }
+        try {
+          localStorage.setItem("customer_user", JSON.stringify(updatedUser));
+        } catch {}
         window.dispatchEvent(new Event("customer-auth-changed"));
         setVerificationSuccess(true);
         setProfileMessage("تم تأكيد البريد الإلكتروني وتحديث بيانات الحساب بنجاح ✓");
@@ -363,7 +311,7 @@ export default function CustomerProfile({
         setVerifying(false);
       }
     },
-    [pendingEmail, verificationCode, getToken, logout, authHeaders]
+    [pendingEmail, verificationCode, logout]
   );
 
   // =====================================
@@ -426,18 +374,16 @@ export default function CustomerProfile({
         return;
       }
 
-      const token = getToken();
-      if (!token) {
-        navigate("/customer/login", { replace: true });
-        return;
-      }
-
       setChangingPassword(true);
 
       try {
         const response = await fetch(`${API_URL}/customer/profile/password`, {
           method: "PATCH",
-          headers: authHeaders(),
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             current_password: currentPassword,
             password: password,
@@ -445,7 +391,7 @@ export default function CustomerProfile({
           }),
         });
 
-        const data = await response.json();
+        const data = await response.json().catch(() => null);
 
         if (response.status === 401) {
           await logout();
@@ -462,12 +408,11 @@ export default function CustomerProfile({
           throw new Error(data?.message || "فشل تغيير كلمة المرور");
         }
 
-        if (data.token) {
-          localStorage.setItem("customer_token", data.token);
-        }
-        if (data.user) {
+        if (data?.user) {
           setCustomer(data.user);
-          localStorage.setItem("customer_user", JSON.stringify(data.user));
+          try {
+            localStorage.setItem("customer_user", JSON.stringify(data.user));
+          } catch {}
         }
 
         setCurrentPassword("");
@@ -484,7 +429,7 @@ export default function CustomerProfile({
         setChangingPassword(false);
       }
     },
-    [password, passwordConfirmation, currentPassword, getToken, navigate, authHeaders, logout]
+    [password, passwordConfirmation, currentPassword, logout]
   );
 
   // =====================================
@@ -519,13 +464,8 @@ export default function CustomerProfile({
 
   const handleCheckout = useCallback(() => {
     if (cart.length === 0) return;
-    const token = getToken();
-    if (!token) {
-      navigate("/customer/login");
-      return;
-    }
     onCheckout();
-  }, [cart.length, getToken, navigate, onCheckout]);
+  }, [cart.length, onCheckout]);
 
   // =====================================
   // MEMOIZED NAVBAR
