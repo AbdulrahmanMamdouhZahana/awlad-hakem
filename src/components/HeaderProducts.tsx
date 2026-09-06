@@ -118,8 +118,8 @@ const HeaderProducts = ({
             Main Categories
         ===================================== */}
 
-<div id="categories" className="mb-6 scroll-mt-24">
-         <div className="mb-4">
+        <div id="categories" className="mb-6 scroll-mt-24">
+          <div className="mb-4">
             <h2 className="text-xl font-black text-slate-900 sm:text-2xl">
               تسوق حسب القسم
             </h2>
@@ -136,23 +136,20 @@ const HeaderProducts = ({
                 setSelectedMainCategory("الكل")
                 setSelectedSubCategory("الكل")
               }}
-              className={`group rounded-2xl border p-4 text-right transition-all duration-200 ${
-                selectedMainCategory === "الكل"
-                  ? "border-[#17656b] bg-[#17656b] text-white shadow-lg"
-                  : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-[#42a1a7] hover:shadow-md"
-              }`}
+              className={`group rounded-2xl border p-4 text-right transition-all duration-200 ${selectedMainCategory === "الكل"
+                ? "border-[#17656b] bg-[#17656b] text-white shadow-lg"
+                : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-[#42a1a7] hover:shadow-md"
+                }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl ${
-                  selectedMainCategory === "الكل" ? "bg-white/15" : "bg-slate-100"
-                }`}>
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl ${selectedMainCategory === "الكل" ? "bg-white/15" : "bg-slate-100"
+                  }`}>
                   🛍️
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-black sm:text-base">كل المنتجات</div>
-                  <div className={`mt-0.5 text-[10px] sm:text-xs ${
-                    selectedMainCategory === "الكل" ? "text-white/75" : "text-slate-500"
-                  }`}>
+                  <div className={`mt-0.5 text-[10px] sm:text-xs ${selectedMainCategory === "الكل" ? "text-white/75" : "text-slate-500"
+                    }`}>
                     تصفح كل المنتجات
                   </div>
                 </div>
@@ -165,23 +162,20 @@ const HeaderProducts = ({
                 setSelectedMainCategory("العروض")
                 setSelectedSubCategory("الكل")
               }}
-              className={`group rounded-2xl border p-4 text-right transition-all duration-200 ${
-                selectedMainCategory === "العروض"
-                  ? "border-red-500 bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-lg shadow-red-500/30"
-                  : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-red-400 hover:shadow-md"
-              }`}
+              className={`group rounded-2xl border p-4 text-right transition-all duration-200 ${selectedMainCategory === "العروض"
+                ? "border-red-500 bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-lg shadow-red-500/30"
+                : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-red-400 hover:shadow-md"
+                }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl ${
-                  selectedMainCategory === "العروض" ? "bg-white/20" : "bg-red-50"
-                }`}>
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl ${selectedMainCategory === "العروض" ? "bg-white/20" : "bg-red-50"
+                  }`}>
                   🔥
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-black sm:text-base">عروض وتخفيضات</div>
-                  <div className={`mt-0.5 text-[10px] sm:text-xs ${
-                    selectedMainCategory === "العروض" ? "text-white/85" : "text-red-500 font-bold"
-                  }`}>
+                  <div className={`mt-0.5 text-[10px] sm:text-xs ${selectedMainCategory === "العروض" ? "text-white/85" : "text-red-500 font-bold"
+                    }`}>
                     وفر مع أفضل العروض
                   </div>
                 </div>
@@ -200,16 +194,14 @@ const HeaderProducts = ({
                     setSelectedMainCategory(mainCategory)
                     setSelectedSubCategory("الكل")
                   }}
-                  className={`group rounded-2xl border p-4 text-right transition-all duration-200 ${
-                    active
-                      ? "border-[#17656b] bg-[#17656b] text-white shadow-lg"
-                      : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-[#42a1a7] hover:shadow-md"
-                  }`}
+                  className={`group rounded-2xl border p-4 text-right transition-all duration-200 ${active
+                    ? "border-[#17656b] bg-[#17656b] text-white shadow-lg"
+                    : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-[#42a1a7] hover:shadow-md"
+                    }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl transition-transform group-hover:scale-105 ${
-                      active ? "bg-white/15" : "bg-[#eef7f7]"
-                    }`}>
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl transition-transform group-hover:scale-105 ${active ? "bg-white/15" : "bg-[#eef7f7]"
+                      }`}>
                       {getMainCategoryIcon(mainCategory)}
                     </div>
 
@@ -217,14 +209,13 @@ const HeaderProducts = ({
                       <div className="text-sm font-black sm:text-base">
                         {mainCategory}
                       </div>
-                      <div className={`mt-0.5 text-[10px] sm:text-xs ${
-                        active ? "text-white/75" : "text-slate-500"
-                      }`}>
+                      <div className={`mt-0.5 text-[10px] sm:text-xs ${active ? "text-white/75" : "text-slate-500"
+                        }`}>
                         {meta?.description}
                       </div>
                     </div>
 
-                 
+
                   </div>
                 </button>
               )
@@ -247,11 +238,10 @@ const HeaderProducts = ({
                 <button
                   type="button"
                   onClick={() => setSelectedSubCategory("الكل")}
-                  className={`rounded-lg px-3 py-1.5 text-[10px] font-black transition ${
-                    selectedSubCategory === "الكل"
-                      ? "bg-[#17656b] text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  className={`rounded-lg px-3 py-1.5 text-[10px] font-black transition ${selectedSubCategory === "الكل"
+                    ? "bg-[#17656b] text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
                 >
                   الكل
                 </button>
@@ -266,11 +256,10 @@ const HeaderProducts = ({
                       key={subCategory}
                       type="button"
                       onClick={() => setSelectedSubCategory(subCategory)}
-                      className={`shrink-0 rounded-xl border px-3 py-2 text-[10px] font-bold transition-all sm:text-xs ${
-                        active
-                          ? "border-[#17656b] bg-[#17656b] text-white shadow-sm"
-                          : "border-slate-200 bg-slate-50 text-slate-600 hover:border-[#42a1a7] hover:bg-[#eef7f7]"
-                      }`}
+                      className={`shrink-0 rounded-xl border px-3 py-2 text-[10px] font-bold transition-all sm:text-xs ${active
+                        ? "border-[#17656b] bg-[#17656b] text-white shadow-sm"
+                        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-[#42a1a7] hover:bg-[#eef7f7]"
+                        }`}
                     >
                       {subCategory}
                     </button>
@@ -326,7 +315,7 @@ const HeaderProducts = ({
 
               <div
                 key={product.id}
-                className="min-w-0"
+                className="min-w-0 h-full"
               >
 
                 <Products

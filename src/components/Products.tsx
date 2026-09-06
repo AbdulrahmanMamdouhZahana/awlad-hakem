@@ -327,24 +327,31 @@ const ProductCard = ({
         rounded-xl
         sm:rounded-2xl
         border-2
-        ${
-          offer
-            ? "border-red-500/80 bg-gradient-to-b from-red-50/20 to-white shadow-md shadow-red-500/10 ring-1 ring-red-400/30 hover:border-red-600 hover:shadow-xl hover:shadow-red-500/20"
-            : "border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-md"
-        }
+        bg-white
         transition-all
         duration-300
-        hover:-translate-y-1
+        hover:-translate-y-1.5
+        ${
+          offer
+            ? "border-red-500/90 bg-gradient-to-b from-red-50/30 via-white to-white shadow-[0_4px_18px_-4px_rgba(239,68,68,0.18)] ring-1 ring-red-400/30 hover:border-red-600 hover:ring-2 hover:ring-red-500/40 hover:shadow-[0_14px_32px_-6px_rgba(239,68,68,0.28)]"
+            : "border-slate-200/90 shadow-[0_2px_8px_-2px_rgba(15,23,42,0.06)] hover:border-[#17656b] hover:ring-2 hover:ring-[#17656b]/20 hover:shadow-[0_12px_28px_-6px_rgba(23,101,107,0.2)]"
+        }
         ${className}
       `}
     >
+      {/* Glossy light sheen sweep effect on hover (تأثير لمعان وبريق) */}
+      <div className="pointer-events-none absolute -inset-y-2 -inset-x-full z-30 h-[120%] w-[150%] -skew-x-12 bg-gradient-to-r from-transparent via-white/35 to-transparent opacity-0 transition-all duration-700 ease-out group-hover:translate-x-full group-hover:opacity-100" />
+
+      {/* Top subtle glass gloss line */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent" />
+
       {/* Offer top accent bar */}
       {offer && (
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-600 via-amber-500 to-red-600 z-20" />
       )}
 
       {/* Product Image & Badges */}
-      <div className="relative aspect-square w-full overflow-hidden bg-gradient-to-b from-[#eef3f3]/60 to-[#eef3f3] p-1.5 sm:p-3">
+      <div className="relative aspect-square w-full overflow-hidden border-b border-slate-100 bg-gradient-to-b from-[#eef3f3]/60 to-[#eef3f3] p-1.5 sm:p-3">
         <img
           src={imageUrl}
           alt={product.name}
