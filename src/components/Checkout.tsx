@@ -12,6 +12,7 @@ interface iProducts {
   name: string
   category: string
   price: number
+  tax_rate?: number | null
   unit: string
   image: string
   stock: number
@@ -68,11 +69,22 @@ const Checkout = ({
     paymentMethod: "الدفع عند الاستلام",
   })
 
-  const total = cart.reduce(
+  const subtotal = cart.reduce(
     (sum, item) =>
       sum + item.product.price * item.quantity,
     0
   )
+
+  const tax = cart.reduce(
+    (sum, item) => {
+      const rate = Number(item.product.tax_rate || 0)
+      if (rate <= 0) return sum
+      return sum + (item.product.price * item.quantity * (rate / 100))
+    },
+    0
+  )
+
+  const total = Math.round((subtotal + tax) * 100) / 100
 
   // =========================
   // Load Bank Accounts from Laravel API
@@ -735,6 +747,11 @@ const Checkout = ({
                 </div>
               )}
 
+              {/* Payment Notice */}
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs font-bold text-amber-800">
+                ℹ️ تنبيه: المبلغ المحول الآن ({total.toFixed(2)} ج.م) يغطي المنتجات والضريبة. سيتم تحديد مصاريف التوصيل بواسطة الإدارة لاحقاً بناءً على المسافة.
+              </div>
+
               {/* Upload Image */}
               <div>
                 <label className="mb-2 block text-sm font-black text-slate-700">
@@ -799,15 +816,9 @@ const Checkout = ({
           </div>
 
           {/* Summary */}
-
-          <div className="rounded-2xl bg-slate-50 p-5">
-
-            <div className="mb-3 flex justify-between text-sm text-slate-500">
-
-              <span>
-                عدد المنتجات
-              </span>
-
+          <div className="rounded-2xl bg-slate-50 p-5 space-y-2.5">
+            <div className="flex justify-between text-sm text-slate-500 font-bold">
+              <span>عدد المنتجات</span>
               <span>
                 {cart.reduce(
                   (sum, item) =>
@@ -815,21 +826,37 @@ const Checkout = ({
                   0
                 )}
               </span>
-
             </div>
 
-            <div className="flex items-center justify-between">
-
-              <span className="font-semibold text-slate-700">
-                الإجمالي
-              </span>
-
-              <span className="text-2xl font-bold text-slate-900">
-                {total} جنيه
-              </span>
-
+            <div className="flex justify-between text-sm text-slate-600 font-bold">
+              <span>المجموع الفرعي (المنتجات)</span>
+              <span>{subtotal.toFixed(2)} ج.م</span>
             </div>
 
+            <div className="flex justify-between text-sm text-slate-600 font-bold">
+              <span>ضريبة القيمة المضافة (Tax)</span>
+              <span>{tax.toFixed(2)} ج.م</span>
+            </div>
+
+            <div className="flex items-center justify-between text-xs rounded-xl bg-amber-50 border border-amber-200 p-2.5">
+              <span className="font-bold text-amber-800">🚚 مصاريف التوصيل:</span>
+              <span className="font-black text-amber-700">جاري تحديدها بواسطة الإدارة</span>
+            </div>
+
+            <div className="border-t border-slate-200 pt-3 flex items-center justify-between">
+              <div>
+                <span className="font-black text-slate-800 block text-base">
+                  المجموع قبل التوصيل
+                </span>
+                <span className="text-[11px] text-slate-400 font-semibold">
+                  (سيتم تحديد وإضافة مصاريف التوصيل من الإدارة)
+                </span>
+              </div>
+
+              <span className="text-2xl font-black text-indigo-700">
+                {total.toFixed(2)} ج.م
+              </span>
+            </div>
           </div>
 
           {/* Submit */}

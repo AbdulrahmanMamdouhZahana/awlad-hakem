@@ -1,4 +1,7 @@
+import { useState, useEffect } from "react";
 import Modal from "./Modal";
+import toast from "react-hot-toast";
+import { apiFetch } from "../../services/api";
 
 interface OrderItem {
   id: number;
@@ -36,6 +39,10 @@ interface Order {
   address: string;
   notes: string;
   payment_method: string;
+  subtotal?: number | null;
+  tax?: number | null;
+  delivery_fee?: number | null;
+  delivery_status?: "pending" | "calculated" | string | null;
   total: number;
   status: string;
 
@@ -66,6 +73,7 @@ interface OrderDetailsModalProps {
   order: Order | null;
   onConfirm?: (orderId: number) => void | Promise<void>;
   onCancel?: (orderId: number) => void | Promise<void>;
+  onOrderUpdated?: (order: Order) => void;
   confirming?: boolean;
   cancelling?: boolean;
 }
@@ -76,13 +84,31 @@ const OrderDetailsModal = ({
   order,
   onConfirm,
   onCancel,
+  onOrderUpdated,
   confirming = false,
   cancelling = false,
 }: OrderDetailsModalProps) => {
+  const [localOrder, setLocalOrder] = useState<Order | null>(order);
+  const [deliveryFeeInput, setDeliveryFeeInput] = useState<string>("");
+  const [isEditingFee, setIsEditingFee] = useState<boolean>(false);
+  const [savingFee, setSavingFee] = useState<boolean>(false);
+
+  useEffect(() => {
+    setLocalOrder(order);
+    if (order?.delivery_fee != null) {
+      setDeliveryFeeInput(order.delivery_fee.toString());
+      setIsEditingFee(false);
+    } else {
+      setDeliveryFeeInput("");
+      setIsEditingFee(true);
+    }
+  }, [order]);
+
   if (!order) return null;
+  const activeOrder = localOrder || order;
 
   const normalizedStatus =
-    order.status === "pending_approval" ? "pending" : order.status;
+    activeOrder.status === "pending_approval" ? "pending" : activeOrder.status;
 
   const statusColors: Record<string, string> = {
     pending: "bg-amber-100 text-amber-700",
@@ -103,8 +129,58 @@ const OrderDetailsModal = ({
   };
 
   const isElectronicPayment =
-    order.payment_method === "الدفع إلكتروني" ||
-    Boolean(order.transfer_image);
+    activeOrder.payment_method === "الدفع إلكتروني" ||
+    Boolean(activeOrder.transfer_image);
+
+  const handleSaveDeliveryFee = async () => {
+    if (!activeOrder) return;
+
+    const feeNum = Number(deliveryFeeInput);
+    if (deliveryFeeInput === "" || isNaN(feeNum) || feeNum < 0) {
+      toast.error("يرجى إدخال مصاريف توصيل صحيحة (أكبر من أو تساوي 0)");
+      return;
+    }
+
+    try {
+      setSavingFee(true);
+      const res = await apiFetch(`/orders/${activeOrder.id}/delivery-fee`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          delivery_fee: feeNum,
+        }),
+      });
+
+      if (res?.success && res.order) {
+        toast.success("تم تحديد مصاريف التوصيل وتحديث إجمالي الطلب بنجاح 🚚");
+        setLocalOrder(res.order);
+        setIsEditingFee(false);
+        if (onOrderUpdated) {
+          onOrderUpdated(res.order);
+        }
+      } else {
+        toast.success("تم حفظ مصاريف التوصيل");
+      }
+    } catch (err: any) {
+      console.error("Error setting delivery fee:", err);
+      toast.error(err?.message || "فشل تحديث مصاريف التوصيل");
+    } finally {
+      setSavingFee(false);
+    }
+  };
+
+  const subtotal =
+    activeOrder.subtotal !== null && activeOrder.subtotal !== undefined
+      ? Number(activeOrder.subtotal)
+      : Number(activeOrder.total);
+  const tax = Number(activeOrder.tax || 0);
+  const deliveryFee =
+    activeOrder.delivery_fee != null ? Number(activeOrder.delivery_fee) : null;
+  const isDeliveryCalculated =
+    activeOrder.delivery_status === "calculated" && deliveryFee !== null;
+  const totalBeforeDelivery = subtotal + tax;
+  const finalTotal = isDeliveryCalculated
+    ? totalBeforeDelivery + deliveryFee
+    : totalBeforeDelivery;
 
   const formatDate = (date?: string | null) => {
     if (!date) return "غير متوفر";
@@ -417,12 +493,158 @@ const OrderDetailsModal = ({
           </div>
         </section>
 
-        {/* Total */}
-        <section className="rounded-2xl bg-indigo-600 p-5 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <span className="text-lg font-black">إجمالي الطلب</span>
+        {/* Financial Breakdown (Subtotal, Tax, Delivery Fee, Total) */}
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-base font-black text-slate-800">
+            💵 تفاصيل الحساب والإجمالي
+          </h3>
+
+          <div className="space-y-3">
+            {/* Subtotal */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 text-sm">
+              <span className="font-bold text-slate-600">المجموع الفرعي (المنتجات):</span>
+              <span className="font-black text-slate-900">{formatMoney(subtotal)} ج.م</span>
+            </div>
+
+            {/* Tax */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 text-sm">
+              <span className="font-bold text-slate-600">ضريبة القيمة المضافة (Tax):</span>
+              <span className="font-black text-slate-900">{formatMoney(tax)} ج.م</span>
+            </div>
+
+            {/* Total Before Delivery */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 text-sm">
+              <span className="font-bold text-slate-600">المجموع قبل مصاريف التوصيل:</span>
+              <span className="font-black text-indigo-700">{formatMoney(totalBeforeDelivery)} ج.م</span>
+            </div>
+
+            {/* Delivery Fee & Status Section */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200/60 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🚚</span>
+                  <span className="text-sm font-black text-slate-800">مصاريف التوصيل (Delivery Fee)</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-black ${
+                      isDeliveryCalculated
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {isDeliveryCalculated ? "✓ تم التحديد (Calculated)" : "⏳ قيد التحديد (Pending)"}
+                  </span>
+                  {isDeliveryCalculated && !isEditingFee && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingFee(true)}
+                      className="rounded-lg bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-300 transition"
+                    >
+                      تعديل
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Delivery Fee Input Form */}
+              {isEditingFee || !isDeliveryCalculated ? (
+                <div className="mt-3.5 space-y-3">
+                  <p className="text-xs font-bold text-slate-500">
+                    أدخل مصاريف التوصيل يدويًا بناءً على موقع العميل والمسافة:
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={deliveryFeeInput}
+                        onChange={(e) => setDeliveryFeeInput(e.target.value)}
+                        placeholder="مثال: 50.00"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-900 outline-none transition focus:border-indigo-500"
+                      />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">
+                        ج.م
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={savingFee}
+                      onClick={handleSaveDeliveryFee}
+                      className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {savingFee ? "جاري الحفظ..." : "تأكيد مصاريف التوصيل"}
+                    </button>
+
+                    {isDeliveryCalculated && isEditingFee && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingFee(false);
+                          setDeliveryFeeInput(activeOrder.delivery_fee?.toString() || "");
+                        }}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 transition"
+                      >
+                        إلغاء
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500">القيمة المحددة للتوصيل:</span>
+                  <span className="text-base font-black text-emerald-700">
+                    {formatMoney(deliveryFee ?? 0)} ج.م
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* GPS Reference */}
+            {activeOrder.latitude !== null && activeOrder.longitude !== null && (
+              <div className="flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <span>📍</span>
+                  <span className="font-bold text-indigo-900">
+                    موقع العميل: {activeOrder.latitude?.toFixed(5)}, {activeOrder.longitude?.toFixed(5)}
+                  </span>
+                </div>
+                <a
+                  href={`https://www.google.com/maps?q=${activeOrder.latitude},${activeOrder.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-indigo-600 px-3 py-1.5 font-bold text-white transition hover:bg-indigo-700"
+                >
+                  فتح في خرائط جوجل ↗
+                </a>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Final Total Banner */}
+        <section className={`rounded-3xl p-6 text-white shadow-xl transition-all ${
+          isDeliveryCalculated
+            ? "bg-gradient-to-r from-emerald-600 to-teal-700 shadow-emerald-600/20"
+            : "bg-gradient-to-r from-indigo-600 to-slate-800 shadow-indigo-600/20"
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <span className="text-lg font-black">
+                {isDeliveryCalculated ? "الإجمالي النهائي (شامل التوصيل)" : "إجمالي الطلب (قبل مصاريف التوصيل)"}
+              </span>
+              <p className="mt-0.5 text-xs text-white/80">
+                {isDeliveryCalculated
+                  ? `مجموع المنتجات (${formatMoney(subtotal)}) + الضريبة (${formatMoney(tax)}) + التوصيل (${formatMoney(deliveryFee ?? 0)})`
+                  : "سيتم تحديث الإجمالي النهائي بعد تأكيد مصاريف التوصيل أعلاه"}
+              </p>
+            </div>
             <span className="text-3xl font-black">
-              {formatMoney(order.total)} ج.م
+              {formatMoney(finalTotal)} ج.م
             </span>
           </div>
         </section>

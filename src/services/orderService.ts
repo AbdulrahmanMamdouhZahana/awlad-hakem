@@ -25,6 +25,8 @@ export interface CreateOrderInput {
   address: string
   notes: string
   paymentMethod: string
+  subtotal?: number
+  tax?: number
   total: number
   latitude: number | null
   longitude: number | null
@@ -299,4 +301,40 @@ export const getOrderStatusEmoji = (
     emojiMap[status] ||
     "📋"
   )
+}
+
+// =====================================================
+// Admin - Set Delivery Fee
+// =====================================================
+
+export const setOrderDeliveryFee = async (
+  orderId: number,
+  deliveryFee: number
+) => {
+  const token =
+    localStorage.getItem("staff_token") ||
+    localStorage.getItem("auth_token")
+
+  const response = await fetch(
+    `${API_URL}/orders/${orderId}/delivery-fee`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        delivery_fee: deliveryFee,
+      }),
+    }
+  )
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data?.message || "فشل تحديث مصاريف التوصيل")
+  }
+
+  return data
 }

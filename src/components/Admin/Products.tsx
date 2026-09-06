@@ -12,6 +12,7 @@ export interface IProduct {
   name: string;
   category: string;
   price: number;
+  tax_rate?: number | null;
   unit: string;
   image: string;
   stock: number;
@@ -673,10 +674,18 @@ const Products = ({ products, setProducts }: ProductsProps) => {
               )
             : null;
 
+        const taxRateNum =
+          formData.taxRate !== "" && formData.taxRate != null
+            ? Number(formData.taxRate)
+            : formData.tax_rate != null
+            ? Number(formData.tax_rate)
+            : 0;
+
         const productData = {
           name: name.trim(),
           category,
           price: priceNum,
+          tax_rate: isNaN(taxRateNum) || taxRateNum < 0 ? 0 : taxRateNum,
           unit: resolvedUnit,
           image: imageUrl,
           stock: stockNum,

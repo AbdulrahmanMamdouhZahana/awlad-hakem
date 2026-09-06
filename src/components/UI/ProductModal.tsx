@@ -8,6 +8,7 @@ interface Product {
   name: string;
   category: string;
   price: number;
+  tax_rate?: number | null;
   unit: string;
   image: string;
   stock: number;
@@ -67,6 +68,7 @@ const ProductModal = ({
         : "",
     image: editingProduct?.image || "",
     stock: editingProduct?.stock?.toString() || "0",
+    taxRate: editingProduct?.tax_rate?.toString() || "0",
     isOffer: false,
     offerPrice: "",
     discountPercentage: "",
@@ -179,6 +181,10 @@ const ProductModal = ({
           : "",
       image: editingProduct?.image || "",
       stock: editingProduct?.stock?.toString() || "0",
+      taxRate:
+        editingProduct?.tax_rate != null
+          ? editingProduct.tax_rate.toString()
+          : "0",
       isOffer: isOfferActive,
       offerPrice: offerPriceVal,
       discountPercentage: discountVal,
@@ -349,11 +355,16 @@ const ProductModal = ({
         : Math.round(((price - offerPriceNum) / price) * 100);
     }
 
+    const taxRateNum = Number(form.taxRate);
+    const taxRate = isNaN(taxRateNum) || taxRateNum < 0 ? 0 : taxRateNum;
+
     await onSave({
       ...form,
       unit: resolvedUnit,
       image: imageMode === "file" ? "" : cleanImageUrl(form.image),
       price,
+      taxRate,
+      tax_rate: taxRate,
       piecePrice,
       weightPrice,
       saleType: finalSaleType,
@@ -391,6 +402,7 @@ const ProductModal = ({
       weightPrice: "",
       image: "",
       stock: "0",
+      taxRate: "0",
       isOffer: false,
       offerPrice: "",
       discountPercentage: "",
@@ -662,6 +674,55 @@ const ProductModal = ({
             : form.saleType === "weight"
               ? "⚖️ العميل يحدد الوزن الذي يريده، ويتم حساب السعر = الوزن × سعر الكيلو."
               : "🔄 العميل يختار بين القطعة والوزن، ولكل طريقة سعرها الخاص."}
+        </div>
+
+        {/* =======================================================
+            TAX RATE SECTION (نسبة الضريبة)
+        ======================================================= */}
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <label className="block text-sm font-black text-slate-800">
+                💰 نسبة الضريبة على المنتج (%)
+              </label>
+              <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                اكتب نسبة الضريبة المطبقة (0 = بدون ضريبة، 14 = 14%، 15 = 15%)
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative w-32">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.taxRate}
+                  onChange={(e) => setForm({ ...form, taxRate: e.target.value })}
+                  placeholder="0"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-black outline-none transition focus:border-indigo-400"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">
+                  %
+                </span>
+              </div>
+              <div className="flex gap-1">
+                {[0, 14, 15].map((rate) => (
+                  <button
+                    key={rate}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, taxRate: rate.toString() }))}
+                    className={`rounded-lg px-2.5 py-1.5 text-xs font-black transition ${
+                      Number(form.taxRate) === rate
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {rate}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* =======================================================

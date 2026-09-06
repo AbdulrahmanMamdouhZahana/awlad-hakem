@@ -36,6 +36,10 @@ export interface Order {
   address: string
   notes: string
   payment_method: string
+  subtotal?: number | null
+  tax?: number | null
+  delivery_fee?: number | null
+  delivery_status?: "pending" | "calculated" | string | null
   total: number
   status: string
 
@@ -296,9 +300,20 @@ const OrderCard = ({
               )}
             </div>
 
-            <span className="text-xl font-bold text-slate-900">
-              {Number(order.total).toLocaleString("ar-EG")} ج.م
-            </span>
+            <div className="text-left">
+              <span className="text-xl font-bold text-slate-900 block">
+                {Number(order.total).toLocaleString("ar-EG")} ج.م
+              </span>
+              {order.delivery_status === "calculated" && order.delivery_fee != null ? (
+                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md inline-block mt-0.5">
+                  شامل {Number(order.delivery_fee)} ج.م توصيل
+                </span>
+              ) : (
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md inline-block mt-0.5">
+                  التوصيل: قيد التحديد ⏳
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Customer Info */}

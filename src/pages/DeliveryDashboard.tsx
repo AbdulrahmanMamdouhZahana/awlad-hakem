@@ -36,6 +36,10 @@ interface Order {
   address: string
   notes?: string
   payment_method: string
+  subtotal?: number | null
+  tax?: number | null
+  delivery_fee?: number | null
+  delivery_status?: "pending" | "calculated" | string | null
   total: number
   status: string
   latitude?: number | null

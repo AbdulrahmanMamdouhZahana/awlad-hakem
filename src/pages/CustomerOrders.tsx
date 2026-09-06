@@ -19,6 +19,10 @@ interface OrderItem {
 interface Order {
   id: number | string;
   status?: string;
+  subtotal?: number | string | null;
+  tax?: number | string | null;
+  delivery_fee?: number | string | null;
+  delivery_status?: string | null;
   total?: number | string;
   payment_method?: string;
   address?: string;
@@ -422,13 +426,42 @@ export default function CustomerOrders({
                       </p>
                     )}
 
-                    <div className="flex items-center justify-between border-t border-slate-100/80 pt-4">
-                      <span className="text-sm font-bold text-slate-500">
-                        الإجمالي
-                      </span>
-                      <span className="text-xl font-black text-[#17656b]">
-                        {getTotal(order).toFixed(2)} ج.م
-                      </span>
+                    <div className="border-t border-slate-100/80 pt-3 space-y-1.5 text-xs">
+                      {order.subtotal !== null && order.subtotal !== undefined && (
+                        <div className="flex items-center justify-between text-slate-500 font-bold">
+                          <span>المجموع الفرعي:</span>
+                          <span>{Number(order.subtotal).toFixed(2)} ج.م</span>
+                        </div>
+                      )}
+                      {Number(order.tax || 0) > 0 && (
+                        <div className="flex items-center justify-between text-slate-500 font-bold">
+                          <span>الضريبة:</span>
+                          <span>{Number(order.tax).toFixed(2)} ج.م</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-500">التوصيل:</span>
+                        {order.delivery_status === "calculated" && order.delivery_fee != null ? (
+                          <span className="font-black text-emerald-700">
+                            {Number(order.delivery_fee).toFixed(2)} ج.م
+                          </span>
+                        ) : (
+                          <span className="font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 text-[11px]">
+                            ⏳ جاري تحديد مصاريف التوصيل
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-slate-100/80 pt-2">
+                        <span className="text-sm font-bold text-slate-600">
+                          {order.delivery_status === "calculated" && order.delivery_fee != null
+                            ? "الإجمالي النهائي"
+                            : "الإجمالي قبل التوصيل"}
+                        </span>
+                        <span className="text-xl font-black text-[#17656b]">
+                          {getTotal(order).toFixed(2)} ج.م
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -554,16 +587,58 @@ export default function CustomerOrders({
                 </div>
               </div>
 
-              {/* total */}
-              <div className="rounded-2xl border border-[#17656b]/10 bg-[#17656b]/5 p-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-slate-600">
-                    إجمالي الطلب
+              {/* Financial Breakdown */}
+              <div className="rounded-2xl border border-[#17656b]/15 bg-[#17656b]/5 p-5 space-y-2.5 text-sm">
+                <h4 className="font-black text-slate-800 mb-2 border-b border-[#17656b]/10 pb-2">
+                  💵 ملخص الحساب
+                </h4>
+
+                <div className="flex items-center justify-between font-bold text-slate-600">
+                  <span>المجموع الفرعي (المنتجات):</span>
+                  <span className="text-slate-900 font-black">
+                    {(selectedOrder.subtotal !== null && selectedOrder.subtotal !== undefined
+                      ? Number(selectedOrder.subtotal)
+                      : getTotal(selectedOrder) - Number(selectedOrder.tax || 0)
+                    ).toFixed(2)} ج.م
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between font-bold text-slate-600">
+                  <span>ضريبة القيمة المضافة (Tax):</span>
+                  <span className="text-slate-900 font-black">
+                    {Number(selectedOrder.tax || 0).toFixed(2)} ج.م
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between font-bold">
+                  <span className="text-slate-600">مصاريف التوصيل:</span>
+                  {selectedOrder.delivery_status === "calculated" && selectedOrder.delivery_fee != null ? (
+                    <span className="font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg">
+                      {Number(selectedOrder.delivery_fee).toFixed(2)} ج.م
+                    </span>
+                  ) : (
+                    <span className="font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg text-xs">
+                      ⏳ جاري تحديد مصاريف التوصيل بواسطة الإدارة
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-[#17656b]/15">
+                  <span className="text-base font-black text-slate-800">
+                    {selectedOrder.delivery_status === "calculated" && selectedOrder.delivery_fee != null
+                      ? "الإجمالي النهائي"
+                      : "المجموع قبل مصاريف التوصيل"}
                   </span>
                   <span className="text-2xl font-black text-[#17656b]">
                     {getTotal(selectedOrder).toFixed(2)} ج.م
                   </span>
                 </div>
+
+                {!(selectedOrder.delivery_status === "calculated" && selectedOrder.delivery_fee != null) && (
+                  <p className="text-[11px] font-semibold text-amber-700 bg-amber-50/80 p-2.5 rounded-xl border border-amber-100">
+                    ℹ️ يتم تحديد مصاريف التوصيل بواسطة إدارة المتجر بناءً على عنوانك ومسافة التوصيل، وسيتم تحديث الإجمالي النهائي فور تحديدها.
+                  </p>
+                )}
               </div>
 
               {/* address */}

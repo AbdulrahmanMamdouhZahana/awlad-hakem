@@ -59,6 +59,7 @@ export interface iProducts {
   name: string
   category: string
   price: number
+  tax_rate?: number | null
   unit: string
   image: string
   stock: number

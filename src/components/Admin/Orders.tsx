@@ -1286,6 +1286,12 @@ const orderDate = order.created_at
   order={selectedOrder}
   onConfirm={handleConfirmOrder}
   onCancel={handleCancelOrder}
+  onOrderUpdated={(updatedOrder) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === updatedOrder.id ? ({ ...o, ...updatedOrder } as Order) : o))
+    )
+    setSelectedOrder((prev) => (prev && prev.id === updatedOrder.id ? ({ ...prev, ...updatedOrder } as Order) : prev))
+  }}
   confirming={confirmingOrder === selectedOrder?.id}
   cancelling={cancellingOrder === selectedOrder?.id}
 />
