@@ -629,10 +629,14 @@ const loadOrders = async () => {
 const handleAssignDelivery = async (orderId: number, deliveryId: number) => {
     try {
       setAssigningDelivery(orderId)
+      const nowIso = new Date().toISOString()
 
       const { data, error } = await supabase
         .from("orders")
-        .update({ delivery_id: deliveryId })
+        .update({
+          delivery_id: deliveryId,
+          assigned_at: nowIso,
+        })
         .eq("id", orderId)
         .select(`
           *,
@@ -661,6 +665,7 @@ const handleAssignDelivery = async (orderId: number, deliveryId: number) => {
       const updatedOrder: Order = {
         ...data,
         delivery,
+        assigned_at: data?.assigned_at || nowIso,
       }
 
       setOrders((prev) =>
@@ -763,11 +768,14 @@ const buildDeliveryWhatsAppMessage = (
     setConfirmingOrder(deliverySelectionOrder.id)
 
     // تأكيد الطلب + تعيين الدليفري
+    const nowIso = new Date().toISOString()
+
     const { data, error } = await supabase
       .from("orders")
       .update({
         delivery_id: delivery.id,
         status: "confirmed",
+        assigned_at: nowIso,
       })
       .eq("id", deliverySelectionOrder.id)
       .select(`
@@ -799,6 +807,7 @@ const buildDeliveryWhatsAppMessage = (
     const confirmedOrder: Order = {
       ...data,
       delivery,
+      assigned_at: data?.assigned_at || nowIso,
     }
 
 setOrders((prev) =>

@@ -89,6 +89,18 @@ const formatDate = (date?: string | null): string => {
   return Number.isNaN(parsed.getTime()) ? "غير متوفر" : parsed.toLocaleString("ar-EG")
 }
 
+const formatTimeOnly = (date?: string | null): string => {
+  if (!date) return "—"
+  const parsed = new Date(date)
+  return Number.isNaN(parsed.getTime())
+    ? "—"
+    : parsed.toLocaleTimeString("ar-EG", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+}
+
 const formatMoney = (value: number): string => {
   return Number(value || 0).toLocaleString("ar-EG")
 }
@@ -957,6 +969,33 @@ const OrderCard = ({
           <span className="text-lg font-black text-indigo-600">{formatMoney(order.total)} جنيه</span>
         </div>
       </div>
+
+      {/* مواعيد التوصيل */}
+      {(order.assigned_at || order.picked_up_at || order.delivered_at) && (
+        <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-3 text-center">
+          <p className="mb-2 text-xs font-black text-indigo-900">⏱️ توقيت مراحل الطلب</p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-indigo-100 bg-white p-2">
+              <p className="text-[10px] font-bold text-indigo-600">تم التعيين</p>
+              <p className="mt-0.5 text-xs font-black text-slate-800">
+                {order.assigned_at ? formatTimeOnly(order.assigned_at) : "—"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-blue-100 bg-white p-2">
+              <p className="text-[10px] font-bold text-blue-600">خرج للتوصيل</p>
+              <p className="mt-0.5 text-xs font-black text-blue-900">
+                {order.picked_up_at ? formatTimeOnly(order.picked_up_at) : "لم تخرج بعد"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-emerald-100 bg-white p-2">
+              <p className="text-[10px] font-bold text-emerald-600">تم التوصيل</p>
+              <p className="mt-0.5 text-xs font-black text-emerald-900">
+                {order.delivered_at ? formatTimeOnly(order.delivered_at) : "قيد التوصيل"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {renderOrderItems(order.order_items || [])}
       {renderDeliveryProofImage(order.delivery_proof_image || "")}

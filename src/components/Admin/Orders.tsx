@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import toast from "react-hot-toast"
 import { apiFetch } from "../../services/api"
+import { supabase } from "../../lib/supabase"
 import { OrderCard, OrderDetailsModal } from "../UI"
 import { confirmDelete } from "../../utils/alerts"
 
@@ -209,6 +210,37 @@ const Orders = () => {
         ...order,
         status: order.status === "pending_approval" ? "pending" : order.status,
       }))
+
+      // Sync with Supabase for real-time delivery tracking timestamps
+      try {
+        const { data: supabaseOrders } = await supabase
+          .from("orders")
+          .select("id, status, delivery_id, assigned_at, picked_up_at, delivered_at")
+
+        if (supabaseOrders && supabaseOrders.length > 0) {
+          const spMap = new Map(supabaseOrders.map((o) => [Number(o.id), o]))
+          nextOrders.forEach((order) => {
+            const spOrder = spMap.get(Number(order.id))
+            if (spOrder) {
+              if (spOrder.assigned_at) order.assigned_at = spOrder.assigned_at
+              if (spOrder.picked_up_at) order.picked_up_at = spOrder.picked_up_at
+              if (spOrder.delivered_at) order.delivered_at = spOrder.delivered_at
+              if (spOrder.delivery_id && !order.delivery_id) {
+                order.delivery_id = spOrder.delivery_id
+              }
+              if (
+                spOrder.status &&
+                spOrder.status !== order.status &&
+                (spOrder.status === "out_for_delivery" || spOrder.status === "delivered")
+              ) {
+                order.status = spOrder.status
+              }
+            }
+          })
+        }
+      } catch (err) {
+        console.warn("Supabase orders sync error in Orders.tsx:", err)
+      }
 
       // =====================================
       // Detect genuinely new orders
@@ -427,6 +459,8 @@ const buildDeliveryWhatsAppMessage = (
 
     const whatsappWindow = window.open("about:blank", "_blank")
 
+    const nowIso = new Date().toISOString()
+
     try {
       setAssigningDelivery(true)
       setConfirmingOrder(deliverySelectionOrder.id)
@@ -449,6 +483,7 @@ const buildDeliveryWhatsAppMessage = (
           method: "PATCH",
           body: JSON.stringify({
             delivery_id: delivery.id,
+            assigned_at: nowIso,
           }),
         }
       )
@@ -458,12 +493,28 @@ const buildDeliveryWhatsAppMessage = (
         assignResponse?.data ??
         assignResponse
 
+      // 3) Sync directly with Supabase orders table for the Delivery Dashboard
+      try {
+        await supabase
+          .from("orders")
+          .update({
+            delivery_id: delivery.id,
+            status: "confirmed",
+            assigned_at: nowIso,
+          })
+          .eq("id", deliverySelectionOrder.id)
+      } catch (supaErr) {
+        console.warn("Supabase assign sync error in Orders.tsx:", supaErr)
+      }
+
       const finalOrder: Order = {
         ...deliverySelectionOrder,
         ...(confirmedOrder ?? {}),
         ...(assignedOrder ?? {}),
         delivery_id: delivery.id,
         delivery,
+        assigned_at: nowIso,
+        status: "confirmed",
       }
 
       setOrders((currentOrders) =>

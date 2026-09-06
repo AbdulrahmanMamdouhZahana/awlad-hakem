@@ -47,6 +47,10 @@ export interface Order {
   latitude: number | null
   longitude: number | null
   created_at?: string
+  updated_at?: string
+  assigned_at?: string | null
+  picked_up_at?: string | null
+  delivered_at?: string | null
   order_items?: OrderItem[]
 
   delivery_id?: number | null
@@ -94,6 +98,30 @@ const OrderCard = ({
           minute: "2-digit",
         })
       : "-"
+  }
+
+  const formatTimeOnly = (date?: string | null) => {
+    if (!date) return null
+    const parsed = new Date(date)
+    if (Number.isNaN(parsed.getTime())) return null
+    return parsed.toLocaleTimeString("ar-EG", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+  }
+
+  const calculateDuration = (startTime?: string | null, endTime?: string | null) => {
+    if (!startTime || !endTime) return ""
+    const start = new Date(startTime).getTime()
+    const end = new Date(endTime).getTime()
+    if (Number.isNaN(start) || Number.isNaN(end) || end < start) return ""
+    const diffMinutes = Math.round((end - start) / (1000 * 60))
+    if (diffMinutes < 1) return "أقل من دقيقة"
+    if (diffMinutes < 60) return `${diffMinutes} دقيقة`
+    const hours = Math.floor(diffMinutes / 60)
+    const mins = diffMinutes % 60
+    return mins > 0 ? `${hours} ساعة و ${mins} دقيقة` : `${hours} ساعة`
   }
 
   // =============================================
@@ -380,23 +408,80 @@ const OrderCard = ({
               </div>
             )}
 
-            {order.delivery && (
-              <div className="mt-3 rounded-xl bg-emerald-50 p-3">
-                <p className="text-xs font-bold text-emerald-600">
-                  🚚 الدليفري المسؤول
-                </p>
+            {/* Delivery Tracking & Timestamps Timeline */}
+            {(order.delivery || order.assigned_at || order.picked_up_at || order.delivered_at) && (
+              <div className="mt-3 overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-b from-indigo-50/70 to-slate-50 p-3.5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-indigo-100/70 pb-2">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-indigo-900">
+                    <span className="text-base">⏱️</span>
+                    <span>تتبع مواعيد التوصيل</span>
+                  </div>
+                  {order.delivery && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-slate-800">
+                        {order.delivery.name}
+                      </span>
+                      <a
+                        href={`tel:${order.delivery.phone}`}
+                        className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        📞 اتصال
+                      </a>
+                    </div>
+                  )}
+                </div>
 
-                <p className="mt-1 font-black text-emerald-900">
-                  {order.delivery.name}
-                </p>
+                <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
+                  {/* وقت التعيين */}
+                  <div
+                    className={`rounded-xl p-2 border transition ${
+                      order.assigned_at
+                        ? "bg-white border-indigo-200/80 shadow-xs"
+                        : "bg-slate-100/70 border-slate-200/50 opacity-60"
+                    }`}
+                  >
+                    <p className="text-[10px] font-extrabold text-indigo-600">👤 تم التعيين</p>
+                    <p className="mt-1 text-xs font-black text-slate-800">
+                      {order.assigned_at ? formatTimeOnly(order.assigned_at) : "لم يُعيَّن"}
+                    </p>
+                  </div>
 
-                <a
-                  href={`tel:${order.delivery.phone}`}
-                  className="text-sm font-bold text-emerald-700 hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  📞 {order.delivery.phone}
-                </a>
+                  {/* وقت الخروج للتوصيل */}
+                  <div
+                    className={`rounded-xl p-2 border transition ${
+                      order.picked_up_at
+                        ? "bg-blue-50/90 border-blue-200 shadow-xs"
+                        : "bg-slate-100/70 border-slate-200/50 opacity-60"
+                    }`}
+                  >
+                    <p className="text-[10px] font-extrabold text-blue-600">🚚 خرج للتوصيل</p>
+                    <p className="mt-1 text-xs font-black text-blue-900">
+                      {order.picked_up_at ? formatTimeOnly(order.picked_up_at) : "لم يخرج بعد"}
+                    </p>
+                  </div>
+
+                  {/* وقت إتمام التوصيل */}
+                  <div
+                    className={`rounded-xl p-2 border transition ${
+                      order.delivered_at
+                        ? "bg-emerald-50/90 border-emerald-200 shadow-xs"
+                        : "bg-slate-100/70 border-slate-200/50 opacity-60"
+                    }`}
+                  >
+                    <p className="text-[10px] font-extrabold text-emerald-600">✅ تم التوصيل</p>
+                    <p className="mt-1 text-xs font-black text-emerald-900">
+                      {order.delivered_at ? formatTimeOnly(order.delivered_at) : "قيد الانتظار"}
+                    </p>
+                  </div>
+                </div>
+
+                {order.picked_up_at && order.delivered_at && (
+                  <div className="mt-2.5 flex items-center justify-center gap-1 rounded-xl bg-emerald-100/70 px-3 py-1 text-center text-[11px] font-black text-emerald-800">
+                    <span>⚡ مدة التوصيل الفعلية:</span>
+                    <span>{calculateDuration(order.picked_up_at, order.delivered_at)}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

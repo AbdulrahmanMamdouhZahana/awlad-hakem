@@ -119,6 +119,19 @@ const OrderDetailsModal = ({
     });
   };
 
+  const calculateDuration = (startTime?: string | null, endTime?: string | null) => {
+    if (!startTime || !endTime) return ""
+    const start = new Date(startTime).getTime()
+    const end = new Date(endTime).getTime()
+    if (Number.isNaN(start) || Number.isNaN(end) || end < start) return ""
+    const diffMinutes = Math.round((end - start) / (1000 * 60))
+    if (diffMinutes < 1) return "أقل من دقيقة"
+    if (diffMinutes < 60) return `${diffMinutes} دقيقة`
+    const hours = Math.floor(diffMinutes / 60)
+    const mins = diffMinutes % 60
+    return mins > 0 ? `${hours} ساعة و ${mins} دقيقة` : `${hours} ساعة`
+  };
+
   const formatMoney = (value: number) =>
     Number(value || 0).toLocaleString("ar-EG");
 
@@ -448,18 +461,134 @@ const OrderDetailsModal = ({
           )}
         </section>
 
-        {/* Dates */}
+        {/* Timeline & Delivery Tracking */}
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 text-base font-black text-slate-800">
-            🕐 التواريخ
-          </h3>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <h3 className="flex items-center gap-2 text-base font-black text-slate-800">
+              <span>⏱️</span>
+              <span>مسار تتبع الطلب ومواعيد التوصيل الدقيقة</span>
+            </h3>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Info label="تاريخ إنشاء الطلب" value={formatDate(order.created_at)} />
-            <Info label="آخر تحديث" value={formatDate(order.updated_at)} />
-            <Info label="تم تعيين الدليفري" value={formatDate(order.assigned_at)} />
-            <Info label="تم استلام الطلب" value={formatDate(order.picked_up_at)} />
-            <Info label="تم التوصيل" value={formatDate(order.delivered_at)} />
+            {order.picked_up_at && order.delivered_at && (
+              <span className="rounded-xl bg-emerald-100/80 px-3 py-1 text-xs font-black text-emerald-800">
+                ⚡ مدة رحلة التوصيل: {calculateDuration(order.picked_up_at, order.delivered_at)}
+              </span>
+            )}
+          </div>
+
+          <div className="relative space-y-4 pr-1 before:absolute before:right-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+            {/* 1. وقت إنشاء الطلب */}
+            <div className="relative flex items-start gap-4">
+              <div className="z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white shadow ring-4 ring-white">
+                1
+              </div>
+              <div className="flex-1 rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-black text-slate-800">📦 إنشاء الطلب</p>
+                  <span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-600">
+                    {formatDate(order.created_at)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. وقت إسناد الطلب وتأكيده للدليفري */}
+            <div className="relative flex items-start gap-4">
+              <div className={`z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow ring-4 ring-white ${
+                order.assigned_at ? "bg-indigo-600" : "bg-slate-300"
+              }`}>
+                2
+              </div>
+              <div className={`flex-1 rounded-2xl border p-3.5 transition ${
+                order.assigned_at
+                  ? "border-indigo-200 bg-indigo-50/50"
+                  : "border-slate-200 bg-slate-50/40 opacity-70"
+              }`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-black text-indigo-900">
+                      👤 تعيين الدليفري
+                    </p>
+                    {order.delivery && (
+                      <p className="mt-0.5 text-xs font-bold text-indigo-700">
+                        المندوب: {order.delivery.name} ({order.delivery.phone})
+                      </p>
+                    )}
+                  </div>
+                  <span className={`rounded-lg border px-2.5 py-1 text-xs font-bold ${
+                    order.assigned_at
+                      ? "border-indigo-200 bg-white text-indigo-800"
+                      : "border-slate-200 bg-white text-slate-400"
+                  }`}>
+                    {order.assigned_at ? formatDate(order.assigned_at) : "لم يتم التعيين بعد"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. وقت خروج الدليفري للتوصيل */}
+            <div className="relative flex items-start gap-4">
+              <div className={`z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow ring-4 ring-white ${
+                order.picked_up_at ? "bg-blue-600" : "bg-slate-300"
+              }`}>
+                3
+              </div>
+              <div className={`flex-1 rounded-2xl border p-3.5 transition ${
+                order.picked_up_at
+                  ? "border-blue-200 bg-blue-50/50"
+                  : "border-slate-200 bg-slate-50/40 opacity-70"
+              }`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-black text-blue-900">
+                      🚚 خروج الدليفري للتوصيل
+                    </p>
+                    <p className="mt-0.5 text-xs font-semibold text-blue-700">
+                      {order.picked_up_at ? "المندوب استلم الطلب وهو في الطريق الآن للعميل" : "في انتظار بدء التحرك والتوصيل"}
+                    </p>
+                  </div>
+                  <span className={`rounded-lg border px-2.5 py-1 text-xs font-bold ${
+                    order.picked_up_at
+                      ? "border-blue-200 bg-white text-blue-800"
+                      : "border-slate-200 bg-white text-slate-400"
+                  }`}>
+                    {order.picked_up_at ? formatDate(order.picked_up_at) : "لم يخرج بعد"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. وقت وصول وتسليم الأوردر */}
+            <div className="relative flex items-start gap-4">
+              <div className={`z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow ring-4 ring-white ${
+                order.delivered_at ? "bg-emerald-600" : "bg-slate-300"
+              }`}>
+                4
+              </div>
+              <div className={`flex-1 rounded-2xl border p-3.5 transition ${
+                order.delivered_at
+                  ? "border-emerald-200 bg-emerald-50/50"
+                  : "border-slate-200 bg-slate-50/40 opacity-70"
+              }`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-black text-emerald-900">
+                      ✅ وصول وتسليم الطلب للعميل
+                    </p>
+                    <p className="mt-0.5 text-xs font-semibold text-emerald-700">
+                      {order.delivered_at ? "تم استلام العميل للطلب بنجاح" : "الطلب قيد الانتظار / التوصيل"}
+                    </p>
+                  </div>
+                  <span className={`rounded-lg border px-2.5 py-1 text-xs font-bold ${
+                    order.delivered_at
+                      ? "border-emerald-200 bg-white text-emerald-800"
+                      : "border-slate-200 bg-white text-slate-400"
+                  }`}>
+                    {order.delivered_at ? formatDate(order.delivered_at) : "قيد الانتظار"}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
