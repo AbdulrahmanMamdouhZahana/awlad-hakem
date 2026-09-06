@@ -1,6 +1,10 @@
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import Products from "./Products"
+import {
+  getProductOffer,
+  OFFERS_CHANGED_EVENT,
+} from "../services/offerService"
 
 // =====================================
 // Customer Categories
@@ -42,6 +46,11 @@ interface iProducts {
   image: string
   stock: number
   created_at?: string
+  is_offer?: boolean
+  offer_price?: number | null
+  original_price?: number | null
+  discount_percentage?: number | null
+  offer_badge?: string | null
 }
 
 interface IProps {
@@ -60,9 +69,16 @@ const HeaderProducts = ({
 
   const [selectedMainCategory, setSelectedMainCategory] = useState("الكل")
   const [selectedSubCategory, setSelectedSubCategory] = useState("الكل")
+  const [offersVersion, setOffersVersion] = useState(0)
+
+  useEffect(() => {
+    const handleOffersChanged = () => setOffersVersion((v) => v + 1)
+    window.addEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
+    return () => window.removeEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
+  }, [])
 
   const subCategories = useMemo(() => {
-    if (selectedMainCategory === "الكل") return []
+    if (selectedMainCategory === "الكل" || selectedMainCategory === "العروض") return []
     return CATEGORY_GROUPS[selectedMainCategory] ?? []
   }, [selectedMainCategory])
 
@@ -73,7 +89,11 @@ const HeaderProducts = ({
   const filteredProducts = useMemo(() => {
     let result = products
 
-    if (selectedMainCategory !== "الكل") {
+    if (selectedMainCategory === "العروض") {
+      result = result.filter((product) =>
+        Boolean(getProductOffer(product.id) || product.is_offer)
+      )
+    } else if (selectedMainCategory !== "الكل") {
       const allowedSubCategories = CATEGORY_GROUPS[selectedMainCategory] ?? []
 
       result = result.filter((product) =>
@@ -88,7 +108,7 @@ const HeaderProducts = ({
     }
 
     return result.slice(0, 8)
-  }, [products, selectedMainCategory, selectedSubCategory])
+  }, [products, selectedMainCategory, selectedSubCategory, offersVersion])
 
   // =====================================
   // Main Category Icon
@@ -146,6 +166,35 @@ const HeaderProducts = ({
                     selectedMainCategory === "الكل" ? "text-white/75" : "text-slate-500"
                   }`}>
                     تصفح كل المنتجات
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedMainCategory("العروض")
+                setSelectedSubCategory("الكل")
+              }}
+              className={`group rounded-2xl border p-4 text-right transition-all duration-200 ${
+                selectedMainCategory === "العروض"
+                  ? "border-red-500 bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-lg shadow-red-500/30"
+                  : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-red-400 hover:shadow-md"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl ${
+                  selectedMainCategory === "العروض" ? "bg-white/20" : "bg-red-50"
+                }`}>
+                  🔥
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-black sm:text-base">عروض وتخفيضات</div>
+                  <div className={`mt-0.5 text-[10px] sm:text-xs ${
+                    selectedMainCategory === "العروض" ? "text-white/85" : "text-red-500 font-bold"
+                  }`}>
+                    وفر مع أفضل العروض
                   </div>
                 </div>
               </div>

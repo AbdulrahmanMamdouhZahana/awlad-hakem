@@ -15,6 +15,11 @@ export interface iProducts {
   piece_price?: number | null
   weight_price?: number | null
   created_at?: string
+  is_offer?: boolean
+  offer_price?: number | null
+  original_price?: number | null
+  discount_percentage?: number | null
+  offer_badge?: string | null
 }
 
 // =====================================

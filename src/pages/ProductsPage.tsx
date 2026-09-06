@@ -1,6 +1,10 @@
-import { useMemo, useState, useRef } from "react"
+import { useMemo, useState, useRef, useEffect } from "react"
 import { Link } from "react-router-dom"
 import Products from "../components/Products"
+import {
+  getProductOffer,
+  OFFERS_CHANGED_EVENT,
+} from "../services/offerService"
 
 interface iProducts {
   id: number
@@ -11,6 +15,11 @@ interface iProducts {
   image: string
   stock: number
   created_at?: string
+  is_offer?: boolean
+  offer_price?: number | null
+  original_price?: number | null
+  discount_percentage?: number | null
+  offer_badge?: string | null
 }
 
 interface IProps {
@@ -38,6 +47,13 @@ const ProductsPage = ({
   const [selectedSubCategory, setSelectedSubCategory] = useState("الكل")
   const [currentPage, setCurrentPage] = useState(1)
   const [sortBy, setSortBy] = useState<"newest" | "price-low" | "price-high" | "name">("newest")
+  const [offersVersion, setOffersVersion] = useState(0)
+
+  useEffect(() => {
+    const handleOffersChanged = () => setOffersVersion((v) => v + 1)
+    window.addEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
+    return () => window.removeEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
+  }, [])
 
   const productsPerPage = 24
 
@@ -114,7 +130,9 @@ const ProductsPage = ({
       // Check if product matches main category
       let matchesMainCategory = selectedMainCategory === "الكل"
 
-      if (!matchesMainCategory) {
+      if (selectedMainCategory === "العروض") {
+        matchesMainCategory = Boolean(getProductOffer(product.id) || product.is_offer)
+      } else if (!matchesMainCategory) {
         const productMainCategory = getMainCategory(productCategory)
         matchesMainCategory = productMainCategory === selectedMainCategory
       }
@@ -158,7 +176,7 @@ const ProductsPage = ({
 
     return result
 
-  }, [products, searchQuery, selectedMainCategory, selectedSubCategory, sortBy])
+  }, [products, searchQuery, selectedMainCategory, selectedSubCategory, sortBy, offersVersion])
 
   // =========================
   // Pagination
@@ -363,7 +381,19 @@ const ProductsPage = ({
                   }`}
               >
                 🎯 كل المنتجات
+              </button>
 
+              <button
+                type="button"
+                onClick={() => handleMainCategoryChange("العروض")}
+                className={`shrink-0 flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${
+                  selectedMainCategory === "العروض"
+                    ? "bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-lg shadow-red-500/30"
+                    : "border-2 border-red-200 bg-white text-red-600 hover:border-red-400 hover:bg-red-50 hover:shadow-md"
+                }`}
+              >
+                <span>🔥</span>
+                <span>العروض والتخفيضات</span>
               </button>
 
               {mainCategories.map((mainCategory) => {
@@ -379,14 +409,13 @@ const ProductsPage = ({
                       }`}
                   >
                     {getCategoryIcon(mainCategory)} {mainCategory}
-
                   </button>
                 )
               })}
             </div>
 
             {/* Sub Categories */}
-            {selectedMainCategory !== "الكل" && (
+            {selectedMainCategory !== "الكل" && selectedMainCategory !== "العروض" && (
               <div className="flex gap-2 overflow-x-auto border-t-2 border-slate-100 pt-4 pb-2 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent" style={{ scrollbarWidth: "thin" }}>
                 <button
                   type="button"

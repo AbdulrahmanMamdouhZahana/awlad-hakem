@@ -12,6 +12,11 @@ interface iProducts {
   piece_price?: number | null
   weight_price?: number | null
   created_at?: string
+  is_offer?: boolean
+  offer_price?: number | null
+  original_price?: number | null
+  discount_percentage?: number | null
+  offer_badge?: string | null
 }
 
 interface CartItem {
@@ -403,6 +408,11 @@ const Cart = ({
                         <span className="inline-flex items-center rounded-md bg-[#17656b]/10 px-1.5 py-0.2 font-bold text-[#17656b] text-[10px]">
                           {item.saleType === "weight" ? "بالوزن" : "بالقطعة"}
                         </span>
+                        {item.product.is_offer && (
+                          <span className="inline-flex items-center rounded-md bg-red-100 px-1.5 py-0.2 font-bold text-red-600 text-[10px]">
+                            {item.product.offer_badge || "عرض 🔥"}
+                          </span>
+                        )}
                         <span className="text-slate-300">•</span>
                         {item.saleType === "weight" ? (
                           <span className="inline-flex flex-wrap items-center gap-1 text-slate-600">
@@ -798,6 +808,12 @@ const Cart = ({
                             <span className="rounded-md bg-[#17656b]/10 px-2 py-0.5 text-[11px] font-bold text-[#17656b]">
                               {item.saleType === "weight" ? "بالوزن" : "بالقطعة"}
                             </span>
+
+                            {item.product.is_offer && (
+                              <span className="rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-600">
+                                {item.product.offer_badge || "عرض 🔥"}
+                              </span>
+                            )}
 
                             <span className="text-slate-300">•</span>
 

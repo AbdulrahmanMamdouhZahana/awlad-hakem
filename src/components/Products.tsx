@@ -1,5 +1,9 @@
-import { useState, useMemo, memo } from "react"
+import { useState, useMemo, useEffect, memo } from "react"
 import { createPortal } from "react-dom"
+import {
+  getProductOffer,
+  OFFERS_CHANGED_EVENT,
+} from "../services/offerService"
 
 export interface iProducts {
   id: number
@@ -13,6 +17,11 @@ export interface iProducts {
   piece_price?: number | null
   weight_price?: number | null
   created_at?: string
+  is_offer?: boolean
+  offer_price?: number | null
+  original_price?: number | null
+  discount_percentage?: number | null
+  offer_badge?: string | null
 }
 
 export type IProduct = iProducts
@@ -165,6 +174,47 @@ const ProductCard = ({
     saleType === "weight" ? "weight" : "piece"
   )
   const [selectedWeight, setSelectedWeight] = useState("0.25")
+  const [offersVersion, setOffersVersion] = useState(0)
+
+  useEffect(() => {
+    const handleOffersChanged = () => setOffersVersion((v) => v + 1)
+    window.addEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
+    return () => window.removeEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
+  }, [])
+
+  const offer = useMemo(() => {
+    const localOffer = getProductOffer(product.id)
+    if (localOffer && localOffer.isOffer && localOffer.offerPrice > 0) {
+      return localOffer
+    }
+    if (product.is_offer && product.offer_price && Number(product.offer_price) > 0) {
+      const orig = product.original_price ?? product.price
+      return {
+        isOffer: true,
+        originalPrice: orig,
+        offerPrice: Number(product.offer_price),
+        discountPercentage:
+          product.discount_percentage ??
+          (orig > 0 ? Math.round(((orig - Number(product.offer_price)) / orig) * 100) : undefined),
+        offerBadge: product.offer_badge || "عرض خاص 🔥",
+      }
+    }
+    return null
+  }, [product, offersVersion])
+
+  const effectiveProduct = useMemo(() => {
+    if (!offer) return product
+    return {
+      ...product,
+      price: offer.offerPrice,
+      piece_price: product.piece_price != null ? offer.offerPrice : product.piece_price,
+      is_offer: true,
+      offer_price: offer.offerPrice,
+      original_price: offer.originalPrice,
+      discount_percentage: offer.discountPercentage,
+      offer_badge: offer.offerBadge,
+    }
+  }, [product, offer])
 
   const stockStatus = useMemo(() => {
     const stockNum = Number(product.stock)
@@ -188,7 +238,7 @@ const ProductCard = ({
     if (!onAddToCart || !isAvailable) return
 
     if (saleType === "piece") {
-      onAddToCart(product, { saleType: "piece" })
+      onAddToCart(effectiveProduct, { saleType: "piece" })
       return
     }
 
@@ -218,12 +268,12 @@ const ProductCard = ({
         return
       }
 
-      onAddToCart(product, {
+      onAddToCart(effectiveProduct, {
         saleType: "weight",
         weight,
       })
     } else {
-      onAddToCart(product, {
+      onAddToCart(effectiveProduct, {
         saleType: "piece",
       })
     }
@@ -301,16 +351,23 @@ const ProductCard = ({
         overflow-hidden
         rounded-xl
         sm:rounded-2xl
-        border
-        border-slate-200/80
-        bg-white
+        border-2
+        ${
+          offer
+            ? "border-red-500/80 bg-gradient-to-b from-red-50/20 to-white shadow-md shadow-red-500/10 ring-1 ring-red-400/30 hover:border-red-600 hover:shadow-xl hover:shadow-red-500/20"
+            : "border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-md"
+        }
         transition-all
         duration-300
         hover:-translate-y-1
-        hover:shadow-md
         ${className}
       `}
     >
+      {/* Offer top accent bar */}
+      {offer && (
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-600 via-amber-500 to-red-600 z-20" />
+      )}
+
       {/* Product Image & Badges */}
       <div className="relative aspect-square w-full overflow-hidden bg-gradient-to-b from-[#eef3f3]/60 to-[#eef3f3] p-1.5 sm:p-3">
         <img
@@ -357,10 +414,50 @@ const ProductCard = ({
           {stockStatus.text}
         </span>
 
-        {/* Category badge - desktop only */}
-        <span className="hidden md:inline-block absolute left-2 bottom-2 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-600 shadow-sm backdrop-blur">
-          {subCategory}
-        </span>
+        {/* Category badge - desktop only (shown when no offer badge in same spot) */}
+        {!offer && (
+          <span className="hidden md:inline-block absolute left-2 bottom-2 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-600 shadow-sm backdrop-blur">
+            {subCategory}
+          </span>
+        )}
+
+        {/* Offer badge */}
+        {offer && (
+          <span
+            className="
+              absolute
+              left-1
+              sm:left-2
+              bottom-1
+              sm:bottom-2
+              z-10
+              rounded-lg
+              bg-gradient-to-r
+              from-red-600
+              to-amber-500
+              px-2
+              py-0.5
+              sm:px-3
+              sm:py-1
+              text-[9px]
+              sm:text-[11px]
+              font-black
+              text-white
+              shadow-md
+              shadow-red-500/30
+              flex
+              items-center
+              gap-1
+            "
+          >
+            <span>{offer.offerBadge || "عرض خاص 🔥"}</span>
+            {offer.discountPercentage != null && offer.discountPercentage > 0 && (
+              <span className="bg-black/20 rounded px-1 text-[7px] sm:text-[9px]">
+                -{offer.discountPercentage}%
+              </span>
+            )}
+          </span>
+        )}
 
         {/* Customer favorite button */}
         {!isAdmin && (
@@ -466,7 +563,28 @@ const ProductCard = ({
         {/* Pricing & Actions */}
         <div className="mt-2 pt-1 border-t border-slate-100">
           <div className="min-w-0">
-            {saleType === "weight" ? (
+            {offer ? (
+              <div>
+                <div className="flex items-baseline flex-wrap gap-1.5">
+                  <div className="flex items-baseline gap-0.5 text-xs sm:text-base font-black text-red-600">
+                    <bdi>{offer.offerPrice.toFixed(2)}</bdi>
+                    <span className="text-[8px] sm:text-[10px] font-bold text-red-500">ج.م</span>
+                  </div>
+                  <div className="flex items-baseline text-[9px] sm:text-xs font-bold text-slate-400 line-through">
+                    <bdi>{(offer.originalPrice || piecePrice || weightPrice).toFixed(2)}</bdi>
+                  </div>
+                </div>
+                {saleType === "weight" ? (
+                  <span className="text-[8px] sm:text-[10px] text-slate-400 block truncate">
+                    لكل كجم (عرض خاص)
+                  </span>
+                ) : product.unit ? (
+                  <span className="truncate text-[8px] sm:text-[10px] font-medium text-slate-400 block">
+                    / {product.unit}
+                  </span>
+                ) : null}
+              </div>
+            ) : saleType === "weight" ? (
               weightPrice > 0 ? (
                 <div>
                   <div className="flex items-baseline gap-0.5 text-xs sm:text-sm font-black text-[#17656b]">

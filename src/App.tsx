@@ -47,6 +47,8 @@ import {
   saveCart,
 } from "./services/cartService"
 
+import { getProductOffer } from "./services/offerService"
+
 // =====================================
 // Product Type
 // =====================================
@@ -63,6 +65,11 @@ export interface iProducts {
   piece_price?: number | null
   weight_price?: number | null
   created_at?: string
+  is_offer?: boolean
+  offer_price?: number | null
+  original_price?: number | null
+  discount_percentage?: number | null
+  offer_badge?: string | null
 }
 
 // =====================================
@@ -1360,10 +1367,20 @@ useEffect(() => {
       options?.saleType ||
       (product.sale_type === "weight" ? "weight" : "piece")
 
-    const unitPrice =
+    const offer = getProductOffer(product.id)
+    const effectiveOfferPrice =
+      offer && offer.isOffer && offer.offerPrice > 0
+        ? offer.offerPrice
+        : product.is_offer && product.offer_price && Number(product.offer_price) > 0
+        ? Number(product.offer_price)
+        : null
+
+    const basePrice =
       saleType === "weight"
         ? Number(product.weight_price ?? product.price)
         : Number(product.piece_price ?? product.price)
+
+    const unitPrice = effectiveOfferPrice != null ? effectiveOfferPrice : basePrice
 
     if (!Number.isFinite(unitPrice) || unitPrice < 0) {
       toast.error("سعر المنتج غير صحيح")
@@ -1382,6 +1399,15 @@ useEffect(() => {
         toast.error("الكمية المطلوبة أكبر من المخزون")
         return
       }
+    }
+
+    const productToStore: iProducts = {
+      ...product,
+      price: unitPrice,
+      is_offer: Boolean(effectiveOfferPrice != null),
+      offer_price: effectiveOfferPrice,
+      original_price: effectiveOfferPrice != null ? (offer?.originalPrice ?? (product.original_price ?? basePrice)) : undefined,
+      offer_badge: offer?.offerBadge ?? product.offer_badge,
     }
 
     const existingIndex = cart.findIndex(
@@ -1406,6 +1432,7 @@ useEffect(() => {
             index === existingIndex
               ? {
                   ...item,
+                  product: productToStore,
                   weight: nextWeight,
                   quantity: 1,
                   unitPrice,
@@ -1424,6 +1451,7 @@ useEffect(() => {
             index === existingIndex
               ? {
                   ...item,
+                  product: productToStore,
                   quantity: item.quantity + 1,
                   unitPrice,
                 }
@@ -1439,7 +1467,7 @@ useEffect(() => {
     setCart((currentCart) => [
       ...currentCart,
       {
-        product,
+        product: productToStore,
         quantity: 1,
         saleType,
         weight: saleType === "weight" ? selectedWeight : undefined,

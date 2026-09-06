@@ -13,6 +13,13 @@ import {
   uploadProductImage,
 } from "../../services/productService"
 
+import {
+  getProductOffer,
+  setProductOffer,
+  removeProductOffer,
+  OFFERS_CHANGED_EVENT,
+} from "../../services/offerService"
+
 import { supabase } from "../../lib/supabase"
 import { apiFetch } from "../../services/api"
 import { OrderCard, OrderDetailsModal, ProductModal } from "../UI"
@@ -35,6 +42,11 @@ interface iProducts {
   piece_price?: number | null
   weight_price?: number | null
   created_at?: string
+  is_offer?: boolean
+  offer_price?: number | null
+  original_price?: number | null
+  discount_percentage?: number | null
+  offer_badge?: string | null
 }
 
 
@@ -233,6 +245,18 @@ const Dashboard = ({
     "المكتبة": ["المكتبة"],
     "المقلاة": ["المقلاة"],
   })
+
+  const [, setOffersVersion] = useState(0)
+
+  useEffect(() => {
+    const handleOffersChanged = () => setOffersVersion((v) => v + 1)
+    window.addEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
+    return () => window.removeEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged)
+  }, [])
+
+  const activeOffersCount = products.filter(
+    (p) => Boolean(getProductOffer(p.id) || p.is_offer)
+  ).length
 
   // =====================================================
   // Orders State
@@ -986,6 +1010,10 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
     saleType?: "piece" | "weight" | "both"
     piecePrice?: number | null
     weightPrice?: number | null
+    isOffer?: boolean
+    offerPrice?: string | number
+    discountPercentage?: string | number
+    offerBadge?: string
   }) => {
     try {
       setSavingProduct(true)
@@ -1040,6 +1068,19 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
       if (editingProduct) {
         const updatedProduct = await updateProduct(editingProduct.id, productData)
 
+        // Save or remove offer
+        if (data.isOffer && data.offerPrice) {
+          setProductOffer(editingProduct.id, {
+            originalPrice: data.price,
+            offerPrice: Number(data.offerPrice),
+            discountPercentage: data.discountPercentage ? Number(data.discountPercentage) : undefined,
+            offerBadge: data.offerBadge,
+            isOffer: true,
+          })
+        } else {
+          removeProductOffer(editingProduct.id)
+        }
+
         setProducts((prev) =>
           prev.map((product) =>
             product.id === updatedProduct.id ? updatedProduct : product
@@ -1049,6 +1090,17 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
         toast.success("تم تعديل المنتج بنجاح")
       } else {
         const product = await addProduct(productData)
+
+        // Save offer for new product
+        if (data.isOffer && data.offerPrice) {
+          setProductOffer(product.id, {
+            originalPrice: data.price,
+            offerPrice: Number(data.offerPrice),
+            discountPercentage: data.discountPercentage ? Number(data.discountPercentage) : undefined,
+            offerBadge: data.offerBadge,
+            isOffer: true,
+          })
+        }
 
         setProducts((prev) => [product, ...prev])
 
@@ -1303,6 +1355,7 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
 
       try {
         await deleteProduct(productId)
+        removeProductOffer(productId)
 
         setProducts((prev) =>
           prev.filter((product) => product.id !== productId)
@@ -1451,10 +1504,14 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                         تابع الطلبات، أدِر المنتجات، وراقب حالة المتجر من مكان واحد.
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 sm:min-w-[300px]">
+                    <div className="grid grid-cols-3 gap-3 sm:min-w-[380px]">
                       <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md">
                         <p className="text-xs text-indigo-100">المنتجات</p>
                         <p className="mt-1 text-2xl font-black">{products.length}</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md">
+                        <p className="text-xs text-indigo-100">العروض 🔥</p>
+                        <p className="mt-1 text-2xl font-black text-amber-300">{activeOffersCount}</p>
                       </div>
                       <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md">
                         <p className="text-xs text-indigo-100">الطلبات</p>

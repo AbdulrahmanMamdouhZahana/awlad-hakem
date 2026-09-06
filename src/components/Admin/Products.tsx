@@ -5,6 +5,12 @@ import { ProductModal } from "../UI";
 import ProductCard from "../Products";
 import { supabase } from "../../lib/supabase";
 import { confirmDelete } from "../../utils/alerts";
+import {
+  getProductOffer,
+  setProductOffer,
+  removeProductOffer,
+  OFFERS_CHANGED_EVENT,
+} from "../../services/offerService";
 
 export interface IProduct {
   id: number;
@@ -18,6 +24,11 @@ export interface IProduct {
   piece_price?: number | null;
   weight_price?: number | null;
   created_at?: string;
+  is_offer?: boolean;
+  offer_price?: number | null;
+  original_price?: number | null;
+  discount_percentage?: number | null;
+  offer_badge?: string | null;
 }
 
 interface ProductsProps {
@@ -209,6 +220,8 @@ const Products = ({ products, setProducts }: ProductsProps) => {
   const [search, setSearch] = useState("");
   const [mainCategory, setMainCategory] = useState("الكل");
   const [category, setCategory] = useState("الكل");
+  const [onlyOffers, setOnlyOffers] = useState(false);
+  const [offersVersion, setOffersVersion] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -219,6 +232,14 @@ const Products = ({ products, setProducts }: ProductsProps) => {
     useState<Record<string, string[]>>(CATEGORY_GROUPS);
 
   const mainCategories = useMemo(() => Object.keys(categoryGroups), [categoryGroups]);
+
+  useEffect(() => {
+    const handleOffersChanged = () => {
+      setOffersVersion((v) => v + 1);
+    };
+    window.addEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged);
+    return () => window.removeEventListener(OFFERS_CHANGED_EVENT, handleOffersChanged);
+  }, []);
 
   useEffect(() => {
     const savedGroups = loadCategoryGroups();
@@ -273,6 +294,11 @@ const Products = ({ products, setProducts }: ProductsProps) => {
     const searchValue = search.trim().toLowerCase();
 
     return products.filter((product) => {
+      const hasOffer = Boolean(getProductOffer(product.id) || product.is_offer);
+      if (onlyOffers && !hasOffer) {
+        return false;
+      }
+
       const productName = String(product.name ?? "").toLowerCase();
       const productCategory = String(product.category ?? "");
       const productMainCategory = getMainCategory(productCategory, categoryGroups);
@@ -290,7 +316,7 @@ const Products = ({ products, setProducts }: ProductsProps) => {
 
       return matchesSearch && matchesMainCategory && matchesCategory;
     });
-  }, [products, search, mainCategory, category, categoryGroups]);
+  }, [products, search, mainCategory, category, onlyOffers, categoryGroups, offersVersion]);
 
   const totalPages = Math.max(
     1,
@@ -304,7 +330,7 @@ const Products = ({ products, setProducts }: ProductsProps) => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, mainCategory, category]);
+  }, [search, mainCategory, category, onlyOffers]);
 
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
@@ -319,8 +345,9 @@ const Products = ({ products, setProducts }: ProductsProps) => {
       currentPageCount: paginatedProducts.length,
       lowStock: products.filter((p) => p.stock > 0 && p.stock <= 10).length,
       outOfStock: products.filter((p) => p.stock <= 0).length,
+      offersCount: products.filter((p) => Boolean(getProductOffer(p.id) || p.is_offer)).length,
     }),
-    [products, filteredProducts, paginatedProducts]
+    [products, filteredProducts, paginatedProducts, offersVersion]
   );
 
   const openAddModal = useCallback(() => {
@@ -679,6 +706,19 @@ const Products = ({ products, setProducts }: ProductsProps) => {
             throw new Error("الخادم لم يرجع بيانات المنتج بعد التعديل");
           }
 
+          // Offer handling
+          if (formData.isOffer && formData.offerPrice) {
+            setProductOffer(editingProduct.id, {
+              originalPrice: priceNum,
+              offerPrice: Number(formData.offerPrice),
+              discountPercentage: formData.discountPercentage ? Number(formData.discountPercentage) : undefined,
+              offerBadge: formData.offerBadge,
+              isOffer: true,
+            });
+          } else {
+            removeProductOffer(editingProduct.id);
+          }
+
           // Re-fetch the products list from the backend so the UI is
           // synchronized with the actual database value.
           await loadProducts();
@@ -699,6 +739,17 @@ const Products = ({ products, setProducts }: ProductsProps) => {
 
           if (!newProduct?.id) {
             throw new Error("الخادم لم يرجع بيانات المنتج بعد الحفظ");
+          }
+
+          // Offer handling for new product
+          if (formData.isOffer && formData.offerPrice) {
+            setProductOffer(newProduct.id, {
+              originalPrice: priceNum,
+              offerPrice: Number(formData.offerPrice),
+              discountPercentage: formData.discountPercentage ? Number(formData.discountPercentage) : undefined,
+              offerBadge: formData.offerBadge,
+              isOffer: true,
+            });
           }
 
           // Re-fetch from the backend so the displayed product is
@@ -811,6 +862,8 @@ const Products = ({ products, setProducts }: ProductsProps) => {
             onCategoryChange={setCategory}
             subCategories={availableSubCategories}
             mainCategories={mainCategories}
+            onlyOffers={onlyOffers}
+            onOnlyOffersChange={setOnlyOffers}
           />
 
           <Stats stats={stats} />
@@ -888,6 +941,8 @@ const Filters = ({
   onCategoryChange,
   subCategories,
   mainCategories,
+  onlyOffers,
+  onOnlyOffersChange,
 }: {
   search: string;
   onSearchChange: (v: string) => void;
@@ -897,16 +952,39 @@ const Filters = ({
   onCategoryChange: (v: string) => void;
   subCategories: string[];
   mainCategories: string[];
+  onlyOffers: boolean;
+  onOnlyOffersChange: (v: boolean) => void;
 }) => (
   <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
     <div className="flex flex-col gap-4">
-      <input
-        type="text"
-        value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
-        placeholder="ابحث عن منتج..."
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
-      />
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="flex-1">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="ابحث عن منتج بالاسم أو القسم..."
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => onOnlyOffersChange(!onlyOffers)}
+          className={`shrink-0 flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition border ${
+            onlyOffers
+              ? "bg-gradient-to-r from-red-600 to-amber-500 text-white border-transparent shadow-md shadow-red-200"
+              : "bg-slate-50 text-slate-700 border-slate-200 hover:border-red-300 hover:text-red-600 hover:bg-red-50/50"
+          }`}
+        >
+          <span className="text-base">🔥</span>
+          <span>العروض والتخفيضات فقط</span>
+          {onlyOffers && (
+            <span className="bg-white/25 text-white px-2 py-0.5 rounded-full text-xs">
+              مفعل
+            </span>
+          )}
+        </button>
+      </div>
 
       <div>
         <p className="mb-2 text-xs font-black text-slate-500">
@@ -964,10 +1042,12 @@ const Stats = ({
     currentPageCount: number;
     lowStock: number;
     outOfStock: number;
+    offersCount: number;
   };
 }) => (
-  <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
     <StatCard label="إجمالي المنتجات" value={stats.total} color="text-slate-950" />
+    <StatCard label="العروض والتخفيضات 🔥" value={stats.offersCount} color="text-red-500" />
     <StatCard label="نتائج البحث" value={stats.displayed} color="text-indigo-600" />
     <StatCard label="في الصفحة الحالية" value={stats.currentPageCount} color="text-emerald-600" />
     <StatCard label="مخزون منخفض" value={stats.lowStock} color="text-amber-500" />

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Modal from "./Modal";
 import toast from "react-hot-toast";
 import { promptText } from "../../utils/alerts";
+import { getProductOffer } from "../../services/offerService";
 
 interface Product {
   id: number;
@@ -14,6 +15,11 @@ interface Product {
   sale_type?: "piece" | "weight" | "both";
   piece_price?: number | null;
   weight_price?: number | null;
+  is_offer?: boolean;
+  offer_price?: number | null;
+  original_price?: number | null;
+  discount_percentage?: number | null;
+  offer_badge?: string | null;
 }
 
 interface ProductModalProps {
@@ -61,6 +67,10 @@ const ProductModal = ({
         : "",
     image: editingProduct?.image || "",
     stock: editingProduct?.stock?.toString() || "0",
+    isOffer: false,
+    offerPrice: "",
+    discountPercentage: "",
+    offerBadge: "عرض خاص 🔥",
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -129,6 +139,29 @@ const ProductModal = ({
       ? getMainCategoryForProduct(editingProduct.category)
       : mainCategories[0] || "";
 
+    const existingOffer = editingProduct ? getProductOffer(editingProduct.id) : null;
+    const isOfferActive = Boolean(
+      existingOffer?.isOffer ||
+      editingProduct?.is_offer ||
+      (editingProduct?.offer_price && Number(editingProduct.offer_price) > 0)
+    );
+    const offerPriceVal =
+      existingOffer?.offerPrice != null
+        ? existingOffer.offerPrice.toString()
+        : editingProduct?.offer_price != null
+          ? editingProduct.offer_price.toString()
+          : "";
+    const discountVal =
+      existingOffer?.discountPercentage != null
+        ? existingOffer.discountPercentage.toString()
+        : editingProduct?.discount_percentage != null
+          ? editingProduct.discount_percentage.toString()
+          : "";
+    const badgeVal =
+      existingOffer?.offerBadge ||
+      editingProduct?.offer_badge ||
+      "عرض خاص 🔥";
+
     setForm({
       name: editingProduct?.name || "",
       mainCategory,
@@ -149,6 +182,10 @@ const ProductModal = ({
           : "",
       image: editingProduct?.image || "",
       stock: editingProduct?.stock?.toString() || "0",
+      isOffer: isOfferActive,
+      offerPrice: offerPriceVal,
+      discountPercentage: discountVal,
+      offerBadge: badgeVal,
     });
 
     setImageFile(null);
@@ -295,6 +332,25 @@ const ProductModal = ({
 
     const finalSaleType = form.saleType || "piece";
 
+    let finalOfferPrice: number | null = null;
+    let finalDiscountPercentage: number | null = null;
+
+    if (form.isOffer) {
+      const offerPriceNum = Number(form.offerPrice);
+      if (isNaN(offerPriceNum) || offerPriceNum <= 0) {
+        toast.error("يرجى إدخال سعر العرض بشكل صحيح");
+        return;
+      }
+      if (offerPriceNum >= price) {
+        toast.error("سعر العرض يجب أن يكون أقل من السعر الأصلي");
+        return;
+      }
+      finalOfferPrice = offerPriceNum;
+      finalDiscountPercentage = form.discountPercentage
+        ? Number(form.discountPercentage)
+        : Math.round(((price - offerPriceNum) / price) * 100);
+    }
+
     await onSave({
       ...form,
       unit: resolvedUnit,
@@ -308,6 +364,16 @@ const ProductModal = ({
       weight_price: weightPrice,
       stock,
       imageFile: imageFile || undefined,
+      isOffer: form.isOffer,
+      is_offer: form.isOffer,
+      offerPrice: finalOfferPrice,
+      offer_price: finalOfferPrice,
+      originalPrice: price,
+      original_price: price,
+      discountPercentage: finalDiscountPercentage,
+      discount_percentage: finalDiscountPercentage,
+      offerBadge: form.isOffer ? form.offerBadge || "عرض خاص 🔥" : null,
+      offer_badge: form.isOffer ? form.offerBadge || "عرض خاص 🔥" : null,
     });
   };
 
@@ -325,6 +391,10 @@ const ProductModal = ({
       weightPrice: "",
       image: "",
       stock: "0",
+      isOffer: false,
+      offerPrice: "",
+      discountPercentage: "",
+      offerBadge: "عرض خاص 🔥",
     });
 
     setImageFile(null);
@@ -591,6 +661,170 @@ const ProductModal = ({
             : form.saleType === "weight"
               ? "⚖️ العميل يحدد الوزن الذي يريده، ويتم حساب السعر = الوزن × سعر الكيلو."
               : "🔄 العميل يختار بين القطعة والوزن، ولكل طريقة سعرها الخاص."}
+        </div>
+
+        {/* =======================================================
+            OFFER & DISCOUNT SECTION (العروض والخصومات)
+        ======================================================= */}
+        <div
+          className={`rounded-2xl border transition-all duration-300 p-4 ${
+            form.isOffer
+              ? "border-amber-400 bg-gradient-to-br from-amber-50/80 via-orange-50/40 to-white shadow-md shadow-amber-500/10"
+              : "border-slate-200 bg-slate-50/60"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-lg">
+                🔥
+              </span>
+              <div>
+                <h4 className="text-sm font-black text-slate-900">
+                  تفعيل عرض / خصم خاص على المنتج
+                </h4>
+                <p className="text-[11px] font-medium text-slate-500">
+                  سيظهر للمستخدم شارة العرض مع شطب السعر القديم وإبراز سعر الخصم
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle Switch */}
+            <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={form.isOffer}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  const currentBasePrice =
+                    Number(form.saleType === "weight" ? form.weightPrice : form.piecePrice) ||
+                    Number(form.price) ||
+                    0;
+                  setForm((prev) => ({
+                    ...prev,
+                    isOffer: checked,
+                    offerPrice:
+                      checked && !prev.offerPrice && currentBasePrice > 0
+                        ? (currentBasePrice * 0.85).toFixed(2)
+                        : prev.offerPrice,
+                    discountPercentage:
+                      checked && !prev.discountPercentage ? "15" : prev.discountPercentage,
+                    offerBadge:
+                      checked && !prev.offerBadge ? "عرض خاص 🔥" : prev.offerBadge,
+                  }));
+                }}
+                className="peer sr-only"
+              />
+              <div className="peer h-6 w-11 rounded-full bg-slate-300 after:absolute after:top-[2px] after:right-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-[#17656b] peer-checked:after:-translate-x-full peer-focus:outline-none"></div>
+            </label>
+          </div>
+
+          {form.isOffer && (
+            <div className="mt-4 border-t border-amber-200/60 pt-4 space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {/* Offer Price */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-black text-slate-800">
+                    سعر العرض بعد الخصم (ج.م) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.offerPrice}
+                    onChange={(e) => {
+                      const newOfferPrice = e.target.value;
+                      const basePrice =
+                        Number(form.saleType === "weight" ? form.weightPrice : form.piecePrice) ||
+                        Number(form.price) ||
+                        0;
+                      let discount = form.discountPercentage;
+                      if (basePrice > 0 && Number(newOfferPrice) > 0 && Number(newOfferPrice) < basePrice) {
+                        discount = Math.round(((basePrice - Number(newOfferPrice)) / basePrice) * 100).toString();
+                      }
+                      setForm((prev) => ({
+                        ...prev,
+                        offerPrice: newOfferPrice,
+                        discountPercentage: discount,
+                      }));
+                    }}
+                    placeholder="مثال: 75"
+                    className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-sm font-black text-[#17656b] outline-none transition focus:border-[#17656b] focus:ring-2 focus:ring-[#17656b]/20"
+                  />
+                </div>
+
+                {/* Discount Percentage */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-black text-slate-800">
+                    نسبة الخصم (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    value={form.discountPercentage}
+                    onChange={(e) => {
+                      const newDiscount = e.target.value;
+                      const basePrice =
+                        Number(form.saleType === "weight" ? form.weightPrice : form.piecePrice) ||
+                        Number(form.price) ||
+                        0;
+                      let computedOfferPrice = form.offerPrice;
+                      if (basePrice > 0 && Number(newDiscount) > 0) {
+                        computedOfferPrice = (basePrice * (1 - Number(newDiscount) / 100)).toFixed(2);
+                      }
+                      setForm((prev) => ({
+                        ...prev,
+                        discountPercentage: newDiscount,
+                        offerPrice: computedOfferPrice,
+                      }));
+                    }}
+                    placeholder="مثال: 20"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition focus:border-[#17656b]"
+                  />
+                </div>
+
+                {/* Offer Badge Text */}
+                <div>
+                  <label className="mb-1.5 block text-xs font-black text-slate-800">
+                    نص الشارة على المنتج
+                  </label>
+                  <input
+                    type="text"
+                    value={form.offerBadge}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, offerBadge: e.target.value }))
+                    }
+                    placeholder="مثال: عرض خاص 🔥"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold outline-none transition focus:border-[#17656b]"
+                  />
+                </div>
+              </div>
+
+              {/* Live Preview Box */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300/70 bg-amber-100/50 p-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-600">معاينة السعر للعميل:</span>
+                  <span className="font-semibold text-slate-400 line-through">
+                    {(
+                      Number(form.saleType === "weight" ? form.weightPrice : form.piecePrice) ||
+                      Number(form.price) ||
+                      0
+                    ).toFixed(2)}{" "}
+                    ج.م
+                  </span>
+                  <span className="text-sm font-black text-red-600">
+                    {(Number(form.offerPrice) || 0).toFixed(2)} ج.م
+                  </span>
+                </div>
+
+                {Number(form.offerPrice) > 0 && (
+                  <span className="rounded-lg bg-red-600 px-2.5 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                    {form.offerBadge || `خصم ${form.discountPercentage || 0}%`}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
