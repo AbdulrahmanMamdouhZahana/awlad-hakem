@@ -169,12 +169,12 @@ const ProductCard = ({
   const stockStatus = useMemo(() => {
     const stockNum = Number(product.stock)
     if (stockNum <= 0) {
-      return { text: "نفد المخزون", className: "bg-red-100 text-red-700" }
+      return { text: "نفد", className: "bg-red-100 text-red-700 border border-red-200" }
     }
     if (stockNum <= 10) {
-      return { text: "مخزون منخفض", className: "bg-amber-100 text-amber-700" }
+      return { text: "قارب النفاد", className: "bg-amber-100 text-amber-700 border border-amber-200" }
     }
-    return { text: "متوفر", className: "bg-emerald-100 text-emerald-700" }
+    return { text: "متوفر", className: "bg-emerald-100 text-emerald-700 border border-emerald-200" }
   }, [product.stock])
 
   const { mainCategory, subCategory } = useMemo(
@@ -297,19 +297,22 @@ const ProductCard = ({
         flex
         h-full
         flex-col
+        justify-between
         overflow-hidden
-        rounded-2xl
+        rounded-xl
+        sm:rounded-2xl
         border
-        border-slate-200
+        border-slate-200/80
         bg-white
         transition-all
         duration-300
         hover:-translate-y-1
-        hover:shadow-lg
+        hover:shadow-md
         ${className}
       `}
     >
-      <div className="relative h-44 overflow-hidden bg-[#eef3f3] sm:h-48">
+      {/* Product Image & Badges */}
+      <div className="relative aspect-square w-full overflow-hidden bg-gradient-to-b from-[#eef3f3]/60 to-[#eef3f3] p-1.5 sm:p-3">
         <img
           src={imageUrl}
           alt={product.name}
@@ -319,7 +322,6 @@ const ProductCard = ({
             h-full
             w-full
             object-contain
-            p-4
             transition-transform
             duration-300
             group-hover:scale-105
@@ -328,7 +330,7 @@ const ProductCard = ({
             e.currentTarget.onerror = null
             e.currentTarget.src = "/main_logo.png"
             e.currentTarget.className =
-              "h-full w-full object-contain p-10"
+              "h-full w-full object-contain p-2"
           }}
         />
 
@@ -336,21 +338,27 @@ const ProductCard = ({
         <span
           className={`
             absolute
-            right-2
-            top-2
+            right-1
+            sm:right-2
+            top-1
+            sm:top-2
             rounded-md
-            px-2
-            py-1
-            text-[10px]
+            px-1.5
+            py-0.5
+            sm:px-2
+            sm:py-1
+            text-[8px]
+            sm:text-[10px]
             font-black
+            shadow-sm
             ${stockStatus.className}
           `}
         >
           {stockStatus.text}
         </span>
 
-        {/* Category badge */}
-        <span className="absolute left-2 top-2 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-600 shadow-sm backdrop-blur">
+        {/* Category badge - desktop only */}
+        <span className="hidden md:inline-block absolute left-2 bottom-2 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-600 shadow-sm backdrop-blur">
           {subCategory}
         </span>
 
@@ -371,11 +379,15 @@ const ProductCard = ({
             }
             className={`
               absolute
-              left-2
-              bottom-2
+              left-1
+              sm:left-2
+              top-1
+              sm:top-2
               flex
-              h-8
-              w-8
+              h-6
+              w-6
+              sm:h-7
+              sm:w-7
               items-center
               justify-center
               rounded-full
@@ -383,15 +395,15 @@ const ProductCard = ({
               shadow-sm
               transition-all
               duration-200
-              hover:scale-105
+              hover:scale-110
               ${isFavorite
                 ? "text-red-500"
-                : "text-slate-500 hover:text-red-500"
+                : "text-slate-400 hover:text-red-500"
               }
             `}
           >
             <svg
-              className="h-4 w-4"
+              className="h-3 w-3 sm:h-3.5 sm:w-3.5"
               fill={
                 isFavorite
                   ? "currentColor"
@@ -411,116 +423,137 @@ const ProductCard = ({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col px-4 py-3.5">
-        <div className="mb-2 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="shrink-0 rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-bold text-indigo-600">
+      {/* Card Body */}
+      <div className="flex flex-1 flex-col justify-between p-2 sm:p-3">
+        <div>
+          {/* Main Category tag */}
+          <div className="mb-1 min-w-0">
+            <span className="truncate max-w-full rounded-md bg-[#17656b]/10 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-bold text-[#17656b] inline-block">
               {mainCategory}
+            </span>
+          </div>
+
+          {/* Product Name */}
+          <h3
+            className="
+              line-clamp-2
+              min-h-[26px]
+              sm:min-h-[34px]
+              text-[11px]
+              sm:text-xs
+              md:text-sm
+              font-black
+              leading-tight
+              sm:leading-snug
+              text-slate-900
+              break-words
+            "
+            title={product.name}
+          >
+            {product.name}
+          </h3>
+
+          {/* Stock / Unit indicator */}
+          <div className="mt-1 flex items-center justify-between gap-1">
+            <span className="truncate text-[8px] sm:text-[10px] font-medium text-slate-400">
+              {saleType === "weight"
+                ? `المخزون: ${Number(product.stock).toFixed(1)} كجم`
+                : `المخزون: ${Number(product.stock).toFixed(0)} ${product.unit || "قطعة"}`}
             </span>
           </div>
         </div>
 
-        <h3
-          className="
-            min-h-[38px]
-            line-clamp-2
-            text-xs
-            font-black
-            leading-5
-            text-slate-900
-            sm:text-sm
-          "
-          title={product.name}
-        >
-          {product.name}
-        </h3>
-
-        <div className="mt-1 flex items-center justify-between gap-1">
-          <div className="flex text-[10px] text-amber-400">
-            ★★★★★
-          </div>
-
-          <span className="text-[10px] font-bold text-slate-400">
-            {saleType === "weight"
-              ? `المخزون: ${Number(product.stock).toFixed(1)} كجم`
-              : `المخزون: ${Number(product.stock).toFixed(0)} ${product.unit || "قطعة"}`}
-          </span>
-        </div>
-
-        <div className="mt-3 flex items-center justify-between gap-2">
+        {/* Pricing & Actions */}
+        <div className="mt-2 pt-1 border-t border-slate-100">
           <div className="min-w-0">
             {saleType === "weight" ? (
               weightPrice > 0 ? (
                 <div>
-                  <div className="text-sm font-black text-slate-900 sm:text-base">
-                    {weightPrice.toFixed(2)} ج.م / كجم
+                  <div className="flex items-baseline gap-0.5 text-xs sm:text-sm font-black text-[#17656b]">
+                    <bdi>{weightPrice.toFixed(2)}</bdi>
+                    <span className="text-[8px] sm:text-[10px] font-bold text-slate-500">ج.م</span>
                   </div>
+                  <span className="text-[8px] sm:text-[10px] text-slate-400 block truncate">
+                    لكل كجم
+                  </span>
                 </div>
               ) : (
-                <span className="text-xs font-semibold text-slate-400">
+                <span className="text-[10px] font-semibold text-slate-400">
                   سعر الكيلو غير محدد
                 </span>
               )
             ) : saleType === "both" ? (
-              <div className="space-y-0.5">
-                <div className="text-[11px] font-black text-slate-900">
-                  قطعة: {piecePrice.toFixed(2)} ج.م
+              <div>
+                <div className="flex items-baseline gap-0.5 text-xs sm:text-sm font-black text-[#17656b]">
+                  <bdi>{piecePrice.toFixed(2)}</bdi>
+                  <span className="text-[8px] sm:text-[10px] font-bold text-slate-500">ج.م/قطعة</span>
                 </div>
-                <div className="text-[11px] font-black text-slate-900">
+                <div className="text-[8px] sm:text-[9px] font-bold text-slate-500 truncate">
                   كيلو: {weightPrice.toFixed(2)} ج.م
                 </div>
               </div>
             ) : (
               piecePrice > 0 ? (
-                <div className="flex items-baseline gap-1">
-                  <span className="text-sm font-black text-slate-900 sm:text-base">
-                    {piecePrice.toFixed(2)} ج.م
-                  </span>
+                <div>
+                  <div className="flex items-baseline gap-0.5 text-xs sm:text-sm font-black text-[#17656b]">
+                    <bdi>{piecePrice.toFixed(2)}</bdi>
+                    <span className="text-[8px] sm:text-[10px] font-bold text-slate-500">ج.م</span>
+                  </div>
                   {product.unit && (
-                    <span className="truncate text-[10px] font-bold text-slate-400">
+                    <span className="truncate text-[8px] sm:text-[10px] font-medium text-slate-400 block">
                       / {product.unit}
                     </span>
                   )}
                 </div>
               ) : (
-                <span className="text-xs font-semibold text-slate-400">
+                <span className="text-[10px] font-semibold text-slate-400">
                   السعر غير محدد
                 </span>
               )
             )}
           </div>
 
+          {/* Add to Cart Button */}
           {onAddToCart && !isAdmin && (
             <button
               type="button"
               disabled={!isAvailable}
               onClick={openAddOptions}
               className="
+                mt-1.5
+                sm:mt-2
                 flex
-                shrink-0
+                w-full
                 items-center
+                justify-center
                 gap-1
                 rounded-lg
-                border
-                border-slate-300
-                bg-white
-                px-2.5
+                sm:rounded-xl
+                bg-gradient-to-r
+                from-[#17656b]
+                to-[#0f4a4f]
                 py-1.5
+                sm:py-2
+                px-1
                 text-[10px]
+                sm:text-xs
                 font-bold
-                text-slate-700
-                transition
-                hover:border-[#17656b]
-                hover:bg-[#17656b]
-                hover:text-white
+                text-white
+                shadow-sm
+                shadow-[#17656b]/20
+                transition-all
+                hover:shadow-md
+                hover:shadow-[#17656b]/30
+                active:scale-95
                 disabled:cursor-not-allowed
-                disabled:border-slate-200
-                disabled:bg-slate-100
+                disabled:from-slate-200
+                disabled:to-slate-200
                 disabled:text-slate-400
+                disabled:shadow-none
               "
             >
               <svg
-                className="h-3.5 w-3.5"
+                className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -528,47 +561,56 @@ const ProductCard = ({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={1.8}
+                  strokeWidth={2}
                   d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13 5.4 5M7 13l-2 2h13m-11 4a1 1 0 1 0 2 0m8 0a1 1 0 1 0 2 0"
                 />
               </svg>
 
-              <span>أضف للسلة</span>
+              <span className="leading-none">
+                {!isAvailable ? (
+                  "نفد"
+                ) : (
+                  <>
+                    <span className="sm:hidden">أضف</span>
+                    <span className="hidden sm:inline">أضف للسلة</span>
+                  </>
+                )}
+              </span>
             </button>
           )}
+
+          {/* Admin Action Buttons */}
+          {isAdmin && (
+            <div className="mt-2 flex gap-1 border-t border-slate-100 pt-2">
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEdit(product)
+                  }}
+                  className="flex-1 rounded-lg border border-indigo-100 bg-indigo-50 py-1.5 text-[10px] sm:text-xs font-bold text-indigo-700 transition hover:bg-indigo-100"
+                >
+                  تعديل
+                </button>
+              )}
+
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete(product.id)
+                  }}
+                  disabled={isDeleting}
+                  className="flex-1 rounded-lg border border-red-100 bg-red-50 py-1.5 text-[10px] sm:text-xs font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+                >
+                  {isDeleting ? "..." : "حذف"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
-
-        {/* Admin Action Buttons */}
-        {isAdmin && (
-          <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
-            {onEdit && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onEdit(product)
-                }}
-                className="flex-1 rounded-xl border border-indigo-100 bg-indigo-50 py-2.5 text-xs font-black text-indigo-700 transition hover:bg-indigo-100 hover:shadow-sm"
-              >
-                تعديل
-              </button>
-            )}
-
-            {onDelete && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDelete(product.id)
-                }}
-                disabled={isDeleting}
-                className="flex-1 rounded-xl border border-red-100 bg-red-50 py-2.5 text-xs font-black text-red-600 transition hover:bg-red-100 hover:shadow-sm disabled:opacity-50"
-              >
-                {isDeleting ? "جاري..." : "حذف"}
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Sale Options Modal (Weight/Piece selection) for customer */}

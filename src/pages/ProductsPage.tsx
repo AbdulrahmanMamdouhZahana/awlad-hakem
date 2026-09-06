@@ -110,10 +110,10 @@ const ProductsPage = ({
 
     let result = products.filter((product) => {
       const productCategory = product.category?.trim() || ""
-      
+
       // Check if product matches main category
       let matchesMainCategory = selectedMainCategory === "الكل"
-      
+
       if (!matchesMainCategory) {
         const productMainCategory = getMainCategory(productCategory)
         matchesMainCategory = productMainCategory === selectedMainCategory
@@ -121,13 +121,13 @@ const ProductsPage = ({
 
       // Check if product matches subcategory
       let matchesSubCategory = selectedSubCategory === "الكل"
-      
+
       if (!matchesSubCategory) {
         matchesSubCategory = productCategory === selectedSubCategory
       }
 
       // Check search query
-      const matchesSearch = query === "" || 
+      const matchesSearch = query === "" ||
         product.name.toLowerCase().includes(query)
 
       return matchesMainCategory && matchesSubCategory && matchesSearch
@@ -183,7 +183,7 @@ const ProductsPage = ({
     setSelectedMainCategory(category)
     setSelectedSubCategory("الكل")
     setCurrentPage(1)
-    
+
     // Scroll to products after a small delay
     setTimeout(() => {
       scrollToSection(productsRef)
@@ -193,7 +193,7 @@ const ProductsPage = ({
   const handleSubCategoryChange = (subCategory: string) => {
     setSelectedSubCategory(subCategory)
     setCurrentPage(1)
-    
+
     // Scroll to products after a small delay
     setTimeout(() => {
       scrollToSection(productsRef)
@@ -261,7 +261,7 @@ const ProductsPage = ({
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC40Ij48cGF0aCBkPSJNMzYgMzR2LTRoNHY0aC00em0wIDB2LTRoLTR2NGg0eiIvPjwvZz48L2c+PC9zdmc+')]"></div>
         </div>
-        
+
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -283,7 +283,7 @@ const ProductsPage = ({
               </p>
             </div>
 
-         
+
           </div>
         </div>
       </section>
@@ -357,14 +357,13 @@ const ProductsPage = ({
               <button
                 type="button"
                 onClick={() => handleMainCategoryChange("الكل")}
-                className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${
-                  selectedMainCategory === "الكل" && selectedSubCategory === "الكل"
+                className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${selectedMainCategory === "الكل" && selectedSubCategory === "الكل"
                     ? "bg-[#17656b] text-white shadow-lg shadow-[#17656b]/30"
                     : "border-2 border-slate-200 bg-white text-slate-600 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b] hover:shadow-md"
-                }`}
+                  }`}
               >
                 🎯 كل المنتجات
-               
+
               </button>
 
               {mainCategories.map((mainCategory) => {
@@ -374,14 +373,13 @@ const ProductsPage = ({
                     key={mainCategory}
                     type="button"
                     onClick={() => handleMainCategoryChange(mainCategory)}
-                    className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${
-                      active
+                    className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${active
                         ? "bg-[#17656b] text-white shadow-lg shadow-[#17656b]/30"
                         : "border-2 border-slate-200 bg-white text-slate-600 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b] hover:shadow-md"
-                    }`}
+                      }`}
                   >
                     {getCategoryIcon(mainCategory)} {mainCategory}
-                   
+
                   </button>
                 )
               })}
@@ -393,11 +391,10 @@ const ProductsPage = ({
                 <button
                   type="button"
                   onClick={() => handleSubCategoryChange("الكل")}
-                  className={`shrink-0 rounded-lg px-4 py-1.5 text-xs font-bold transition-all duration-300 ${
-                    selectedSubCategory === "الكل"
+                  className={`shrink-0 rounded-lg px-4 py-1.5 text-xs font-bold transition-all duration-300 ${selectedSubCategory === "الكل"
                       ? "bg-[#17656b] text-white shadow-md"
                       : "border-2 border-slate-200 bg-slate-50 text-slate-600 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b]"
-                  }`}
+                    }`}
                 >
                   📋 كل الأقسام
                 </button>
@@ -409,11 +406,10 @@ const ProductsPage = ({
                       key={subCategory}
                       type="button"
                       onClick={() => handleSubCategoryChange(subCategory)}
-                      className={`shrink-0 rounded-lg px-4 py-1.5 text-xs font-bold transition-all duration-300 ${
-                        active
+                      className={`shrink-0 rounded-lg px-4 py-1.5 text-xs font-bold transition-all duration-300 ${active
                           ? "bg-[#17656b] text-white shadow-md"
                           : "border-2 border-slate-200 bg-slate-50 text-slate-600 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b]"
-                      }`}
+                        }`}
                     >
                       {subCategory}
                     </button>
@@ -428,8 +424,8 @@ const ProductsPage = ({
       {/* =========================
           Products
       ========================= */}
-      <section ref={productsRef} className="py-10 sm:py-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section ref={productsRef} className="py-6 sm:py-12">
+        <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
           {displayedProducts.length === 0 ? (
             /* Empty State */
             <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-white px-6 py-24 text-center shadow-lg">
@@ -455,18 +451,18 @@ const ProductsPage = ({
           ) : (
             <>
               {/* Results Info */}
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm font-medium text-slate-500">
+              <div className="mb-4 sm:mb-6 flex flex-wrap items-center justify-between gap-3 px-1 sm:px-0">
+                <p className="text-xs sm:text-sm font-medium text-slate-500">
                   عرض{" "}
-                  <span className="rounded-lg bg-[#17656b]/10 px-2 py-1 font-bold text-[#17656b]">
+                  <span className="rounded-lg bg-[#17656b]/10 px-1.5 sm:px-2 py-0.5 sm:py-1 font-bold text-[#17656b]">
                     {startIndex + 1}
                   </span>
                   {" "}إلى{" "}
-                  <span className="rounded-lg bg-[#17656b]/10 px-2 py-1 font-bold text-[#17656b]">
+                  <span className="rounded-lg bg-[#17656b]/10 px-1.5 sm:px-2 py-0.5 sm:py-1 font-bold text-[#17656b]">
                     {Math.min(endIndex, filteredProducts.length)}
                   </span>
                   {" "}من{" "}
-                  <span className="rounded-lg bg-[#17656b]/10 px-2 py-1 font-bold text-[#17656b]">
+                  <span className="rounded-lg bg-[#17656b]/10 px-1.5 sm:px-2 py-0.5 sm:py-1 font-bold text-[#17656b]">
                     {filteredProducts.length}
                   </span>
                   {" "}منتج
@@ -484,7 +480,7 @@ const ProductsPage = ({
               </div>
 
               {/* Grid */}
-              <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-5 lg:grid-cols-3 xl:grid-cols-4">
                 {displayedProducts.map((product) => (
                   <Products
                     key={product.id}
@@ -514,11 +510,10 @@ const ProductsPage = ({
                       key={page}
                       type="button"
                       onClick={() => changePage(page)}
-                      className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-bold transition-all duration-300 ${
-                        safeCurrentPage === page
+                      className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-bold transition-all duration-300 ${safeCurrentPage === page
                           ? "bg-[#17656b] text-white shadow-lg shadow-[#17656b]/30 scale-110"
                           : "border-2 border-slate-200 bg-white text-slate-600 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b]"
-                      }`}
+                        }`}
                     >
                       {page}
                     </button>
