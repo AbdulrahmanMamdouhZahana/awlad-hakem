@@ -30,6 +30,7 @@ interface iProducts {
   name: string
   category: string
   price: number
+  tax_rate?: number | null
   unit: string
   image: string
   stock: number
@@ -234,6 +235,8 @@ const Dashboard = ({
     name: "",
     category: "السوبر ماركت",
     price: "",
+    tax_rate: "0",
+    taxRate: "0",
     unit: "",
     image: "",
     stock: "0",
@@ -993,6 +996,8 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
     mainCategory: string
     category: string
     price: number
+    tax_rate?: number | null
+    taxRate?: string | number | null
     unit: string
     stock: number
     imageFile?: File
@@ -1059,10 +1064,18 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
           ? Math.round(((originalPriceNum - offerPriceNum) / originalPriceNum) * 100)
           : (data.discountPercentage != null && Number(data.discountPercentage) > 0 ? Number(data.discountPercentage) : null)
 
+      const taxRateNum =
+        data.taxRate !== "" && data.taxRate != null
+          ? Number(data.taxRate)
+          : data.tax_rate != null
+          ? Number(data.tax_rate)
+          : 0
+
       const productData = {
         name: data.name.trim(),
         category: data.category, // Use sub-category as the main category field
         price: data.price,
+        tax_rate: isNaN(taxRateNum) || taxRateNum < 0 ? 0 : taxRateNum,
         unit: String(data.unit ?? "").trim() || (normalizedSaleType === "weight" ? "كيلو" : "قطعة"),
         image: imageUrl,
         stock: data.stock,
@@ -1219,6 +1232,13 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
       }
 
 
+      const taxRateNum =
+        newProduct.taxRate !== "" && newProduct.taxRate != null
+          ? Number(newProduct.taxRate)
+          : newProduct.tax_rate != null
+          ? Number(newProduct.tax_rate)
+          : (editingProduct?.tax_rate ?? 0)
+
       const productData = {
         name:
           newProduct.name.trim(),
@@ -1227,6 +1247,7 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
           newProduct.category,
 
         price,
+        tax_rate: isNaN(taxRateNum) || taxRateNum < 0 ? 0 : taxRateNum,
 
         unit: resolvedUnit,
 
@@ -1301,6 +1322,8 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
         category:
           "السوبر ماركت",
         price: "",
+        tax_rate: "0",
+        taxRate: "0",
         unit: "",
         image: "",
         stock: "0",
@@ -1379,6 +1402,8 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
       name: "",
       category: "السوبر ماركت",
       price: "",
+      tax_rate: "0",
+      taxRate: "0",
       unit: "",
       image: "",
       stock: "0",
@@ -1398,6 +1423,8 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
         name: product.name,
         category: product.category,
         price: String(product.price),
+        tax_rate: String(product.tax_rate ?? 0),
+        taxRate: String(product.tax_rate ?? 0),
         unit: product.unit,
         image: product.image,
         stock: String(product.stock),
