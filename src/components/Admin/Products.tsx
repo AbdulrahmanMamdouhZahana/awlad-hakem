@@ -66,6 +66,66 @@ export const CATEGORY_GROUPS: Record<string, string[]> = {
 
 const CATEGORY_STORAGE_KEY = "awlad_hakem_category_groups";
 
+export const syncCategoryGroupsWithProducts = (
+  baseGroups: Record<string, string[]>,
+  products: { category?: string }[]
+): Record<string, string[]> => {
+  const merged: Record<string, string[]> = {};
+
+  for (const [main, subs] of Object.entries(baseGroups)) {
+    merged[main] = Array.from(new Set(subs.filter(Boolean)));
+  }
+
+  if (!merged["السوبر ماركت"]) merged["السوبر ماركت"] = [];
+  if (!merged["المكتبة"]) merged["المكتبة"] = [];
+  if (!merged["المحمصة"]) merged["المحمصة"] = [];
+
+  // Merge default CATEGORY_GROUPS items
+  for (const [main, subs] of Object.entries(CATEGORY_GROUPS)) {
+    if (!merged[main]) merged[main] = [];
+    subs.forEach((s) => {
+      if (!Object.values(merged).some((existing) => existing.includes(s))) {
+        merged[main].push(s);
+      }
+    });
+  }
+
+  // Merge every distinct category from products
+  products.forEach((p) => {
+    const cat = p.category?.trim();
+    if (!cat) return;
+
+    const alreadyMapped = Object.values(merged).some((subs) => subs.includes(cat));
+    if (!alreadyMapped) {
+      if (
+        cat.includes("بن ") ||
+        cat.includes("مكسرات") ||
+        cat.includes("تسالي") ||
+        cat.includes("محمص") ||
+        cat.includes("لب ") ||
+        cat.includes("المقلاة")
+      ) {
+        merged["المحمصة"].push(cat);
+      } else if (
+        cat.includes("كشكول") ||
+        cat.includes("كرسات") ||
+        cat.includes("قلم") ||
+        cat.includes("مكتب") ||
+        cat.includes("ورق") ||
+        cat.includes("ادوات") ||
+        cat.includes("وصلات") ||
+        cat.includes("اعياد ميلاد")
+      ) {
+        merged["المكتبة"].push(cat);
+      } else {
+        merged["السوبر ماركت"].push(cat);
+      }
+    }
+  });
+
+  return merged;
+};
+
 const loadCategoryGroups = (): Record<string, string[]> => {
   try {
     const saved = localStorage.getItem(CATEGORY_STORAGE_KEY);
@@ -79,7 +139,11 @@ const loadCategoryGroups = (): Record<string, string[]> => {
 };
 
 const saveCategoryGroups = (groups: Record<string, string[]>) => {
-  localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(groups));
+  try {
+    localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(groups));
+  } catch {
+    // ignore
+  }
 };
 
 const getMainCategoryFromGroups = (
@@ -98,6 +162,7 @@ const getMainCategory = (
   category: string,
   groups: Record<string, string[]> = CATEGORY_GROUPS
 ) => getMainCategoryFromGroups(category, groups);
+
 
 // ============================================================
 // Helper: Clean and extract real image URL
@@ -241,8 +306,10 @@ const Products = ({ products, setProducts }: ProductsProps) => {
 
   useEffect(() => {
     const savedGroups = loadCategoryGroups();
-    setCategoryGroups(savedGroups);
-  }, []);
+    const synced = syncCategoryGroupsWithProducts(savedGroups, products);
+    setCategoryGroups(synced);
+    saveCategoryGroups(synced);
+  }, [products]);
 
   const handleSubcategoryRenamed = useCallback(
     (oldName: string, newName: string) => {

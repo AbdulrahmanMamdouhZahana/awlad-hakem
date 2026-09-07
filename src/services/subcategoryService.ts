@@ -59,12 +59,14 @@ export async function deleteSubcategory(
   success: boolean;
   message: string;
 }> {
-  const response = await apiFetch("/admin/subcategories", {
+  const trimmed = name.trim();
+  const response = await apiFetch(`/admin/subcategories/${encodeURIComponent(trimmed)}`, {
     method: "DELETE",
     body: JSON.stringify({
-      name: name.trim(),
+      name: trimmed,
     }),
   });
 
   return response;
 }
+
