@@ -20,6 +20,9 @@ import { apiFetch } from "../../services/api"
 import { OrderCard, OrderDetailsModal, ProductModal } from "../UI"
 import type { Order as OrderCardOrder } from "../UI/Cards/OrderCard"
 import { confirmDelete } from "../../utils/alerts"
+import { CATEGORY_GROUPS, syncCategoryGroupsWithProducts } from "./Products"
+
+
 import {
   ArrowPathIcon,
   ChevronLeftIcon,
@@ -278,12 +281,15 @@ const Dashboard = ({
     stock: "0",
   })
 
-  // Categories for ProductModal
-  const [categories, setCategories] = useState<Record<string, string[]>>({
-    "السوبر ماركت": ["السوبر ماركت"],
-    "المكتبة": ["المكتبة"],
-    "المقلاة": ["المقلاة"],
+  // Categories for ProductModal (synced with all products from DB)
+  const [categories, setCategories] = useState<Record<string, string[]>>(() => {
+    return syncCategoryGroupsWithProducts(CATEGORY_GROUPS, products || [])
   })
+
+  useEffect(() => {
+    setCategories(syncCategoryGroupsWithProducts(CATEGORY_GROUPS, products || []))
+  }, [products])
+
 
   const activeOffersCount = products.filter(isOfferActive).length
 

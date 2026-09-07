@@ -559,28 +559,48 @@ export const SubcategoriesModal: React.FC<SubcategoriesModalProps> = ({
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filteredSubcategories.map((sub) => {
-                  return (
-                    <div
-                      key={sub.category}
-                      className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:shadow-md hover:border-slate-300"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <h4
-                            className="text-sm font-black text-slate-900 truncate"
-                            title={sub.category}
-                          >
-                            {sub.category}
-                          </h4>
-                          <span className="mt-1 inline-block text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                            {sub.mainCategory}
-                          </span>
-                        </div>
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <table className="min-w-full divide-y divide-slate-200 text-right text-xs sm:text-sm">
 
+                <thead className="bg-slate-50/90 text-slate-700 font-black">
+                  <tr>
+                    <th scope="col" className="py-3 px-4 sm:px-6">
+                      القسم الرئيسي
+                    </th>
+                    <th scope="col" className="py-3 px-4 sm:px-6">
+                      القسم الفرعي
+                    </th>
+                    <th scope="col" className="py-3 px-4 sm:px-6 text-center">
+                      عدد المنتجات
+                    </th>
+                    <th scope="col" className="py-3 px-4 sm:px-6 text-center">
+                      الإجراءات
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white font-bold">
+                  {filteredSubcategories.map((sub) => (
+                    <tr
+                      key={sub.category}
+                      className="transition hover:bg-slate-50/80"
+                    >
+                      {/* Main Category */}
+                      <td className="py-3.5 px-4 sm:px-6 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-black text-indigo-700">
+                          <FolderIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>{sub.mainCategory}</span>
+                        </span>
+                      </td>
+
+                      {/* Subcategory Name */}
+                      <td className="py-3.5 px-4 sm:px-6 text-slate-900 font-black whitespace-nowrap">
+                        {sub.category}
+                      </td>
+
+                      {/* Products Count */}
+                      <td className="py-3.5 px-4 sm:px-6 text-center whitespace-nowrap">
                         <span
-                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-black ${
+                          className={`inline-flex items-center justify-center rounded-full px-3 py-0.5 text-xs font-black ${
                             sub.products_count > 0
                               ? "bg-emerald-100 text-emerald-800"
                               : "bg-slate-100 text-slate-500"
@@ -588,47 +608,51 @@ export const SubcategoriesModal: React.FC<SubcategoriesModalProps> = ({
                         >
                           {sub.products_count} منتج
                         </span>
-                      </div>
+                      </td>
 
-                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-end gap-1.5">
-                        {/* Edit Button -> Opens Real Dedicated Modal */}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(sub)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200"
-                          title="تعديل اسم القسم الفرعي"
-                        >
-                          <PencilSquareIcon className="h-3.5 w-3.5 text-indigo-600" aria-hidden="true" />
-                          <span>تعديل</span>
-                        </button>
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 sm:px-6 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-2">
+                          {/* Edit Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(sub)}
+                            className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300 border border-slate-200"
+                            title="تعديل اسم القسم الفرعي"
+                          >
+                            <PencilSquareIcon className="h-3.5 w-3.5 text-indigo-600" aria-hidden="true" />
+                            <span>تعديل</span>
+                          </button>
 
-                        {/* Delete Button */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeleteSubcategory(sub.category, sub.products_count)
-                          }
-                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition border ${
-                            sub.products_count > 0
-                              ? "bg-slate-50 text-slate-400 border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
-                              : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                          }`}
-                          title={
-                            sub.products_count > 0
-                              ? "مرتبط بمنتجات (لا يمكن الحذف)"
-                              : "حذف القسم الفرعي"
-                          }
-                        >
-                          <TrashIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                          <span>حذف</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                          {/* Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDeleteSubcategory(sub.category, sub.products_count)
+                            }
+                            className={`inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-black transition border ${
+                              sub.products_count > 0
+                                ? "bg-slate-50 text-slate-400 border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                                : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                            }`}
+                            title={
+                              sub.products_count > 0
+                                ? "مرتبط بمنتجات (لا يمكن الحذف)"
+                                : "حذف القسم الفرعي"
+                            }
+                          >
+                            <TrashIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span>حذف</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
           {/* Footer */}
           <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-5 py-3.5 sm:px-6 text-xs text-slate-500 font-bold">
