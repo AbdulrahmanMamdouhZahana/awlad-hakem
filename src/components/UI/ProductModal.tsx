@@ -9,6 +9,8 @@ interface Product {
   category: string;
   price: number;
   tax_rate?: number | null;
+  tax_type?: "percentage" | "fixed" | null;
+  tax_value?: number | null;
   unit: string;
   image: string;
   stock: number;
@@ -68,6 +70,13 @@ const ProductModal = ({
         : "",
     image: editingProduct?.image || "",
     stock: editingProduct?.stock?.toString() || "0",
+    taxType: ((editingProduct?.tax_type === "fixed" || (editingProduct?.tax_rate != null && Number(editingProduct.tax_rate) < 0)) ? "fixed" : "percentage") as "percentage" | "fixed",
+    taxValue:
+      editingProduct?.tax_value != null
+        ? editingProduct.tax_value.toString()
+        : editingProduct?.tax_rate != null
+        ? Math.abs(Number(editingProduct.tax_rate)).toString()
+        : "0",
     taxRate: editingProduct?.tax_rate?.toString() || "0",
     isOffer: false,
     offerPrice: "",
@@ -181,6 +190,13 @@ const ProductModal = ({
           : "",
       image: editingProduct?.image || "",
       stock: editingProduct?.stock?.toString() || "0",
+      taxType: ((editingProduct?.tax_type === "fixed" || (editingProduct?.tax_rate != null && Number(editingProduct.tax_rate) < 0)) ? "fixed" : "percentage") as "percentage" | "fixed",
+      taxValue:
+        editingProduct?.tax_value != null
+          ? editingProduct.tax_value.toString()
+          : editingProduct?.tax_rate != null
+          ? Math.abs(Number(editingProduct.tax_rate)).toString()
+          : "0",
       taxRate:
         editingProduct?.tax_rate != null
           ? editingProduct.tax_rate.toString()
@@ -355,14 +371,26 @@ const ProductModal = ({
         : Math.round(((price - offerPriceNum) / price) * 100);
     }
 
-    const taxRateNum = Number(form.taxRate);
-    const taxRate = isNaN(taxRateNum) || taxRateNum < 0 ? 0 : taxRateNum;
+    const taxValueNum = Number(form.taxValue);
+    if (isNaN(taxValueNum) || taxValueNum < 0) {
+      toast.error("قيمة الضريبة يجب أن تكون رقماً موجباً أو صفراً");
+      return;
+    }
+    if (form.taxType === "percentage" && taxValueNum > 100) {
+      toast.error("نسبة الضريبة المئوية لا يمكن أن تتجاوز 100%");
+      return;
+    }
+    const taxRate = taxValueNum;
 
     await onSave({
       ...form,
       unit: resolvedUnit,
       image: imageMode === "file" ? "" : cleanImageUrl(form.image),
       price,
+      tax_type: form.taxType,
+      tax_value: taxValueNum,
+      taxType: form.taxType,
+      taxValue: taxValueNum,
       taxRate,
       tax_rate: taxRate,
       piecePrice,
@@ -402,6 +430,8 @@ const ProductModal = ({
       weightPrice: "",
       image: "",
       stock: "0",
+      taxType: "percentage",
+      taxValue: "0",
       taxRate: "0",
       isOffer: false,
       offerPrice: "",
@@ -677,47 +707,83 @@ const ProductModal = ({
         </div>
 
         {/* =======================================================
-            TAX RATE SECTION (نسبة الضريبة)
+            TAX SECTION (نوع وقيمة الضريبة: نسبة مئوية أو مبلغ ثابت)
         ======================================================= */}
-        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <label className="block text-sm font-black text-slate-800">
-                💰 نسبة الضريبة على المنتج (%)
+                💰 نظام الضريبة على المنتج
               </label>
               <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                اكتب نسبة الضريبة المطبقة (0 = بدون ضريبة، 14 = 14%، 15 = 15%)
+                اختر نوع الضريبة (نسبة مئوية % من سعر المنتج أو مبلغ ثابت بالجنيه للوحدة)
               </p>
             </div>
+
+            {/* نوع الضريبة */}
+            <div className="w-full sm:w-52">
+              <label className="mb-1 block text-xs font-black text-slate-700">
+                نوع الضريبة:
+              </label>
+              <select
+                value={form.taxType}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    taxType: e.target.value as "percentage" | "fixed",
+                  }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800 outline-none transition focus:border-indigo-400"
+              >
+                <option value="percentage">نسبة مئوية (%)</option>
+                <option value="fixed">مبلغ ثابت (ج.م)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-blue-100/80 pt-3">
+            <div>
+              <label className="block text-xs font-black text-slate-700">
+                قيمة الضريبة:
+              </label>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {form.taxType === "percentage"
+                  ? "اكتب نسبة الضريبة (0 = بدون ضريبة، 14 = 14%)"
+                  : "اكتب مبلغ الضريبة الثابت لكل قطعة/كيلو (مثال: 20 = 20.00 ج.م)"}
+              </p>
+            </div>
+
             <div className="flex items-center gap-2">
-              <div className="relative w-32">
+              <div className="relative w-36">
                 <input
                   type="number"
                   min="0"
-                  max="100"
+                  max={form.taxType === "percentage" ? "100" : undefined}
                   step="0.01"
-                  value={form.taxRate}
-                  onChange={(e) => setForm({ ...form, taxRate: e.target.value })}
+                  value={form.taxValue}
+                  onChange={(e) => setForm({ ...form, taxValue: e.target.value })}
                   placeholder="0"
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-black outline-none transition focus:border-indigo-400"
                 />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">
-                  %
+                  {form.taxType === "percentage" ? "%" : "ج.م"}
                 </span>
               </div>
+
+              {/* أزرار سريعة للاختيار */}
               <div className="flex gap-1">
-                {[0, 14, 15].map((rate) => (
+                {(form.taxType === "percentage" ? [0, 14, 15] : [0, 5, 10, 20]).map((val) => (
                   <button
-                    key={rate}
+                    key={val}
                     type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, taxRate: rate.toString() }))}
+                    onClick={() => setForm((prev) => ({ ...prev, taxValue: val.toString() }))}
                     className={`rounded-lg px-2.5 py-1.5 text-xs font-black transition ${
-                      Number(form.taxRate) === rate
+                      Number(form.taxValue) === val
                         ? "bg-indigo-600 text-white shadow-xs"
                         : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
                     }`}
                   >
-                    {rate}%
+                    {val}{form.taxType === "percentage" ? "%" : " ج.م"}
                   </button>
                 ))}
               </div>

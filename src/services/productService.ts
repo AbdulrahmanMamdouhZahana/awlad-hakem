@@ -9,6 +9,8 @@ export interface iProducts {
   category: string
   price: number
   tax_rate?: number | null
+  tax_type?: "percentage" | "fixed" | null
+  tax_value?: number | null
   unit: string
   image: string
   stock: number

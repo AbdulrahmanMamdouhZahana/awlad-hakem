@@ -31,6 +31,8 @@ interface iProducts {
   category: string
   price: number
   tax_rate?: number | null
+  tax_type?: "percentage" | "fixed" | null
+  tax_value?: number | null
   unit: string
   image: string
   stock: number
@@ -235,6 +237,8 @@ const Dashboard = ({
     name: "",
     category: "السوبر ماركت",
     price: "",
+    tax_type: "percentage" as "percentage" | "fixed",
+    tax_value: "0",
     tax_rate: "0",
     taxRate: "0",
     unit: "",
@@ -998,6 +1002,10 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
     price: number
     tax_rate?: number | null
     taxRate?: string | number | null
+    tax_type?: "percentage" | "fixed" | null
+    taxType?: "percentage" | "fixed" | null
+    tax_value?: number | null
+    taxValue?: string | number | null
     unit: string
     stock: number
     imageFile?: File
@@ -1064,18 +1072,32 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
           ? Math.round(((originalPriceNum - offerPriceNum) / originalPriceNum) * 100)
           : (data.discountPercentage != null && Number(data.discountPercentage) > 0 ? Number(data.discountPercentage) : null)
 
-      const taxRateNum =
-        data.taxRate !== "" && data.taxRate != null
-          ? Number(data.taxRate)
+      const resolvedTaxType: "percentage" | "fixed" =
+        data.tax_type === "fixed" || data.taxType === "fixed"
+          ? "fixed"
+          : "percentage"
+
+      const rawTaxValue =
+        data.tax_value != null
+          ? data.tax_value
+          : data.taxValue != null && data.taxValue !== ""
+          ? data.taxValue
+          : data.taxRate != null && data.taxRate !== ""
+          ? data.taxRate
           : data.tax_rate != null
-          ? Number(data.tax_rate)
+          ? data.tax_rate
           : 0
+
+      const parsedTaxValue = Math.abs(Number(rawTaxValue))
+      const taxValueNum = isNaN(parsedTaxValue) || parsedTaxValue < 0 ? 0 : parsedTaxValue
 
       const productData = {
         name: data.name.trim(),
         category: data.category, // Use sub-category as the main category field
         price: data.price,
-        tax_rate: isNaN(taxRateNum) || taxRateNum < 0 ? 0 : taxRateNum,
+        tax_type: resolvedTaxType,
+        tax_value: taxValueNum,
+        tax_rate: taxValueNum,
         unit: String(data.unit ?? "").trim() || (normalizedSaleType === "weight" ? "كيلو" : "قطعة"),
         image: imageUrl,
         stock: data.stock,
@@ -1232,11 +1254,16 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
       }
 
 
-      const taxRateNum =
-        newProduct.taxRate !== "" && newProduct.taxRate != null
-          ? Number(newProduct.taxRate)
+      const resolvedTaxType: "percentage" | "fixed" =
+        newProduct.tax_type === "fixed" ? "fixed" : "percentage"
+
+      const taxValueNum =
+        newProduct.tax_value !== "" && newProduct.tax_value != null
+          ? Math.abs(Number(newProduct.tax_value))
+          : newProduct.taxRate !== "" && newProduct.taxRate != null
+          ? Math.abs(Number(newProduct.taxRate))
           : newProduct.tax_rate != null
-          ? Number(newProduct.tax_rate)
+          ? Math.abs(Number(newProduct.tax_rate))
           : (editingProduct?.tax_rate ?? 0)
 
       const productData = {
@@ -1247,7 +1274,9 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
           newProduct.category,
 
         price,
-        tax_rate: isNaN(taxRateNum) || taxRateNum < 0 ? 0 : taxRateNum,
+        tax_type: resolvedTaxType,
+        tax_value: isNaN(taxValueNum) || taxValueNum < 0 ? 0 : taxValueNum,
+        tax_rate: isNaN(taxValueNum) || taxValueNum < 0 ? 0 : taxValueNum,
 
         unit: resolvedUnit,
 
@@ -1322,6 +1351,8 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
         category:
           "السوبر ماركت",
         price: "",
+        tax_type: "percentage",
+        tax_value: "0",
         tax_rate: "0",
         taxRate: "0",
         unit: "",
@@ -1402,6 +1433,8 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
       name: "",
       category: "السوبر ماركت",
       price: "",
+      tax_type: "percentage",
+      tax_value: "0",
       tax_rate: "0",
       taxRate: "0",
       unit: "",
@@ -1419,12 +1452,24 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
     (product: iProducts) => {
       setEditingProduct(product)
       setImageFile(null)
+      const isFixed =
+        product.tax_type === "fixed" ||
+        (product.tax_rate != null && Number(product.tax_rate) < 0)
+      const taxVal =
+        product.tax_value != null
+          ? String(product.tax_value)
+          : product.tax_rate != null
+          ? String(Math.abs(Number(product.tax_rate)))
+          : "0"
+
       setNewProduct({
         name: product.name,
         category: product.category,
         price: String(product.price),
-        tax_rate: String(product.tax_rate ?? 0),
-        taxRate: String(product.tax_rate ?? 0),
+        tax_type: isFixed ? "fixed" : "percentage",
+        tax_value: taxVal,
+        tax_rate: taxVal,
+        taxRate: taxVal,
         unit: product.unit,
         image: product.image,
         stock: String(product.stock),

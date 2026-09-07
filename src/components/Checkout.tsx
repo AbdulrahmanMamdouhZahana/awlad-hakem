@@ -13,6 +13,8 @@ interface iProducts {
   category: string
   price: number
   tax_rate?: number | null
+  tax_type?: "percentage" | "fixed" | null
+  tax_value?: number | null
   unit: string
   image: string
   stock: number
@@ -77,9 +79,21 @@ const Checkout = ({
 
   const tax = cart.reduce(
     (sum, item) => {
-      const rate = Number(item.product.tax_rate || 0)
-      if (rate <= 0) return sum
-      return sum + (item.product.price * item.quantity * (rate / 100))
+      const taxType =
+        item.product.tax_type ||
+        (item.product.tax_rate != null && Number(item.product.tax_rate) < 0 ? "fixed" : "percentage")
+      const taxVal = Number(
+        item.product.tax_value != null
+          ? item.product.tax_value
+          : item.product.tax_rate != null
+          ? Math.abs(Number(item.product.tax_rate))
+          : 0
+      )
+      if (taxVal <= 0) return sum
+      if (taxType === "fixed") {
+        return sum + (taxVal * item.quantity)
+      }
+      return sum + (item.product.price * item.quantity * (taxVal / 100))
     },
     0
   )

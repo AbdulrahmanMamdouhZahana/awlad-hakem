@@ -13,6 +13,8 @@ export interface IProduct {
   category: string;
   price: number;
   tax_rate?: number | null;
+  tax_type?: "percentage" | "fixed" | null;
+  tax_value?: number | null;
   unit: string;
   image: string;
   stock: number;
@@ -674,18 +676,33 @@ const Products = ({ products, setProducts }: ProductsProps) => {
               )
             : null;
 
-        const taxRateNum =
-          formData.taxRate !== "" && formData.taxRate != null
-            ? Number(formData.taxRate)
+        const resolvedTaxType: "percentage" | "fixed" =
+          formData.tax_type === "fixed" || formData.taxType === "fixed"
+            ? "fixed"
+            : "percentage";
+
+        const rawTaxValue =
+          formData.tax_value != null
+            ? formData.tax_value
+            : formData.taxValue != null && formData.taxValue !== ""
+            ? formData.taxValue
+            : formData.taxRate != null && formData.taxRate !== ""
+            ? formData.taxRate
             : formData.tax_rate != null
-            ? Number(formData.tax_rate)
+            ? formData.tax_rate
             : 0;
+
+        const parsedTaxValue = Math.abs(Number(rawTaxValue));
+        const taxValueNum =
+          isNaN(parsedTaxValue) || parsedTaxValue < 0 ? 0 : parsedTaxValue;
 
         const productData = {
           name: name.trim(),
           category,
           price: priceNum,
-          tax_rate: isNaN(taxRateNum) || taxRateNum < 0 ? 0 : taxRateNum,
+          tax_type: resolvedTaxType,
+          tax_value: taxValueNum,
+          tax_rate: taxValueNum,
           unit: resolvedUnit,
           image: imageUrl,
           stock: stockNum,
