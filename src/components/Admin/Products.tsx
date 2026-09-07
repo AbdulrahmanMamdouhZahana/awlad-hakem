@@ -7,11 +7,13 @@ import ProductCard from "../Products";
 import { supabase } from "../../lib/supabase";
 import { confirmDelete } from "../../utils/alerts";
 import { isOfferActive } from "../../services/offerService";
+import { SubcategoriesModal } from "./SubcategoriesModal";
 import {
   MagnifyingGlassIcon,
   XMarkIcon,
   SparklesIcon,
   ArrowPathIcon,
+  FolderIcon,
 } from "@heroicons/react/24/outline";
 
 export interface IProduct {
@@ -228,6 +230,7 @@ const Products = ({ products, setProducts }: ProductsProps) => {
   const [onlyOffers, setOnlyOffers] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [subcategoriesModalOpen, setSubcategoriesModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<IProduct | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -240,6 +243,30 @@ const Products = ({ products, setProducts }: ProductsProps) => {
     const savedGroups = loadCategoryGroups();
     setCategoryGroups(savedGroups);
   }, []);
+
+  const handleSubcategoryRenamed = useCallback(
+    (oldName: string, newName: string) => {
+      // Update in-memory products list
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.category === oldName ? { ...p, category: newName } : p
+        )
+      );
+      if (category === oldName) {
+        setCategory(newName);
+      }
+    },
+    [setProducts, category]
+  );
+
+  const handleSubcategoryDeleted = useCallback(
+    (deletedName: string) => {
+      if (category === deletedName) {
+        setCategory("الكل");
+      }
+    },
+    [category]
+  );
 
   const availableSubCategories = useMemo(() => {
     if (mainCategory === "الكل") {
@@ -855,7 +882,10 @@ const Products = ({ products, setProducts }: ProductsProps) => {
         className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8"
       >
         <div className="mx-auto max-w-[1600px]">
-          <Header onAddClick={openAddModal} />
+          <Header
+            onAddClick={openAddModal}
+            onManageSubcategoriesClick={() => setSubcategoriesModalOpen(true)}
+          />
 
           <Filters
             search={search}
@@ -908,27 +938,56 @@ const Products = ({ products, setProducts }: ProductsProps) => {
           saveCategoryGroups(nextGroups);
         }}
       />
+
+      <SubcategoriesModal
+        isOpen={subcategoriesModalOpen}
+        onClose={() => setSubcategoriesModalOpen(false)}
+        categoryGroups={categoryGroups}
+        onCategoryGroupsChange={(nextGroups) => {
+          setCategoryGroups(nextGroups);
+          saveCategoryGroups(nextGroups);
+        }}
+        onSubcategoryRenamed={handleSubcategoryRenamed}
+        onSubcategoryDeleted={handleSubcategoryDeleted}
+      />
     </>
   );
 };
 
-const Header = ({ onAddClick }: { onAddClick: () => void }) => (
+const Header = ({
+  onAddClick,
+  onManageSubcategoriesClick,
+}: {
+  onAddClick: () => void;
+  onManageSubcategoriesClick: () => void;
+}) => (
   <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
     <div>
       <p className="text-sm font-bold text-indigo-600">إدارة المتجر</p>
       <h1 className="mt-1 text-3xl font-black text-slate-950">المنتجات</h1>
       <p className="mt-1 text-sm font-medium text-slate-500">
-        إدارة المنتجات والأسعار والمخزون
+        إدارة المنتجات والأسعار والمخزون والأقسام
       </p>
     </div>
 
-    <button
-      type="button"
-      onClick={onAddClick}
-      className="rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:bg-indigo-700"
-    >
-      + إضافة منتج
-    </button>
+    <div className="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        onClick={onManageSubcategoriesClick}
+        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300 hover:text-indigo-600"
+      >
+        <FolderIcon className="h-5 w-5 text-indigo-600" aria-hidden="true" />
+        <span>إدارة الأقسام الفرعية</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={onAddClick}
+        className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:bg-indigo-700"
+      >
+        <span>+ إضافة منتج</span>
+      </button>
+    </div>
   </div>
 );
 

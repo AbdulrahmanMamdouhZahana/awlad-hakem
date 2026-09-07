@@ -508,11 +508,16 @@ const ProductCard = ({
       {/* Card Body */}
       <div className="flex flex-1 flex-col justify-between p-2 sm:p-3">
         <div>
-          {/* Main Category tag */}
-          <div className="mb-1 min-w-0">
-            <span className="truncate max-w-full rounded-md bg-[#17656b]/10 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-bold text-[#17656b] inline-block">
+          {/* Main Category & Subcategory tags */}
+          <div className="mb-1.5 flex flex-wrap items-center gap-1.5 min-w-0">
+            <span className="truncate max-w-[140px] rounded-md bg-[#17656b]/10 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-bold text-[#17656b]">
               {mainCategory}
             </span>
+            {subCategory && subCategory !== mainCategory && (
+              <span className="truncate max-w-[140px] rounded-md bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-bold text-emerald-700">
+                {subCategory}
+              </span>
+            )}
           </div>
 
           {/* Product Name */}
