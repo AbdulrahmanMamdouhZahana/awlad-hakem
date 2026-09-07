@@ -104,7 +104,11 @@ const ProductModal = ({
   const [imageMode, setImageMode] = useState<"url" | "file">("url");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const subCategories = categories[form.mainCategory] ?? [];
+  const rawSubCategories = categories[form.mainCategory] ?? [];
+  const subCategories =
+    form.category && !rawSubCategories.includes(form.category)
+      ? [form.category, ...rawSubCategories]
+      : rawSubCategories;
 
   const addMainCategory = async () => {
     if (!onCategoriesChange) return;

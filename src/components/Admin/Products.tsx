@@ -508,12 +508,14 @@ const Products = ({ products, setProducts }: ProductsProps) => {
         return;
       }
 
-      if (!mainCategory || !categoryGroups[mainCategory]) {
+      if (!mainCategory) {
         toast.error("اختر القسم الرئيسي");
         return;
       }
 
-      if (!categoryGroups[mainCategory].includes(category)) {
+      const allowedSubs = categoryGroups[mainCategory] ?? [];
+      const isExistingSub = editingProduct && editingProduct.category === category;
+      if (!allowedSubs.includes(category) && !isExistingSub && !category.trim()) {
         toast.error("اختر قسمًا فرعيًا صحيحًا");
         return;
       }
