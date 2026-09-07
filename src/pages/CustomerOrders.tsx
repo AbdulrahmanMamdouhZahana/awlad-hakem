@@ -143,6 +143,17 @@ export default function CustomerOrders({
   }
   const [editItems, setEditItems] = useState<EditItem[]>([]);
   const [selectedAddProductId, setSelectedAddProductId] = useState<string>("");
+  const [catalogProducts, setCatalogProducts] = useState<any[]>(products);
+  useEffect(() => {
+    if (products && products.length > 0) {
+      setCatalogProducts(products);
+    } else {
+      apiFetch("/products").then((res) => {
+        const prods = res?.products || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(prods) && prods.length > 0) setCatalogProducts(prods);
+      }).catch(() => {});
+    }
+  }, [products]);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Cancellation Handler
@@ -191,7 +202,7 @@ export default function CustomerOrders({
     const rawItems = getItems(order);
     const initialItems: EditItem[] = rawItems.map((item) => {
       const prodId = Number(item.product_id || item.id);
-      const catalogProduct = products.find((p) => Number(p.id) === prodId);
+      const catalogProduct = catalogProducts.find((p) => Number(p.id) === prodId);
       return {
         product_id: prodId,
         product_name: item.product_name || item.name || catalogProduct?.name || "منتج",
@@ -211,7 +222,7 @@ export default function CustomerOrders({
   // Add Product to Edit list
   const handleAddProductToEdit = () => {
     if (!selectedAddProductId) return;
-    const prod = products.find((p) => String(p.id) === String(selectedAddProductId));
+    const prod = catalogProducts.find((p) => String(p.id) === String(selectedAddProductId));
     if (!prod) return;
 
     setEditItems((prev) => {
@@ -709,14 +720,42 @@ export default function CustomerOrders({
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-100/80 p-5">
+                  <div className="border-t border-slate-100/80 p-5 space-y-2">
                     <button
                       type="button"
                       onClick={() => setSelectedOrder(order)}
-                      className="w-full rounded-2xl border border-[#17656b]/20 bg-[#17656b]/5 px-5 py-3.5 text-sm font-black text-[#17656b] transition hover:bg-[#17656b]/10 hover:shadow-md"
+                      className="w-full rounded-2xl border border-[#17656b]/20 bg-[#17656b]/5 px-5 py-3 text-sm font-black text-[#17656b] transition hover:bg-[#17656b]/10 hover:shadow-md"
                     >
                       عرض تفاصيل الطلب
                     </button>
+
+                    {status === "pending" || status === "pending_approval" ? (
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(order)}
+                          className="flex-1 rounded-xl bg-amber-500 px-3 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-amber-600 hover:scale-[1.01]"
+                        >
+                          ✏️ تعديل الطلب
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cancellingId === order.id}
+                          onClick={() => void handleCancelOrder(order)}
+                          className="flex-1 rounded-xl bg-rose-600 px-3 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-rose-700 hover:scale-[1.01] disabled:opacity-50"
+                        >
+                          {cancellingId === order.id ? "جاري الإلغاء..." : "✕ إلغاء الطلب"}
+                        </button>
+                      </div>
+                    ) : status === "cancelled" ? (
+                      <div className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-center text-xs font-black text-rose-700">
+                        تم إلغاء الطلب.
+                      </div>
+                    ) : (
+                      <div className="rounded-xl bg-slate-100 border border-slate-200 px-3 py-2 text-center text-xs font-bold text-slate-600">
+                        لا يمكن تعديل الطلب بعد تأكيد الطلب.
+                      </div>
+                    )}
                   </div>
                 </article>
               );
@@ -908,6 +947,39 @@ export default function CustomerOrders({
                   </div>
                 </div>
               )}
+
+              {/* Order Actions / Lifecycle Notices in Details Modal */}
+              <div className="border-t border-slate-100 pt-4">
+                {normalizeStatus(selectedOrder.status) === "pending" || normalizeStatus(selectedOrder.status) === "pending_approval" ? (
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openEditModal(selectedOrder);
+                      }}
+                      className="w-full sm:flex-1 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-amber-600"
+                    >
+                      ✏️ تعديل محتويات الطلب
+                    </button>
+                    <button
+                      type="button"
+                      disabled={cancellingId === selectedOrder.id}
+                      onClick={() => void handleCancelOrder(selectedOrder)}
+                      className="w-full sm:flex-1 rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-rose-700 disabled:opacity-50"
+                    >
+                      {cancellingId === selectedOrder.id ? "جاري الإلغاء..." : "✕ إلغاء الطلب"}
+                    </button>
+                  </div>
+                ) : normalizeStatus(selectedOrder.status) === "cancelled" ? (
+                  <div className="rounded-2xl bg-rose-50 border border-rose-200 p-4 text-center text-sm font-black text-rose-700">
+                    تم إلغاء الطلب.
+                  </div>
+                ) : (
+                  <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-center text-sm font-bold text-amber-800">
+                    لا يمكن تعديل الطلب بعد تأكيد الطلب.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

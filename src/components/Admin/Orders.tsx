@@ -608,49 +608,72 @@ const buildDeliveryWhatsAppMessage = (
       return
     }
 
-    const isPending = order.status === "pending"
-    const isDelivered = order.status === "delivered"
-
-    if (!isPending && !isDelivered) {
-      toast.error("يمكن حذف الطلب فقط وهو قيد الانتظار أو بعد إتمام التوصيل")
-      return
-    }
-
-    const actionText = isDelivered ? "حذف" : "إلغاء وحذف"
-
-    const confirmed = await confirmDelete(
-      `${actionText} الطلب #${order.id}`,
-      "سيتم حذف هذا الطلب نهائياً ولا يمكن استرجاعه."
-    )
-
-    if (!confirmed) return
-
-    try {
-      setCancellingOrder(orderId)
-
-      await apiFetch(`/orders/${orderId}`, {
-        method: "DELETE",
-      })
-
-      setOrders((currentOrders) =>
-        currentOrders.filter((item) => item.id !== orderId)
+    if (order.status === "cancelled") {
+      const confirmed = window.confirm(
+        "هل أنت متأكد من حذف الطلب الملغي نهائياً؟ لا يمكن التراجع عن هذا الإجراء."
       )
+      if (!confirmed) return
 
-      if (selectedOrder?.id === orderId) {
-        setSelectedOrder(null)
-        setOrderModalOpen(false)
+      try {
+        setCancellingOrder(orderId)
+        await apiFetch(`/orders/${orderId}`, {
+          method: "DELETE",
+        })
+
+        setOrders((currentOrders) =>
+          currentOrders.filter((item) => item.id !== orderId)
+        )
+
+        if (selectedOrder?.id === orderId) {
+          setSelectedOrder(null)
+          setOrderModalOpen(false)
+        }
+
+        toast.success(`تم حذف الطلب الملغي #${orderId} نهائياً بنجاح`)
+      } catch (error) {
+        console.error("DELETE CANCELLED ORDER ERROR:", error)
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "حدث خطأ أثناء حذف الطلب"
+        )
+      } finally {
+        setCancellingOrder(null)
       }
+    } else if (order.status === "pending" || order.status === "pending_approval") {
+      const confirmed = window.confirm(`هل أنت متأكد من إلغاء الطلب #${order.id}؟`)
+      if (!confirmed) return
 
-      toast.success(`تم ${isDelivered ? "حذف" : "إلغاء وحذف"} الطلب #${orderId}`)
-    } catch (error) {
-      console.error("CANCEL ORDER ERROR:", error)
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "حدث خطأ أثناء إلغاء الطلب"
-      )
-    } finally {
-      setCancellingOrder(null)
+      try {
+        setCancellingOrder(orderId)
+        const res = await apiFetch(`/orders/${orderId}/cancel`, {
+          method: "PATCH",
+        })
+
+        const updated = res?.order || { ...order, status: "cancelled" }
+        setOrders((currentOrders) =>
+          currentOrders.map((item) =>
+            item.id === orderId ? { ...item, ...updated, status: "cancelled" } : item
+          )
+        )
+
+        if (selectedOrder?.id === orderId) {
+          setSelectedOrder((prev) => (prev ? { ...prev, ...updated, status: "cancelled" } : null))
+        }
+
+        toast.success(`تم إلغاء الطلب #${orderId} بنجاح`)
+      } catch (error) {
+        console.error("ADMIN CANCEL ORDER ERROR:", error)
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "حدث خطأ أثناء إلغاء الطلب"
+        )
+      } finally {
+        setCancellingOrder(null)
+      }
+    } else {
+      toast.error("يمكن حذف الطلبات الملغاة فقط نهائياً.")
     }
   }
 

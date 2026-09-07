@@ -903,18 +903,25 @@ const OrderCard = ({
               </button>
             )}
 
-            {onCancel && ((order.status === "pending" || order.status === "pending_approval") || order.status === "delivered") && (
+            {onCancel && order.status === "cancelled" && (
               <button
                 type="button"
                 disabled={isConfirming || isCancelling}
                 onClick={() => onCancel(order.id)}
                 className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isCancelling
-                  ? "جاري الحذف..."
-                  : order.status === "delivered"
-                  ? "🗑 حذف الطلب"
-                  : "✕ إلغاء الطلب"}
+                {isCancelling ? "جاري الحذف..." : "🗑 حذف الطلب"}
+              </button>
+            )}
+
+            {onCancel && (order.status === "pending" || order.status === "pending_approval") && (
+              <button
+                type="button"
+                disabled={isConfirming || isCancelling}
+                onClick={() => onCancel(order.id)}
+                className="flex-1 rounded-xl bg-slate-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isCancelling ? "جاري الإلغاء..." : "✕ إلغاء الطلب"}
               </button>
             )}
           </div>

@@ -1792,23 +1792,61 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                   ) : deliveryAttendance.length === 0 ? (
                     <p className="py-8 text-center text-sm text-slate-400">لا يوجد موظفو توصيل نشطين مسجلين.</p>
                   ) : (
-                    <table className="w-full text-right text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-xs font-bold text-slate-400">
-                          <th className="pb-3">الموظف</th>
-                          <th className="pb-3">رقم الهاتف</th>
-                          <th className="pb-3">الحالة</th>
-                          <th className="pb-3">وقت الوصول</th>
-                          <th className="pb-3">وقت الانصراف</th>
-                          <th className="pb-3">مدة العمل</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
+                    <>
+                      {/* Desktop Table View */}
+                      <table className="hidden md:table w-full text-right text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-xs font-bold text-slate-400">
+                            <th className="pb-3">الموظف</th>
+                            <th className="pb-3">رقم الهاتف</th>
+                            <th className="pb-3">الحالة</th>
+                            <th className="pb-3">وقت الوصول</th>
+                            <th className="pb-3">وقت الانصراف</th>
+                            <th className="pb-3">مدة العمل</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {deliveryAttendance.map((staff) => (
+                            <tr key={staff.id} className="hover:bg-slate-50/80 transition">
+                              <td className="py-3.5 font-bold text-slate-900">{staff.name}</td>
+                              <td className="py-3.5 text-xs text-slate-500 font-semibold">{staff.phone || "—"}</td>
+                              <td className="py-3.5">
+                                <span
+                                  className={`inline-flex items-center rounded-xl px-2.5 py-1 text-xs font-black ${
+                                    staff.status_key === "active"
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : staff.status_key === "completed"
+                                      ? "bg-rose-100 text-rose-700"
+                                      : "bg-slate-100 text-slate-500"
+                                  }`}
+                                >
+                                  {staff.status_label}
+                                </span>
+                              </td>
+                              <td className="py-3.5 font-semibold text-slate-700">{staff.check_in_time}</td>
+                              <td className="py-3.5 font-semibold text-slate-700">{staff.check_out_time}</td>
+                              <td className="py-3.5 font-bold text-indigo-700">{staff.duration_text}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      {/* Mobile Cards View (< 768px) */}
+                      <div className="md:hidden grid grid-cols-1 gap-3">
                         {deliveryAttendance.map((staff) => (
-                          <tr key={staff.id} className="hover:bg-slate-50/80 transition">
-                            <td className="py-3.5 font-bold text-slate-900">{staff.name}</td>
-                            <td className="py-3.5 text-xs text-slate-500 font-semibold">{staff.phone || "—"}</td>
-                            <td className="py-3.5">
+                          <div
+                            key={staff.id}
+                            className="rounded-2xl border border-slate-200 bg-slate-50/40 p-4 shadow-sm space-y-2.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <h4 className="font-black text-slate-900 text-sm">{staff.name}</h4>
+                                {staff.phone && (
+                                  <a href={`tel:${staff.phone}`} className="text-xs text-indigo-600 font-semibold">
+                                    📞 {staff.phone}
+                                  </a>
+                                )}
+                              </div>
                               <span
                                 className={`inline-flex items-center rounded-xl px-2.5 py-1 text-xs font-black ${
                                   staff.status_key === "active"
@@ -1820,14 +1858,27 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                               >
                                 {staff.status_label}
                               </span>
-                            </td>
-                            <td className="py-3.5 font-semibold text-slate-700">{staff.check_in_time}</td>
-                            <td className="py-3.5 font-semibold text-slate-700">{staff.check_out_time}</td>
-                            <td className="py-3.5 font-bold text-indigo-700">{staff.duration_text}</td>
-                          </tr>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+                              <div className="rounded-xl bg-white p-2.5 border border-slate-100">
+                                <p className="text-slate-400 font-bold">الوصول:</p>
+                                <p className="font-black text-slate-800 mt-0.5">{staff.check_in_time}</p>
+                              </div>
+                              <div className="rounded-xl bg-white p-2.5 border border-slate-100">
+                                <p className="text-slate-400 font-bold">الانصراف:</p>
+                                <p className="font-black text-slate-800 mt-0.5">{staff.check_out_time}</p>
+                              </div>
+                            </div>
+
+                            <div className="rounded-xl bg-indigo-50/70 p-2.5 flex items-center justify-between text-xs">
+                              <span className="font-bold text-indigo-700">المدة:</span>
+                              <span className="font-black text-indigo-900">{staff.duration_text}</span>
+                            </div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
