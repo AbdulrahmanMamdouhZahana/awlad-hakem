@@ -412,7 +412,6 @@ function Store({
               {navbar}
 
               <ProductsPage
-                products={products}
                 onAddToCart={addToCart}
               />
             </>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { apiFetch } from "../../services/api";
+import { getAdminProducts } from "../../services/productService";
 import { ProductModal } from "../UI";
 import ProductCard from "../Products";
 import { supabase } from "../../lib/supabase";
@@ -84,7 +85,6 @@ const getMainCategoryFromGroups = (
 };
 
 const MAIN_CATEGORIES = Object.keys(CATEGORY_GROUPS);
-const PRODUCTS_PER_PAGE = 100;
 
 const getMainCategory = (
   category: string,
@@ -220,7 +220,6 @@ const Products = ({ products, setProducts }: ProductsProps) => {
   const [mainCategory, setMainCategory] = useState("الكل");
   const [category, setCategory] = useState("الكل");
   const [onlyOffers, setOnlyOffers] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<IProduct | null>(null);
@@ -245,24 +244,18 @@ const Products = ({ products, setProducts }: ProductsProps) => {
     return categoryGroups[mainCategory] ?? [];
   }, [mainCategory, categoryGroups]);
 
-  // IMPORTANT:
-  // Always reload products from the backend when this page mounts.
-  // Do NOT depend on the existing `products` state/localStorage here,
-  // otherwise an old product object can survive a browser refresh and
-  // hide the latest image saved in the database.
+  // Load all products from the backend for the Admin dashboard
   const loadProducts = useCallback(async () => {
     try {
       setLoadingProducts(true);
 
-      const response = await apiFetch("/products");
-      const loadedProducts =
-        (response?.products ?? response?.data ?? response) as IProduct[];
+      const loadedProducts = await getAdminProducts();
 
       if (Array.isArray(loadedProducts)) {
-        console.log("🔄 PRODUCTS LOADED FROM BACKEND:", loadedProducts);
-        setProducts(loadedProducts);
+        console.log("🔄 ALL PRODUCTS LOADED FOR ADMIN:", loadedProducts.length);
+        setProducts(loadedProducts as IProduct[]);
       } else {
-        console.error("❌ INVALID PRODUCTS RESPONSE:", response);
+        console.error("❌ INVALID PRODUCTS RESPONSE:", loadedProducts);
         toast.error("فشل تحميل المنتجات");
       }
     } catch (error) {
@@ -308,36 +301,15 @@ const Products = ({ products, setProducts }: ProductsProps) => {
     });
   }, [products, search, mainCategory, category, onlyOffers, categoryGroups]);
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE)
-  );
-
-  const paginatedProducts = useMemo(() => {
-    const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
-    return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
-  }, [filteredProducts, currentPage]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, mainCategory, category, onlyOffers]);
-
-  useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
   const stats = useMemo(
     () => ({
       total: products.length,
       displayed: filteredProducts.length,
-      currentPageCount: paginatedProducts.length,
       lowStock: products.filter((p) => p.stock > 0 && p.stock <= 10).length,
       outOfStock: products.filter((p) => p.stock <= 0).length,
       offersCount: products.filter((p) => isOfferActive(p)).length,
     }),
-    [products, filteredProducts, paginatedProducts]
+    [products, filteredProducts]
   );
 
   const openAddModal = useCallback(() => {
@@ -775,7 +747,6 @@ const Products = ({ products, setProducts }: ProductsProps) => {
           // exactly what was persisted in the database.
           await loadProducts();
 
-          setCurrentPage(1);
           toast.success("تم إضافة المنتج بنجاح");
         }
 
@@ -892,24 +863,13 @@ const Products = ({ products, setProducts }: ProductsProps) => {
           ) : filteredProducts.length === 0 ? (
             <EmptyState />
           ) : (
-            <>
-              <ProductGrid
-                products={paginatedProducts}
-                onEdit={openEditModal}
-                onDelete={handleDelete}
-                deletingId={deleting}
-                categoryGroups={categoryGroups}
-              />
-
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalProducts={filteredProducts.length}
-                  onPageChange={setCurrentPage}
-                />
-              )}
-            </>
+            <ProductGrid
+              products={filteredProducts}
+              onEdit={openEditModal}
+              onDelete={handleDelete}
+              deletingId={deleting}
+              categoryGroups={categoryGroups}
+            />
           )}
         </div>
       </section>
@@ -1058,17 +1018,15 @@ const Stats = ({
   stats: {
     total: number;
     displayed: number;
-    currentPageCount: number;
     lowStock: number;
     outOfStock: number;
     offersCount: number;
   };
 }) => (
-  <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+  <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
     <StatCard label="إجمالي المنتجات" value={stats.total} color="text-slate-950" />
     <StatCard label="العروض والتخفيضات 🔥" value={stats.offersCount} color="text-red-500" />
-    <StatCard label="نتائج البحث" value={stats.displayed} color="text-indigo-600" />
-    <StatCard label="في الصفحة الحالية" value={stats.currentPageCount} color="text-emerald-600" />
+    <StatCard label="المعروض حالياً" value={stats.displayed} color="text-indigo-600" />
     <StatCard label="مخزون منخفض" value={stats.lowStock} color="text-amber-500" />
   </div>
 );
@@ -1107,99 +1065,6 @@ const EmptyState = () => (
     </p>
   </div>
 );
-
-const Pagination = ({
-  currentPage,
-  totalPages,
-  totalProducts,
-  onPageChange,
-}: {
-  currentPage: number;
-  totalPages: number;
-  totalProducts: number;
-  onPageChange: (page: number) => void;
-}) => {
-  const pages: (number | "...")[] = [];
-
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-  } else {
-    pages.push(1);
-    if (currentPage > 3) pages.push("...");
-
-    const startPage = Math.max(2, currentPage - 1);
-    const endPage = Math.min(totalPages - 1, currentPage + 1);
-
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
-
-    if (currentPage < totalPages - 2) pages.push("...");
-    pages.push(totalPages);
-  }
-
-  const firstItem = (currentPage - 1) * PRODUCTS_PER_PAGE + 1;
-  const lastItem = Math.min(currentPage * PRODUCTS_PER_PAGE, totalProducts);
-
-  return (
-    <div className="mt-10 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-5 flex flex-col items-center justify-between gap-2 sm:flex-row">
-        <p className="text-sm font-bold text-slate-500">
-          عرض <span className="font-black text-slate-900">{firstItem}</span> -{" "}
-          <span className="font-black text-slate-900">{lastItem}</span> من{" "}
-          <span className="font-black text-slate-900">{totalProducts}</span>{" "}
-          منتج
-        </p>
-        <p className="text-sm font-bold text-slate-400">
-          الصفحة{" "}
-          <span className="font-black text-indigo-600">{currentPage}</span> من{" "}
-          <span className="font-black text-indigo-600">{totalPages}</span>
-        </p>
-      </div>
-
-      <div dir="ltr" className="flex flex-wrap items-center justify-center gap-2">
-        <button
-          type="button"
-          disabled={currentPage === 1}
-          onClick={() => onPageChange(currentPage - 1)}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          السابق
-        </button>
-
-        {pages.map((page, index) =>
-          page === "..." ? (
-            <span
-              key={`dots-${index}`}
-              className="px-2 font-black text-slate-400"
-            >
-              ...
-            </span>
-          ) : (
-            <button
-              key={page}
-              type="button"
-              onClick={() => onPageChange(page)}
-              className={`min-w-[42px] rounded-xl px-3 py-2.5 text-sm font-black transition ${currentPage === page
-                ? "bg-indigo-600 text-white shadow-md"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
-                }`}
-            >
-              {page}
-            </button>
-          )
-        )}
-
-        <button
-          type="button"
-          disabled={currentPage === totalPages}
-          onClick={() => onPageChange(currentPage + 1)}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          التالي
-        </button>
-      </div>
-    </div>
-  );
-};
 
 const ProductGrid = ({
   products,

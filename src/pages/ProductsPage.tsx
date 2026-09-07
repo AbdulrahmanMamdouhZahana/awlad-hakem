@@ -1,7 +1,6 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react"
-import { Link } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import Products from "../components/Products"
-import { isOfferActive } from "../services/offerService"
 import { getPaginatedProducts } from "../services/productService"
 
 interface iProducts {
@@ -22,14 +21,39 @@ interface iProducts {
 }
 
 interface IProps {
-  products: iProducts[]
+  products?: iProducts[]
   onAddToCart: (product: iProducts) => void
 }
 
 const ProductsPage = ({
-  products,
   onAddToCart,
 }: IProps) => {
+  // =========================
+  // URL Search Parameters
+  // =========================
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const currentPage = Math.max(1, parseInt(searchParams.get("page") || "1", 10))
+  const searchQuery = searchParams.get("search") || ""
+  const selectedMainCategory = searchParams.get("category") || "الكل"
+  const selectedSubCategory = searchParams.get("subcategory") || "الكل"
+  const sortBy = (searchParams.get("sort") as "newest" | "price-low" | "price-high" | "name") || "newest"
+
+  // Local input search state for smooth typing & debouncing
+  const [searchInput, setSearchInput] = useState(searchQuery)
+
+  // Keep searchInput in sync if URL changes externally (e.g. back button)
+  useEffect(() => {
+    setSearchInput(searchQuery)
+  }, [searchQuery])
+
+  // =========================
+  // Server-side State
+  // =========================
+  const [displayedProducts, setDisplayedProducts] = useState<iProducts[]>([])
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalProducts, setTotalProducts] = useState(0)
+  const [loading, setLoading] = useState(true)
 
   // =========================
   // Refs
@@ -37,21 +61,10 @@ const ProductsPage = ({
   const categoriesRef = useRef<HTMLDivElement>(null)
   const productsRef = useRef<HTMLDivElement>(null)
 
-  // =========================
-  // State
-  // =========================
-
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedMainCategory, setSelectedMainCategory] = useState("الكل")
-  const [selectedSubCategory, setSelectedSubCategory] = useState("الكل")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [sortBy, setSortBy] = useState<"newest" | "price-low" | "price-high" | "name">("newest")
-
-
-  const productsPerPage = 24
+  const productsPerPage = 20
 
   // =========================
-  // Categories
+  // Categories Definitions
   // =========================
   const categoryGroups: Record<string, string[]> = {
     "السوبر ماركت": [
@@ -82,22 +95,74 @@ const ProductsPage = ({
 
   const mainCategories = Object.keys(categoryGroups)
 
-  // Get main category for a subcategory
-  const getMainCategory = (subCategory: string): string | null => {
-    for (const [main, subCategories] of Object.entries(categoryGroups)) {
-      if (subCategories.includes(subCategory)) {
-        return main
-      }
-    }
-    return null
-  }
-
-  // Get all subcategories for a main category
   const getSubCategories = (mainCategory: string): string[] => {
     return categoryGroups[mainCategory] || []
   }
 
+  const getCategoryIcon = (category: string) => {
+    const icons: Record<string, string> = {
+      "السوبر ماركت": "🛒",
+      "المكتبة": "📚",
+      "المحمصة": "☕"
+    }
+    return icons[category] || "📦"
+  }
 
+  // =========================
+  // URL Update Helper
+  // =========================
+  const updateUrlParams = useCallback((updates: {
+    page?: number
+    search?: string
+    category?: string
+    subcategory?: string
+    sort?: string
+  }) => {
+    const newParams = new URLSearchParams(searchParams)
+
+    if (updates.page !== undefined) {
+      if (updates.page > 1) {
+        newParams.set("page", String(updates.page))
+      } else {
+        newParams.delete("page")
+      }
+    }
+
+    if (updates.search !== undefined) {
+      const trimmed = updates.search.trim()
+      if (trimmed) {
+        newParams.set("search", trimmed)
+      } else {
+        newParams.delete("search")
+      }
+    }
+
+    if (updates.category !== undefined) {
+      if (updates.category && updates.category !== "الكل") {
+        newParams.set("category", updates.category)
+      } else {
+        newParams.delete("category")
+      }
+    }
+
+    if (updates.subcategory !== undefined) {
+      if (updates.subcategory && updates.subcategory !== "الكل") {
+        newParams.set("subcategory", updates.subcategory)
+      } else {
+        newParams.delete("subcategory")
+      }
+    }
+
+    if (updates.sort !== undefined) {
+      if (updates.sort && updates.sort !== "newest") {
+        newParams.set("sort", updates.sort)
+      } else {
+        newParams.delete("sort")
+      }
+    }
+
+    setSearchParams(newParams)
+  }, [searchParams, setSearchParams])
 
   // =========================
   // Scroll to section
@@ -111,163 +176,160 @@ const ProductsPage = ({
   }
 
   // =========================
-  // Filter Products
+  // Fetch Paginated Products from Server
   // =========================
+  useEffect(() => {
+    let isCancelled = false
+    setLoading(true)
 
-  const filteredProducts = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-
-    let result = products.filter((product) => {
-      const productCategory = product.category?.trim() || ""
-
-      // Check if product matches main category
-      let matchesMainCategory = selectedMainCategory === "الكل"
-
-      if (selectedMainCategory === "العروض") {
-        matchesMainCategory = isOfferActive(product)
-      } else if (!matchesMainCategory) {
-        const productMainCategory = getMainCategory(productCategory)
-        matchesMainCategory = productMainCategory === selectedMainCategory
-      }
-
-      // Check if product matches subcategory
-      let matchesSubCategory = selectedSubCategory === "الكل"
-
-      if (!matchesSubCategory) {
-        matchesSubCategory = productCategory === selectedSubCategory
-      }
-
-      // Check search query
-      const matchesSearch = query === "" ||
-        product.name.toLowerCase().includes(query)
-
-      return matchesMainCategory && matchesSubCategory && matchesSearch
-    })
-
-    // Apply sorting
-    switch (sortBy) {
-      case "price-low":
-        result.sort((a, b) => a.price - b.price)
-        break
-      case "price-high":
-        result.sort((a, b) => b.price - a.price)
-        break
-      case "name":
-        result.sort((a, b) => a.name.localeCompare(b.name))
-        break
-      case "newest":
-      default:
-        if (result.some(p => p.created_at)) {
-          result.sort((a, b) => {
-            if (!a.created_at) return 1
-            if (!b.created_at) return -1
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          })
+    const fetchCurrentPage = async () => {
+      try {
+        const queryArgs: Parameters<typeof getPaginatedProducts>[0] = {
+          page: currentPage,
+          per_page: productsPerPage,
+          sort_by: sortBy,
         }
-        break
+
+        if (searchQuery.trim()) {
+          queryArgs.search = searchQuery.trim()
+        }
+
+        if (selectedMainCategory === "العروض") {
+          queryArgs.only_offers = true
+        } else if (selectedSubCategory !== "الكل") {
+          queryArgs.category = selectedSubCategory
+        } else if (selectedMainCategory !== "الكل") {
+          const subs = categoryGroups[selectedMainCategory] || []
+          if (subs.length > 0) {
+            queryArgs.categories = subs
+          } else {
+            queryArgs.category = selectedMainCategory
+          }
+        }
+
+        const res = await getPaginatedProducts(queryArgs)
+
+        if (!isCancelled) {
+          setDisplayedProducts(res.data || [])
+          setTotalPages(res.last_page || 1)
+          setTotalProducts(res.total || 0)
+        }
+      } catch (err) {
+        console.error("Failed to load products for page:", err)
+        if (!isCancelled) {
+          setDisplayedProducts([])
+          setTotalPages(1)
+          setTotalProducts(0)
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false)
+        }
+      }
     }
 
-    return result
+    fetchCurrentPage()
 
-  }, [products, searchQuery, selectedMainCategory, selectedSubCategory, sortBy])
-
-  // =========================
-  // Pagination
-  // =========================
-
-  const totalPages = Math.ceil(filteredProducts.length / productsPerPage)
-  const safeCurrentPage = Math.min(currentPage, Math.max(totalPages, 1))
-  const startIndex = (safeCurrentPage - 1) * productsPerPage
-  const endIndex = startIndex + productsPerPage
-  const displayedProducts = filteredProducts.slice(startIndex, endIndex)
+    return () => {
+      isCancelled = true
+    }
+  }, [currentPage, searchQuery, selectedMainCategory, selectedSubCategory, sortBy])
 
   // =========================
   // Handlers
   // =========================
-
-  const handleSearch = (value: string) => {
-    setSearchQuery(value)
-    setCurrentPage(1)
+  const handleSearchSubmit = (val: string) => {
+    setSearchInput(val)
+    updateUrlParams({ search: val, page: 1 })
   }
 
-  const handleMainCategoryChange = (category: string) => {
-    setSelectedMainCategory(category)
-    setSelectedSubCategory("الكل")
-    setCurrentPage(1)
+  // Debounce search typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput !== searchQuery) {
+        updateUrlParams({ search: searchInput, page: 1 })
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchInput, searchQuery, updateUrlParams])
 
-    // Scroll to products after a small delay
+  const handleMainCategoryChange = (category: string) => {
+    updateUrlParams({ category, subcategory: "الكل", page: 1 })
     setTimeout(() => {
       scrollToSection(productsRef)
     }, 100)
   }
 
   const handleSubCategoryChange = (subCategory: string) => {
-    setSelectedSubCategory(subCategory)
-    setCurrentPage(1)
-
-    // Scroll to products after a small delay
+    updateUrlParams({ subcategory: subCategory, page: 1 })
     setTimeout(() => {
       scrollToSection(productsRef)
     }, 100)
   }
 
   const handleSortChange = (value: typeof sortBy) => {
-    setSortBy(value)
-    setCurrentPage(1)
+    updateUrlParams({ sort: value, page: 1 })
   }
 
   const changePage = (page: number) => {
-    if (page < 1 || page > totalPages) return
-    setCurrentPage(page)
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    if (page < 1 || page > totalPages || page === currentPage) return
+    updateUrlParams({ page })
+    setTimeout(() => {
+      if (productsRef.current) {
+        const yOffset = -120
+        const y = productsRef.current.getBoundingClientRect().top + window.pageYOffset + yOffset
+        window.scrollTo({ top: y, behavior: "smooth" })
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" })
+      }
+    }, 50)
+  }
+
+  const resetFilters = () => {
+    setSearchInput("")
+    setSearchParams(new URLSearchParams())
   }
 
   // =========================
-  // Page Numbers
+  // Page Numbers List
   // =========================
-
   const pageNumbers = useMemo(() => {
-    const pages: number[] = []
-    const maxVisiblePages = 5
+    const pages: (number | "...")[] = []
 
-    let startPage = Math.max(1, safeCurrentPage - Math.floor(maxVisiblePages / 2))
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1)
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      pages.push(1)
 
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1)
-    }
+      if (currentPage > 3) {
+        pages.push("...")
+      }
 
-    for (let page = startPage; page <= endPage; page++) {
-      pages.push(page)
+      const startPage = Math.max(2, currentPage - 1)
+      const endPage = Math.min(totalPages - 1, currentPage + 1)
+
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i)
+      }
+
+      if (currentPage < totalPages - 2) {
+        pages.push("...")
+      }
+
+      pages.push(totalPages)
     }
 
     return pages
-  }, [safeCurrentPage, totalPages])
+  }, [currentPage, totalPages])
 
-  // Reset all filters
-  const resetFilters = () => {
-    setSearchQuery("")
-    setSelectedMainCategory("الكل")
-    setSelectedSubCategory("الكل")
-    setCurrentPage(1)
-    setSortBy("newest")
-  }
-
-  // Get category icon
-  const getCategoryIcon = (category: string) => {
-    const icons: Record<string, string> = {
-      "السوبر ماركت": "🛒",
-      "المكتبة": "📚",
-      "المحمصة": "☕"
-    }
-    return icons[category] || "📦"
-  }
+  const startIndex = (currentPage - 1) * productsPerPage
+  const endIndex = Math.min(startIndex + productsPerPage, totalProducts)
 
   return (
     <main dir="rtl" className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* =========================
-          Header with Gradient
-      ========================= */}
+      {/* Header */}
       <section className="relative overflow-hidden bg-[#17656b] pb-12 pt-20 shadow-lg">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC40Ij48cGF0aCBkPSJNMzYgMzR2LTRoNHY0aC00em0wIDB2LTRoLTR2NGg0eiIvPjwvZz48L2c+PC9zdmc+')]"></div>
@@ -293,15 +355,11 @@ const ProductsPage = ({
                 تصفح كل منتجات أولاد الحكيم واختر اللي يناسبك
               </p>
             </div>
-
-
           </div>
         </div>
       </section>
 
-      {/* =========================
-          Filters
-      ========================= */}
+      {/* Filters */}
       <section className="sticky top-[76px] z-30 border-b border-slate-200 bg-white/95 py-4 shadow-lg backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4">
@@ -325,16 +383,16 @@ const ProductsPage = ({
 
                 <input
                   type="search"
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="ابحث عن منتج..."
                   className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 py-3 pr-12 pl-4 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#17656b] focus:bg-white focus:ring-4 focus:ring-[#17656b]/20"
                 />
 
-                {searchQuery && (
+                {searchInput && (
                   <button
                     type="button"
-                    onClick={() => handleSearch("")}
+                    onClick={() => handleSearchSubmit("")}
                     className="absolute left-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
                     aria-label="مسح البحث"
                   >
@@ -443,12 +501,16 @@ const ProductsPage = ({
         </div>
       </section>
 
-      {/* =========================
-          Products
-      ========================= */}
+      {/* Products Grid Section */}
       <section ref={productsRef} className="py-6 sm:py-12">
         <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
-          {displayedProducts.length === 0 ? (
+          {loading ? (
+            /* Loading State */
+            <div className="py-20 text-center">
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-[#17656b]" />
+              <p className="mt-4 text-base font-bold text-slate-600">جاري تحميل المنتجات...</p>
+            </div>
+          ) : displayedProducts.length === 0 ? (
             /* Empty State */
             <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-white px-6 py-24 text-center shadow-lg">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#17656b]/10 to-[#17656b]/20 text-4xl">
@@ -477,15 +539,15 @@ const ProductsPage = ({
                 <p className="text-xs sm:text-sm font-medium text-slate-500">
                   عرض{" "}
                   <span className="rounded-lg bg-[#17656b]/10 px-1.5 sm:px-2 py-0.5 sm:py-1 font-bold text-[#17656b]">
-                    {startIndex + 1}
+                    {totalProducts === 0 ? 0 : startIndex + 1}
                   </span>
                   {" "}إلى{" "}
                   <span className="rounded-lg bg-[#17656b]/10 px-1.5 sm:px-2 py-0.5 sm:py-1 font-bold text-[#17656b]">
-                    {Math.min(endIndex, filteredProducts.length)}
+                    {endIndex}
                   </span>
                   {" "}من{" "}
                   <span className="rounded-lg bg-[#17656b]/10 px-1.5 sm:px-2 py-0.5 sm:py-1 font-bold text-[#17656b]">
-                    {filteredProducts.length}
+                    {totalProducts}
                   </span>
                   {" "}منتج
                 </p>
@@ -512,13 +574,13 @@ const ProductsPage = ({
                 ))}
               </div>
 
-              {/* Pagination */}
+              {/* Pagination Controls */}
               {totalPages > 1 && (
                 <div className="mt-12 flex flex-wrap items-center justify-center gap-2">
                   <button
                     type="button"
-                    disabled={safeCurrentPage === 1}
-                    onClick={() => changePage(safeCurrentPage - 1)}
+                    disabled={currentPage === 1}
+                    onClick={() => changePage(currentPage - 1)}
                     className="flex h-10 items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-5 text-sm font-bold text-slate-600 transition-all duration-300 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -527,24 +589,33 @@ const ProductsPage = ({
                     السابق
                   </button>
 
-                  {pageNumbers.map((page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() => changePage(page)}
-                      className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-bold transition-all duration-300 ${safeCurrentPage === page
-                          ? "bg-[#17656b] text-white shadow-lg shadow-[#17656b]/30 scale-110"
-                          : "border-2 border-slate-200 bg-white text-slate-600 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b]"
-                        }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
+                  {pageNumbers.map((page, idx) =>
+                    typeof page === "string" ? (
+                      <span
+                        key={`dots-${idx}`}
+                        className="flex h-10 w-10 items-center justify-center text-sm font-black text-slate-400"
+                      >
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => changePage(page)}
+                        className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-bold transition-all duration-300 ${currentPage === page
+                            ? "bg-[#17656b] text-white shadow-lg shadow-[#17656b]/30 scale-110"
+                            : "border-2 border-slate-200 bg-white text-slate-600 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b]"
+                          }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
 
                   <button
                     type="button"
-                    disabled={safeCurrentPage === totalPages}
-                    onClick={() => changePage(safeCurrentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    onClick={() => changePage(currentPage + 1)}
                     className="flex h-10 items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-5 text-sm font-bold text-slate-600 transition-all duration-300 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     التالي

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
 
 import Dashboard from "../components/Admin/Dashboard"
-import { getProducts } from "../services/productService"
+import { getAdminProducts } from "../services/productService"
 
 
 interface iProducts {
@@ -29,7 +29,7 @@ const Admin = () => {
 
       try {
 
-        const data = await getProducts(true)
+        const data = await getAdminProducts()
 
         setProducts(data)
 

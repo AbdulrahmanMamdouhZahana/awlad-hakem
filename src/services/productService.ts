@@ -45,6 +45,7 @@ export const getPaginatedProducts = async (params?: {
   per_page?: number
   search?: string
   category?: string
+  categories?: string[]
   only_offers?: boolean
   sort_by?: string
 }): Promise<PaginatedProductsResponse> => {
@@ -54,6 +55,9 @@ export const getPaginatedProducts = async (params?: {
   if (params?.search?.trim()) query.append("search", params.search.trim())
   if (params?.category && params.category !== "الكل" && params.category !== "all") {
     query.append("category", params.category)
+  }
+  if (params?.categories && params.categories.length > 0) {
+    query.append("categories", params.categories.join(","))
   }
   if (params?.only_offers) query.append("only_offers", "true")
   if (params?.sort_by) query.append("sort_by", params.sort_by)
@@ -79,6 +83,32 @@ export const getPaginatedProducts = async (params?: {
     per_page: list.length,
     total: list.length,
   }
+}
+
+// =====================================
+// Get Admin Products (Full catalog for Admin, never stored in session/local storage)
+// =====================================
+export const getAdminProducts = async (): Promise<iProducts[]> => {
+  try {
+    const response = await apiFetch("/admin/products")
+    if (response?.data && Array.isArray(response.data)) {
+      return response.data
+    }
+    if (Array.isArray(response)) {
+      return response
+    }
+  } catch (err) {
+    console.warn("Dedicated /admin/products endpoint fallback to /products?all=true", err)
+  }
+
+  const fallback = await apiFetch("/products?all=true")
+  if (fallback?.data && Array.isArray(fallback.data)) {
+    return fallback.data
+  }
+  if (Array.isArray(fallback)) {
+    return fallback
+  }
+  return []
 }
 
 // =====================================
