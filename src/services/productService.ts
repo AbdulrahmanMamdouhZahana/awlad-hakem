@@ -125,9 +125,26 @@ export const getPaginatedProducts = async (params?: {
 // =====================================
 // Get Admin Products (Full catalog for Admin, never stored in session/local storage)
 // =====================================
-export const getAdminProducts = async (): Promise<iProducts[]> => {
+export const getAdminProducts = async (params?: {
+  search?: string
+  category?: string
+  categories?: string[]
+  only_offers?: boolean
+}): Promise<iProducts[]> => {
+  const query = new URLSearchParams()
+  if (params?.search?.trim()) query.append("search", params.search.trim())
+  if (params?.category && params.category !== "الكل" && params.category !== "all") {
+    query.append("category", params.category)
+  }
+  if (params?.categories && params.categories.length > 0) {
+    query.append("categories", params.categories.join(","))
+  }
+  if (params?.only_offers) query.append("only_offers", "true")
+
+  const queryString = query.toString()
+
   try {
-    const response = await apiFetch("/admin/products")
+    const response = await apiFetch(`/admin/products${queryString ? `?${queryString}` : ""}`)
     if (response?.data && Array.isArray(response.data)) {
       return response.data
     }
@@ -138,7 +155,9 @@ export const getAdminProducts = async (): Promise<iProducts[]> => {
     console.warn("Dedicated /admin/products endpoint fallback to /products?all=true", err)
   }
 
-  const fallback = await apiFetch("/products?all=true")
+  const fallbackParams = new URLSearchParams(query)
+  fallbackParams.append("all", "true")
+  const fallback = await apiFetch(`/products?${fallbackParams.toString()}`)
   if (fallback?.data && Array.isArray(fallback.data)) {
     return fallback.data
   }

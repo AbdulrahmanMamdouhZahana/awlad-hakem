@@ -315,8 +315,8 @@ const Navbar = ({
                   if (e.key === "Enter") handleSearchSubmit()
                   if (e.key === "Escape") clearSearch()
                 }}
-                placeholder="ابحث عن منتج..."
-                aria-label="ابحث عن منتج"
+                placeholder="ابحث باسم المنتج أو القسم الفرعي أو الشركة..."
+                aria-label="ابحث باسم المنتج أو القسم الفرعي أو الشركة"
                 className="
                   h-11
                   w-full
@@ -865,8 +865,8 @@ const Navbar = ({
                 if (e.key === "Enter") handleSearchSubmit()
                 if (e.key === "Escape") clearSearch()
               }}
-              placeholder="ابحث عن منتج..."
-              aria-label="ابحث عن منتج"
+              placeholder="ابحث باسم المنتج أو القسم الفرعي أو الشركة..."
+              aria-label="ابحث باسم المنتج أو القسم الفرعي أو الشركة"
               className="
                 h-10
                 w-full

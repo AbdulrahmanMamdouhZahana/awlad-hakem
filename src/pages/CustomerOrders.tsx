@@ -1286,7 +1286,7 @@ export default function CustomerOrders({
                       type="text"
                       value={productSearchQuery}
                       onChange={(e) => setProductSearchQuery(e.target.value)}
-                      placeholder="ابحث عن منتج بالاسم..."
+                      placeholder="ابحث باسم المنتج أو القسم الفرعي أو الشركة..."
                       className="w-full rounded-xl border border-slate-200 bg-white pr-10 pl-4 py-2.5 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none focus:border-[#17656b] focus:ring-2 focus:ring-[#17656b]/20"
                     />
                   </div>
@@ -1294,13 +1294,13 @@ export default function CustomerOrders({
                   {/* Filtered Catalog List */}
                   <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
                     {catalogProducts
-                      .filter((p) =>
-                        !productSearchQuery
-                          ? true
-                          : String(p.name || "")
-                              .toLowerCase()
-                              .includes(productSearchQuery.toLowerCase())
-                      )
+                      .filter((p) => {
+                        if (!productSearchQuery.trim()) return true;
+                        const query = productSearchQuery.trim().toLowerCase();
+                        const name = String(p.name || "").toLowerCase();
+                        const cat = String(p.category || "").toLowerCase();
+                        return name.includes(query) || cat.includes(query);
+                      })
                       .slice(0, 20)
                       .map((prod) => {
                         const maxStock = getMaxAllowedStock(Number(prod.id));

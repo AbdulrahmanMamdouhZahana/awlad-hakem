@@ -13,6 +13,7 @@ import {
   ArrowPathIcon,
   ChevronUpIcon,
   BookOpenIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline"
 
 interface iProducts {
@@ -403,8 +404,8 @@ const ProductsPage = ({
                   type="search"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="ابحث عن منتج..."
-                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 py-3 pr-12 pl-4 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#17656b] focus:bg-white focus:ring-4 focus:ring-[#17656b]/20"
+                  placeholder="ابحث باسم المنتج أو القسم الفرعي أو الشركة..."
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 py-3 pr-12 pl-10 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#17656b] focus:bg-white focus:ring-4 focus:ring-[#17656b]/20"
                 />
 
                 {searchInput && (
@@ -414,9 +415,7 @@ const ProductsPage = ({
                     className="absolute left-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
                     aria-label="مسح البحث"
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 6l12 12M18 6 6 18" />
-                    </svg>
+                    <XMarkIcon className="h-5 w-5" aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -539,10 +538,10 @@ const ProductsPage = ({
               </div>
 
               <h2 className="mt-5 text-2xl font-black text-slate-800">
-                مفيش منتجات مطابقة
+                لم يتم العثور على منتجات مطابقة لبحثك.
               </h2>
               <p className="mt-2 text-sm text-slate-400">
-                جرب البحث باسم مختلف أو اختر قسمًا آخر
+                جرب البحث باسم منتج أو قسم فرعي أو شركة أخرى، أو اختر قسمًا مختلفًا
               </p>
 
               <button

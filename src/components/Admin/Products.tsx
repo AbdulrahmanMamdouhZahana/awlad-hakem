@@ -7,6 +7,12 @@ import ProductCard from "../Products";
 import { supabase } from "../../lib/supabase";
 import { confirmDelete } from "../../utils/alerts";
 import { isOfferActive } from "../../services/offerService";
+import {
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  SparklesIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline";
 
 export interface IProduct {
   id: number;
@@ -283,19 +289,24 @@ const Products = ({ products, setProducts }: ProductsProps) => {
       }
 
       const productName = String(product.name ?? "").toLowerCase();
-      const productCategory = String(product.category ?? "");
-      const productMainCategory = getMainCategory(productCategory, categoryGroups);
+      const productCategory = String(product.category ?? "").toLowerCase();
+      const productMainCategory = getMainCategory(product.category ?? "", categoryGroups).toLowerCase();
+      const productCode = String((product as unknown as { code?: string })?.code ?? "").toLowerCase();
 
       const matchesSearch =
-        !searchValue || productName.includes(searchValue);
+        !searchValue ||
+        productName.includes(searchValue) ||
+        productCategory.includes(searchValue) ||
+        productMainCategory.includes(searchValue) ||
+        productCode.includes(searchValue);
 
       const matchesMainCategory =
         mainCategory === "الكل" ||
-        productMainCategory === mainCategory;
+        productMainCategory === mainCategory.toLowerCase();
 
       const matchesCategory =
         category === "الكل" ||
-        productCategory === category;
+        productCategory === category.toLowerCase();
 
       return matchesSearch && matchesMainCategory && matchesCategory;
     });
@@ -861,7 +872,14 @@ const Products = ({ products, setProducts }: ProductsProps) => {
           {loadingProducts && products.length === 0 ? (
             <LoadingState />
           ) : filteredProducts.length === 0 ? (
-            <EmptyState />
+            <EmptyState
+              onReset={() => {
+                setSearch("");
+                setMainCategory("الكل");
+                setCategory("الكل");
+                setOnlyOffers(false);
+              }}
+            />
           ) : (
             <ProductGrid
               products={filteredProducts}
@@ -937,14 +955,28 @@ const Filters = ({
   <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
     <div className="flex flex-col gap-4">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div className="flex-1">
+        <div className="relative flex-1">
+          <MagnifyingGlassIcon
+            className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+            aria-hidden="true"
+          />
           <input
-            type="text"
+            type="search"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="ابحث عن منتج بالاسم أو القسم..."
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+            placeholder="ابحث باسم المنتج أو القسم الفرعي أو الشركة..."
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pr-12 pl-10 text-sm font-bold outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100 placeholder:text-slate-400 placeholder:font-normal"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => onSearchChange("")}
+              className="absolute left-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+              aria-label="مسح البحث"
+            >
+              <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+            </button>
+          )}
         </div>
         <button
           type="button"
@@ -955,7 +987,7 @@ const Filters = ({
               : "bg-slate-50 text-slate-700 border-slate-200 hover:border-red-300 hover:text-red-600 hover:bg-red-50/50"
           }`}
         >
-          <span className="text-base">🔥</span>
+          <SparklesIcon className="h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
           <span>العروض والتخفيضات فقط</span>
           {onlyOffers && (
             <span className="bg-white/25 text-white px-2 py-0.5 rounded-full text-xs">
@@ -1025,7 +1057,7 @@ const Stats = ({
 }) => (
   <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
     <StatCard label="إجمالي المنتجات" value={stats.total} color="text-slate-950" />
-    <StatCard label="العروض والتخفيضات 🔥" value={stats.offersCount} color="text-red-500" />
+    <StatCard label="العروض والتخفيضات" value={stats.offersCount} color="text-red-500" />
     <StatCard label="المعروض حالياً" value={stats.displayed} color="text-indigo-600" />
     <StatCard label="مخزون منخفض" value={stats.lowStock} color="text-amber-500" />
   </div>
@@ -1056,13 +1088,27 @@ const LoadingState = () => (
   </div>
 );
 
-const EmptyState = () => (
-  <div className="rounded-3xl border bg-white py-20 text-center shadow-sm">
-    <div className="text-5xl">📦</div>
-    <h3 className="mt-4 text-lg font-black text-slate-800">لا توجد منتجات</h3>
+const EmptyState = ({ onReset }: { onReset?: () => void }) => (
+  <div className="rounded-3xl border border-dashed border-slate-200 bg-white py-20 text-center shadow-sm">
+    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+      <MagnifyingGlassIcon className="h-8 w-8" aria-hidden="true" />
+    </div>
+    <h3 className="mt-4 text-lg font-black text-slate-800">
+      لم يتم العثور على منتجات مطابقة لبحثك.
+    </h3>
     <p className="mt-1 text-sm text-slate-400">
-      جرّب تغيير البحث أو القسم
+      جرّب تغيير البحث أو اختيار قسم مختلف
     </p>
+    {onReset && (
+      <button
+        type="button"
+        onClick={onReset}
+        className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-xs font-bold text-white shadow-md transition hover:bg-indigo-700"
+      >
+        <ArrowPathIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span>إعادة ضبط الفلاتر</span>
+      </button>
+    )}
   </div>
 );
 
