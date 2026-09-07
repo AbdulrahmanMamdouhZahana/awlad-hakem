@@ -53,6 +53,16 @@ interface Order {
   delivery_proof_image?: string | null
 }
 
+interface AttendanceSession {
+  id: number
+  staff_id?: number
+  staff_name?: string
+  started_at: string
+  ended_at: string | null
+  duration_minutes: number | null
+  status: "active" | "completed"
+}
+
 interface DeliveryProofImage {
   id: number
   order_id: number
@@ -207,6 +217,94 @@ export default function DeliveryDashboard() {
 
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmOrderId, setConfirmOrderId] = useState<number | null>(null)
+
+  // =====================================
+  // Attendance State (Feature 2)
+  // =====================================
+  const [attendance, setAttendance] = useState<AttendanceSession | null>(null)
+  const [attendanceLoading, setAttendanceLoading] = useState(false)
+  const [liveDuration, setLiveDuration] = useState<string>("0 دقيقة")
+
+  const loadAttendance = useCallback(async () => {
+    try {
+      setAttendanceLoading(true)
+      const res = await apiFetch("/delivery/attendance/current")
+      if (res?.success && res?.attendance) {
+        setAttendance(res.attendance)
+      } else {
+        setAttendance(null)
+      }
+    } catch (err) {
+      console.warn("DELIVERY ATTENDANCE LOAD ERROR:", err)
+    } finally {
+      setAttendanceLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (attendance?.status !== "active" || !attendance?.started_at) {
+      setLiveDuration("—")
+      return
+    }
+
+    const updateTicker = () => {
+      const start = new Date(attendance.started_at).getTime()
+      const now = Date.now()
+      const diffMins = Math.max(0, Math.floor((now - start) / 60000))
+      const hours = Math.floor(diffMins / 60)
+      const mins = diffMins % 60
+      if (hours > 0) {
+        setLiveDuration(`${hours} ساعة و ${mins} دقيقة`)
+      } else {
+        setLiveDuration(`${mins} دقيقة`)
+      }
+    }
+
+    updateTicker()
+    const interval = window.setInterval(updateTicker, 15000)
+    return () => window.clearInterval(interval)
+  }, [attendance])
+
+  const handleCheckIn = async () => {
+    try {
+      setAttendanceLoading(true)
+      const res = await apiFetch("/delivery/attendance/check-in", {
+        method: "POST",
+      })
+      if (res?.success && res?.attendance) {
+        setAttendance(res.attendance)
+        toast.success(res.message || "أهلاً بك! تم تسجيل الحضور وأصبحت متاحاً الآن 🟢")
+      }
+    } catch (err) {
+      console.error("CHECK IN ERROR:", err)
+      toast.error(err instanceof Error ? err.message : "فشل تسجيل الحضور")
+    } finally {
+      setAttendanceLoading(false)
+    }
+  }
+
+  const handleCheckOut = async () => {
+    if (!window.confirm("هل أنت متأكد من تسجيل الانصراف وإنهاء يوم العمل؟")) {
+      return
+    }
+    try {
+      setAttendanceLoading(true)
+      const res = await apiFetch("/delivery/attendance/check-out", {
+        method: "POST",
+      })
+      if (res?.success && res?.attendance) {
+        setAttendance(res.attendance)
+        toast.success(
+          `تم تسجيل الانصراف بنجاح. مدة العمل: ${res.formatted_duration || ""}`
+        )
+      }
+    } catch (err) {
+      console.error("CHECK OUT ERROR:", err)
+      toast.error(err instanceof Error ? err.message : "فشل تسجيل الانصراف")
+    } finally {
+      setAttendanceLoading(false)
+    }
+  }
   const [deliveryImage, setDeliveryImage] = useState<File | null>(null)
   const [deliveryImagePreview, setDeliveryImagePreview] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)

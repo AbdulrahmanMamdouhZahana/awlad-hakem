@@ -26,106 +26,110 @@ export interface iProducts {
   offer_expires_at?: string | null
 }
 
+export interface PaginatedProductsResponse {
+  data: iProducts[]
+  current_page: number
+  last_page: number
+  per_page: number
+  total: number
+}
+
+// In-memory runtime request deduplication (never persisted in browser storage)
+let activeProductsPromise: Promise<iProducts[]> | null = null
+
 // =====================================
-// Products Request Cache
+// Get Paginated Products (Server-Side)
 // =====================================
+export const getPaginatedProducts = async (params?: {
+  page?: number
+  per_page?: number
+  search?: string
+  category?: string
+  only_offers?: boolean
+  sort_by?: string
+}): Promise<PaginatedProductsResponse> => {
+  const query = new URLSearchParams()
+  if (params?.page) query.append("page", String(params.page))
+  if (params?.per_page) query.append("per_page", String(params.per_page))
+  if (params?.search?.trim()) query.append("search", params.search.trim())
+  if (params?.category && params.category !== "الكل" && params.category !== "all") {
+    query.append("category", params.category)
+  }
+  if (params?.only_offers) query.append("only_offers", "true")
+  if (params?.sort_by) query.append("sort_by", params.sort_by)
 
-let productsRequest: Promise<iProducts[]> | null = null
+  const queryString = query.toString()
+  const response = await apiFetch(`/products${queryString ? `?${queryString}` : ""}`)
 
-const CACHE_KEY = "products_cache"
-
-// =====================================
-// Get All Products
-// =====================================
-
-export const getProducts = async (): Promise<iProducts[]> => {
-
-  // ---------------------------------
-  // 1. Check session cache
-  // ---------------------------------
-
-  const cachedProducts =
-    sessionStorage.getItem(CACHE_KEY)
-
-  if (cachedProducts !== null) {
-    try {
-      const parsedProducts =
-        JSON.parse(cachedProducts)
-
-      if (Array.isArray(parsedProducts)) {
-        return parsedProducts
-      }
-    } catch {
-      sessionStorage.removeItem(CACHE_KEY)
+  if (response?.data && Array.isArray(response.data) && typeof response?.current_page === "number") {
+    return {
+      data: response.data,
+      current_page: response.current_page,
+      last_page: response.last_page || 1,
+      per_page: response.per_page || 20,
+      total: response.total || response.data.length,
     }
   }
 
-  // ---------------------------------
-  // 2. Reuse existing request
-  // ---------------------------------
+  const list = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : []
+  return {
+    data: list,
+    current_page: 1,
+    last_page: 1,
+    per_page: list.length,
+    total: list.length,
+  }
+}
 
-  if (productsRequest) {
-    return productsRequest
+// =====================================
+// Get Products (Non-persistent runtime fetch)
+// =====================================
+export const getProducts = async (all: boolean = false): Promise<iProducts[]> => {
+  // If requesting a specific mode or already requesting, avoid duplicate in-flight requests
+  if (!all && activeProductsPromise) {
+    return activeProductsPromise
   }
 
-  // ---------------------------------
-  // 3. Make ONE request
-  // ---------------------------------
+  const endpoint = all ? "/products?all=true" : "/products?page=1&per_page=20"
 
-  productsRequest = apiFetch("/products")
+  const request = apiFetch(endpoint)
     .then((response) => {
-
       let products: iProducts[] = []
 
-      if (
-        response?.data &&
-        Array.isArray(response.data)
-      ) {
+      if (response?.data && Array.isArray(response.data)) {
         products = response.data
-      } else if (
-        Array.isArray(response)
-      ) {
+      } else if (Array.isArray(response)) {
         products = response
-      } else if (
-        response?.products &&
-        Array.isArray(response.products)
-      ) {
+      } else if (response?.products && Array.isArray(response.products)) {
         products = response.products
       }
-
-      // Cache even if products = []
-      // so we don't repeatedly request an empty result.
-      sessionStorage.setItem(
-        CACHE_KEY,
-        JSON.stringify(products)
-      )
 
       return products
     })
     .catch((error) => {
-
-      // Allow retry if the API request actually failed.
-      productsRequest = null
-
-      console.error(
-        "Failed to fetch products:",
-        error
-      )
-
+      activeProductsPromise = null
+      console.error("Failed to fetch products:", error)
       throw error
     })
+    .finally(() => {
+      // Clear in-flight promise after resolution so future calls get fresh data
+      setTimeout(() => {
+        activeProductsPromise = null
+      }, 1000)
+    })
 
-  return productsRequest
+  if (!all) {
+    activeProductsPromise = request
+  }
+
+  return request
 }
 
 // =====================================
-// Clear Products Cache
+// Clear In-Memory Products Cache
 // =====================================
-
 export const clearProductsCache = () => {
-  sessionStorage.removeItem(CACHE_KEY)
-
-  productsRequest = null
+  activeProductsPromise = null
 }
 
 // =====================================

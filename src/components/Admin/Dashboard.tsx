@@ -80,6 +80,23 @@ interface Delivery {
   user_id?: string
 }
 
+interface DeliveryAttendanceSession {
+  id: number
+  started_at: string
+  ended_at: string | null
+  duration_minutes: number | null
+  status: string
+}
+
+interface DeliveryAttendanceItem {
+  id: number
+  name: string
+  phone: string | null
+  is_on_duty: boolean
+  current_session: DeliveryAttendanceSession | null
+  today_sessions: DeliveryAttendanceSession[]
+}
+
 interface BankAccount {
   id: number
   bank_name: string
@@ -260,6 +277,54 @@ const Dashboard = ({
   // =====================================================
 
   const [orders, setOrders] = useState<Order[]>([])
+  const [deliveryAttendanceList, setDeliveryAttendanceList] = useState<DeliveryAttendanceItem[]>([])
+  const [attendanceLoading, setAttendanceLoading] = useState(false)
+
+  const loadDeliveryAttendance = useCallback(async () => {
+    try {
+      setAttendanceLoading(true)
+      const res = await apiFetch("/admin/delivery/attendance")
+      if (res?.success && Array.isArray(res.deliveries)) {
+        setDeliveryAttendanceList(res.deliveries)
+      }
+    } catch (err) {
+      console.warn("ADMIN DELIVERY ATTENDANCE LOAD ERROR:", err)
+    } finally {
+      setAttendanceLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadDeliveryAttendance()
+    const interval = window.setInterval(() => {
+      void loadDeliveryAttendance()
+    }, 10000)
+    return () => window.clearInterval(interval)
+  }, [loadDeliveryAttendance])
+
+  const formatAttendanceDuration = (startedAt?: string | null, endedAt?: string | null, durationMins?: number | null) => {
+    if (durationMins != null && durationMins > 0) {
+      const hours = Math.floor(durationMins / 60)
+      const mins = durationMins % 60
+      if (hours > 0) return `${hours} ساعات و ${mins} دقيقة`
+      return `${mins} دقيقة`
+    }
+    if (!startedAt) return "—"
+    const start = new Date(startedAt).getTime()
+    const end = endedAt ? new Date(endedAt).getTime() : Date.now()
+    const diffMins = Math.max(0, Math.floor((end - start) / 60000))
+    const hours = Math.floor(diffMins / 60)
+    const mins = diffMins % 60
+    if (hours > 0) return `${hours} ساعات و ${mins} دقيقة`
+    return `${mins} دقيقة`
+  }
+
+  const formatAttendanceTime = (timeStr?: string | null) => {
+    if (!timeStr) return "—"
+    const date = new Date(timeStr)
+    if (isNaN(date.getTime())) return "—"
+    return date.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
+  }
 
   const [ordersLoading, setOrdersLoading] =
     useState(true)

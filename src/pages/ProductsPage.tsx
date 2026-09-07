@@ -1,7 +1,8 @@
-import { useMemo, useState, useRef, useEffect } from "react"
+import { useMemo, useState, useRef, useEffect, useCallback } from "react"
 import { Link } from "react-router-dom"
 import Products from "../components/Products"
 import { isOfferActive } from "../services/offerService"
+import { getPaginatedProducts } from "../services/productService"
 
 interface iProducts {
   id: number

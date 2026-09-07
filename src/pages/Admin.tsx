@@ -29,7 +29,7 @@ const Admin = () => {
 
       try {
 
-        const data = await getProducts()
+        const data = await getProducts(true)
 
         setProducts(data)
 

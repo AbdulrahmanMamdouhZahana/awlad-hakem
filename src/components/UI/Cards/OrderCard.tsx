@@ -181,7 +181,7 @@ const OrderCard = ({
       case "pending":
         return compact ? "جديد" : "قيد الانتظار"
       case "cancelled":
-        return "ملغي"
+        return "تم إلغاء الطلب بواسطة العميل"
       case "delivered":
         return "تم التوصيل"
       case "assigned":

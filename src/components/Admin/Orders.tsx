@@ -771,7 +771,7 @@ const orderDate = order.created_at
         return "قيد الانتظار"
 
       case "cancelled":
-        return "ملغي"
+        return "تم إلغاء الطلب بواسطة العميل"
 
       default:
         return status

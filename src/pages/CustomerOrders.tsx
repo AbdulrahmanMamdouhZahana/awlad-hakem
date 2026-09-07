@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar"; 
 import type  { CartItem } from "../App"; 
-import { logoutCustomer } from "../services/authService"; 
+import { logoutCustomer } from "../services/authService";
+import toast from "react-hot-toast";
+import { apiFetch } from "../services/api"; 
 
 const API_URL =
   import.meta.env.VITE_API_URL 
@@ -123,6 +125,169 @@ export default function CustomerOrders({
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | string | null>(null);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  interface EditItem {
+    product_id: number;
+    product_name: string;
+    price: number;
+    quantity: number;
+    tax_rate?: number | null;
+    tax_type?: "percentage" | "fixed" | null;
+    tax_value?: number | null;
+  }
+  const [editItems, setEditItems] = useState<EditItem[]>([]);
+  const [selectedAddProductId, setSelectedAddProductId] = useState<string>("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Cancellation Handler
+  const handleCancelOrder = async (order: Order) => {
+    if (normalizeStatus(order.status) !== "pending") {
+      toast.error("لا يمكن إلغاء الطلب بعد تأكيده من قِبل الإدارة");
+      return;
+    }
+
+    const confirmed = window.confirm(`هل أنت متأكد من رغبتك في إلغاء الطلب #${order.id}؟`);
+    if (!confirmed) return;
+
+    try {
+      setCancellingId(order.id);
+      await apiFetch(`/customer/orders/${order.id}/cancel`, {
+        method: "POST",
+      });
+
+      toast.success("تم إلغاء الطلب بنجاح");
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === order.id ? { ...o, status: "cancelled" } : o
+        )
+      );
+
+      if (selectedOrder?.id === order.id) {
+        setSelectedOrder((prev) =>
+          prev ? { ...prev, status: "cancelled" } : null
+        );
+      }
+    } catch (err) {
+      console.error("CUSTOMER CANCEL ERROR:", err);
+      toast.error(err instanceof Error ? err.message : "تعذر إلغاء الطلب");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  // Open Edit Order Modal
+  const openEditModal = (order: Order) => {
+    if (normalizeStatus(order.status) !== "pending") {
+      toast.error("لا يمكن تعديل الطلب بعد تأكيده من الإدارة");
+      return;
+    }
+
+    const rawItems = getItems(order);
+    const initialItems: EditItem[] = rawItems.map((item) => {
+      const prodId = Number(item.product_id || item.id);
+      const catalogProduct = products.find((p) => Number(p.id) === prodId);
+      return {
+        product_id: prodId,
+        product_name: item.product_name || item.name || catalogProduct?.name || "منتج",
+        price: Number(item.price || catalogProduct?.price || 0),
+        quantity: Math.max(1, Number(item.quantity || 1)),
+        tax_rate: catalogProduct?.tax_rate,
+        tax_type: catalogProduct?.tax_type,
+        tax_value: catalogProduct?.tax_value,
+      };
+    });
+
+    setEditItems(initialItems);
+    setEditingOrder(order);
+    setSelectedAddProductId("");
+  };
+
+  // Add Product to Edit list
+  const handleAddProductToEdit = () => {
+    if (!selectedAddProductId) return;
+    const prod = products.find((p) => String(p.id) === String(selectedAddProductId));
+    if (!prod) return;
+
+    setEditItems((prev) => {
+      const existing = prev.findIndex((it) => it.product_id === prod.id);
+      if (existing >= 0) {
+        return prev.map((it, idx) =>
+          idx === existing ? { ...it, quantity: it.quantity + 1 } : it
+        );
+      }
+      return [
+        ...prev,
+        {
+          product_id: prod.id,
+          product_name: prod.name,
+          price: Number(prod.price || 0),
+          quantity: 1,
+          tax_rate: prod.tax_rate,
+          tax_type: prod.tax_type,
+          tax_value: prod.tax_value,
+        },
+      ];
+    });
+
+    setSelectedAddProductId("");
+  };
+
+  // Save Edit Order
+  const handleSaveEdit = async () => {
+    if (!editingOrder) return;
+    if (editItems.length === 0) {
+      toast.error("يجب أن يحتوي الطلب على منتج واحد على الأقل، أو يمكنك إلغاء الطلب");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      const payload = {
+        items: editItems.map((it) => ({
+          product_id: it.product_id,
+          quantity: it.quantity,
+        })),
+      };
+
+      const response = await apiFetch(`/customer/orders/${editingOrder.id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+
+      const updated = response?.order || response?.data || response;
+      toast.success("تم تحديث الطلب بنجاح");
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === editingOrder.id ? { ...o, ...updated } : o))
+      );
+
+      if (selectedOrder?.id === editingOrder.id) {
+        setSelectedOrder((prev) => (prev ? { ...prev, ...updated } : null));
+      }
+
+      setEditingOrder(null);
+    } catch (err) {
+      console.error("CUSTOMER EDIT ORDER ERROR:", err);
+      toast.error(err instanceof Error ? err.message : "فشل حفظ تعديلات الطلب");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Computed summary for Edit Modal
+  const editSubtotal = editItems.reduce((sum, it) => sum + (it.price * it.quantity), 0);
+  const editTax = editItems.reduce((sum, it) => {
+    if (it.tax_type === "fixed" && it.tax_value != null) {
+      return sum + (Number(it.tax_value) * it.quantity);
+    }
+    const rate = Number(it.tax_value ?? it.tax_rate ?? 0);
+    return sum + (it.price * it.quantity * (rate / 100));
+  }, 0);
+  const editDeliveryFee = editingOrder?.delivery_status === "calculated" && editingOrder?.delivery_fee != null
+    ? Number(editingOrder.delivery_fee)
+    : null;
+  const editTotal = editSubtotal + editTax + (editDeliveryFee || 0);
 
   const loadOrders = async () => {
     setLoading(true);
