@@ -903,7 +903,7 @@ const OrderCard = ({
               </button>
             )}
 
-            {onCancel && order.status === "cancelled" && (
+            {onCancel && (order.status === "cancelled" || order.status === "delivered") && (
               <button
                 type="button"
                 disabled={isConfirming || isCancelling}

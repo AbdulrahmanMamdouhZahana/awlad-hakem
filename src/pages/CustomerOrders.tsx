@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar"; 
-import type  { CartItem } from "../App"; 
+import type { CartItem } from "../App"; 
 import { logoutCustomer } from "../services/authService";
-import toast from "react-hot-toast";
+import Swal from "sweetalert2";
 import { apiFetch } from "../services/api"; 
 
-const API_URL =
-  import.meta.env.VITE_API_URL 
+const API_URL = import.meta.env.VITE_API_URL || "";
 
 interface OrderItem {
   id: number | string;
@@ -16,6 +15,12 @@ interface OrderItem {
   name?: string;
   price?: number | string;
   quantity?: number;
+  product?: {
+    id: number | string;
+    name: string;
+    image?: string | null;
+    price?: number | string;
+  } | null;
 }
 
 interface Order {
@@ -31,6 +36,7 @@ interface Order {
   notes?: string;
   created_at?: string;
   order_items?: OrderItem[];
+  orderItems?: OrderItem[];
   items?: OrderItem[];
 }
 
@@ -45,6 +51,11 @@ const statusConfig: Record<
     className: "bg-amber-50 text-amber-700 border-amber-200",
     icon: "⏳",
   },
+  pending_approval: {
+    label: "في انتظار التأكيد",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+    icon: "⏳",
+  },
   confirmed: {
     label: "تم تأكيد الطلب",
     className: "bg-blue-50 text-blue-700 border-blue-200",
@@ -54,6 +65,11 @@ const statusConfig: Record<
     label: "تم تعيين الدليفري",
     className: "bg-indigo-50 text-indigo-700 border-indigo-200",
     icon: "🚚",
+  },
+  preparing: {
+    label: "جاري التجهيز",
+    className: "bg-cyan-50 text-cyan-700 border-cyan-200",
+    icon: "🍳",
   },
   out_for_delivery: {
     label: "قيد التوصيل",
@@ -75,6 +91,11 @@ const statusConfig: Record<
 const normalizeStatus = (status?: string) =>
   String(status || "pending").trim().toLowerCase();
 
+const isPendingOrder = (status?: string) => {
+  const norm = normalizeStatus(status);
+  return norm === "pending" || norm === "pending_approval";
+};
+
 const formatDate = (value?: string) => {
   if (!value) return "—";
 
@@ -87,14 +108,25 @@ const formatDate = (value?: string) => {
   }).format(date);
 };
 
-const getItems = (order: Order): OrderItem[] =>
-  Array.isArray(order.order_items)
-    ? order.order_items
-    : Array.isArray(order.items)
-      ? order.items
-      : [];
+const getItems = (order: Order): OrderItem[] => {
+  if (Array.isArray(order.order_items) && order.order_items.length > 0) return order.order_items;
+  if (Array.isArray(order.orderItems) && order.orderItems.length > 0) return order.orderItems;
+  if (Array.isArray(order.items) && order.items.length > 0) return order.items;
+  return [];
+};
 
 const getTotal = (order: Order) => Number(order.total || 0);
+
+interface EditItem {
+  product_id: number;
+  product_name: string;
+  price: number;
+  quantity: number;
+  image?: string;
+  tax_rate?: number | null;
+  tax_type?: "percentage" | "fixed" | null;
+  tax_value?: number | null;
+}
 
 // Props for the component
 interface CustomerOrdersProps {
@@ -131,18 +163,14 @@ export default function CustomerOrders({
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [cancellingId, setCancellingId] = useState<number | string | null>(null);
+
+  // Edit Modal State
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  interface EditItem {
-    product_id: number;
-    product_name: string;
-    price: number;
-    quantity: number;
-    tax_rate?: number | null;
-    tax_type?: "percentage" | "fixed" | null;
-    tax_value?: number | null;
-  }
   const [editItems, setEditItems] = useState<EditItem[]>([]);
-  const [selectedAddProductId, setSelectedAddProductId] = useState<string>("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [showAddProductSection, setShowAddProductSection] = useState(false);
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+
   const [catalogProducts, setCatalogProducts] = useState<any[]>(products);
   useEffect(() => {
     if (products && products.length > 0) {
@@ -154,60 +182,38 @@ export default function CustomerOrders({
       }).catch(() => {});
     }
   }, [products]);
-  const [savingEdit, setSavingEdit] = useState(false);
-
-  // Cancellation Handler
-  const handleCancelOrder = async (order: Order) => {
-    if (normalizeStatus(order.status) !== "pending") {
-      toast.error("لا يمكن إلغاء الطلب بعد تأكيده من قِبل الإدارة");
-      return;
-    }
-
-    const confirmed = window.confirm(`هل أنت متأكد من رغبتك في إلغاء الطلب #${order.id}؟`);
-    if (!confirmed) return;
-
-    try {
-      setCancellingId(order.id);
-      await apiFetch(`/customer/orders/${order.id}/cancel`, {
-        method: "POST",
-      });
-
-      toast.success("تم إلغاء الطلب بنجاح");
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === order.id ? { ...o, status: "cancelled" } : o
-        )
-      );
-
-      if (selectedOrder?.id === order.id) {
-        setSelectedOrder((prev) =>
-          prev ? { ...prev, status: "cancelled" } : null
-        );
-      }
-    } catch (err) {
-      console.error("CUSTOMER CANCEL ERROR:", err);
-      toast.error(err instanceof Error ? err.message : "تعذر إلغاء الطلب");
-    } finally {
-      setCancellingId(null);
-    }
-  };
 
   // Open Edit Order Modal
   const openEditModal = (order: Order) => {
-    if (normalizeStatus(order.status) !== "pending") {
-      toast.error("لا يمكن تعديل الطلب بعد تأكيده من الإدارة");
+    if (!isPendingOrder(order.status)) {
+      void Swal.fire({
+        icon: "warning",
+        title: "تنبيه",
+        text: "تم تأكيد الطلب ولا يمكن تعديله.",
+        confirmButtonText: "حسناً",
+        confirmButtonColor: "#17656b",
+      });
       return;
     }
+
+    // Close details modal if open so there is no conflict
+    setSelectedOrder(null);
 
     const rawItems = getItems(order);
     const initialItems: EditItem[] = rawItems.map((item) => {
       const prodId = Number(item.product_id || item.id);
       const catalogProduct = catalogProducts.find((p) => Number(p.id) === prodId);
+      const itemImage =
+        item.product?.image ||
+        catalogProduct?.image ||
+        "/placeholder-image.png";
+
       return {
         product_id: prodId,
         product_name: item.product_name || item.name || catalogProduct?.name || "منتج",
-        price: Number(item.price || catalogProduct?.price || 0),
+        price: Number(item.price || catalogProduct?.price || catalogProduct?.piece_price || catalogProduct?.weight_price || 0),
         quantity: Math.max(1, Number(item.quantity || 1)),
+        image: itemImage,
         tax_rate: catalogProduct?.tax_rate,
         tax_type: catalogProduct?.tax_type,
         tax_value: catalogProduct?.tax_value,
@@ -216,44 +222,116 @@ export default function CustomerOrders({
 
     setEditItems(initialItems);
     setEditingOrder(order);
-    setSelectedAddProductId("");
+    setShowAddProductSection(false);
+    setProductSearchQuery("");
+  };
+
+  // Change Quantity (Local State)
+  const handleQuantityChange = async (productId: number, delta: number) => {
+    const itemIndex = editItems.findIndex((it) => it.product_id === productId);
+    if (itemIndex < 0) return;
+
+    const currentQty = editItems[itemIndex].quantity;
+    const nextQty = currentQty + delta;
+
+    if (nextQty <= 0) {
+      await handleRemoveItem(productId);
+      return;
+    }
+
+    setEditItems((prev) =>
+      prev.map((it, idx) => (idx === itemIndex ? { ...it, quantity: nextQty } : it))
+    );
+  };
+
+  // Remove Item (Local State or Cancel if last item)
+  const handleRemoveItem = async (productId: number) => {
+    if (editItems.length <= 1) {
+      // Deleting all items: show SweetAlert2 confirmation to cancel order!
+      const result = await Swal.fire({
+        icon: "warning",
+        title: "إلغاء الطلب؟",
+        text: "لقد قمت بحذف جميع المنتجات من الطلب. هل تريد إلغاء هذا الطلب نهائياً؟",
+        showCancelButton: true,
+        confirmButtonText: "نعم، إلغاء الطلب",
+        cancelButtonText: "رجوع",
+        confirmButtonColor: "#ef4444",
+        cancelButtonColor: "#64748b",
+        reverseButtons: true,
+      });
+
+      if (result.isConfirmed && editingOrder) {
+        try {
+          setSavingEdit(true);
+          await apiFetch(`/customer/orders/${editingOrder.id}/cancel`, {
+            method: "POST",
+          });
+
+          await Swal.fire({
+            icon: "success",
+            title: "تم بنجاح",
+            text: "تم إلغاء الطلب بنجاح",
+            confirmButtonText: "تم",
+            confirmButtonColor: "#17656b",
+          });
+
+          setEditingOrder(null);
+          await loadOrders();
+        } catch (err: any) {
+          await Swal.fire({
+            icon: "error",
+            title: "حدث خطأ",
+            text: err?.message || "تعذر إلغاء الطلب",
+            confirmButtonText: "حسناً",
+          });
+        } finally {
+          setSavingEdit(false);
+        }
+      }
+      return;
+    }
+
+    setEditItems((prev) => prev.filter((it) => it.product_id !== productId));
   };
 
   // Add Product to Edit list
-  const handleAddProductToEdit = () => {
-    if (!selectedAddProductId) return;
-    const prod = catalogProducts.find((p) => String(p.id) === String(selectedAddProductId));
-    if (!prod) return;
+  const handleAddProduct = (prod: any) => {
+    const prodId = Number(prod.id);
+    const existingIndex = editItems.findIndex((it) => it.product_id === prodId);
 
-    setEditItems((prev) => {
-      const existing = prev.findIndex((it) => it.product_id === prod.id);
-      if (existing >= 0) {
-        return prev.map((it, idx) =>
-          idx === existing ? { ...it, quantity: it.quantity + 1 } : it
-        );
-      }
-      return [
+    if (existingIndex >= 0) {
+      setEditItems((prev) =>
+        prev.map((it, idx) =>
+          idx === existingIndex ? { ...it, quantity: it.quantity + 1 } : it
+        )
+      );
+    } else {
+      setEditItems((prev) => [
         ...prev,
         {
-          product_id: prod.id,
+          product_id: prodId,
           product_name: prod.name,
-          price: Number(prod.price || 0),
+          price: Number(prod.price || prod.piece_price || prod.weight_price || 0),
           quantity: 1,
+          image: prod.image || "/placeholder-image.png",
           tax_rate: prod.tax_rate,
           tax_type: prod.tax_type,
           tax_value: prod.tax_value,
         },
-      ];
-    });
-
-    setSelectedAddProductId("");
+      ]);
+    }
   };
 
   // Save Edit Order
   const handleSaveEdit = async () => {
     if (!editingOrder) return;
     if (editItems.length === 0) {
-      toast.error("يجب أن يحتوي الطلب على منتج واحد على الأقل، أو يمكنك إلغاء الطلب");
+      await Swal.fire({
+        icon: "warning",
+        title: "تنبيه",
+        text: "يجب أن يحتوي الطلب على منتج واحد على الأقل، أو يمكنك إلغاء الطلب",
+        confirmButtonText: "حسناً",
+      });
       return;
     }
 
@@ -272,26 +350,101 @@ export default function CustomerOrders({
       });
 
       const updated = response?.order || response?.data || response;
-      toast.success("تم تحديث الطلب بنجاح");
-
-      setOrders((prev) =>
-        prev.map((o) => (o.id === editingOrder.id ? { ...o, ...updated } : o))
-      );
-
-      if (selectedOrder?.id === editingOrder.id) {
-        setSelectedOrder((prev) => (prev ? { ...prev, ...updated } : null));
-      }
+      await Swal.fire({
+        icon: "success",
+        title: "تم بنجاح",
+        text: "تم تعديل الطلب بنجاح",
+        confirmButtonText: "تم",
+        confirmButtonColor: "#17656b",
+      });
 
       setEditingOrder(null);
-    } catch (err) {
+      await loadOrders();
+    } catch (err: any) {
       console.error("CUSTOMER EDIT ORDER ERROR:", err);
-      toast.error(err instanceof Error ? err.message : "فشل حفظ تعديلات الطلب");
+      const msg = err instanceof Error ? err.message : "تعذر تعديل الطلب";
+      if (msg.includes("تأكيد") || msg.includes("confirmed") || err?.status === 409) {
+        await Swal.fire({
+          icon: "error",
+          title: "تعذر تعديل الطلب",
+          text: "تم تأكيد الطلب ولا يمكن تعديله.",
+          confirmButtonText: "حسناً",
+          confirmButtonColor: "#ef4444",
+        });
+        setEditingOrder(null);
+        await loadOrders();
+      } else {
+        await Swal.fire({
+          icon: "error",
+          title: "حدث خطأ",
+          text: msg || "تعذر تعديل الطلب",
+          confirmButtonText: "حسناً",
+          confirmButtonColor: "#ef4444",
+        });
+      }
     } finally {
       setSavingEdit(false);
     }
   };
 
-  // Computed summary for Edit Modal
+  // Customer Cancellation
+  const handleCancelOrder = async (order: Order) => {
+    if (!isPendingOrder(order.status)) {
+      await Swal.fire({
+        icon: "warning",
+        title: "تنبيه",
+        text: "لا يمكن إلغاء الطلب بعد تأكيده من قِبل الإدارة",
+        confirmButtonText: "حسناً",
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "إلغاء الطلب؟",
+      text: "هل أنت متأكد من إلغاء هذا الطلب؟",
+      showCancelButton: true,
+      confirmButtonText: "نعم، إلغاء الطلب",
+      cancelButtonText: "رجوع",
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#64748b",
+      reverseButtons: true,
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      setCancellingId(order.id);
+      await apiFetch(`/customer/orders/${order.id}/cancel`, {
+        method: "POST",
+      });
+
+      await Swal.fire({
+        icon: "success",
+        title: "تم بنجاح",
+        text: "تم إلغاء الطلب بنجاح",
+        confirmButtonText: "تم",
+        confirmButtonColor: "#17656b",
+      });
+
+      if (selectedOrder?.id === order.id) {
+        setSelectedOrder(null);
+      }
+      await loadOrders();
+    } catch (err: any) {
+      console.error("CUSTOMER CANCEL ERROR:", err);
+      await Swal.fire({
+        icon: "error",
+        title: "حدث خطأ",
+        text: err instanceof Error ? err.message : "تعذر إلغاء الطلب",
+        confirmButtonText: "حسناً",
+      });
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  // Computed summary for Edit Modal preview
   const editSubtotal = editItems.reduce((sum, it) => sum + (it.price * it.quantity), 0);
   const editTax = editItems.reduce((sum, it) => {
     if (it.tax_type === "fixed" && it.tax_value != null) {
@@ -305,6 +458,7 @@ export default function CustomerOrders({
     : null;
   const editTotal = editSubtotal + editTax + (editDeliveryFee || 0);
 
+  // Load Orders from Backend (with Date Filter)
   const loadOrders = async (
     targetDate: DateFilterType = dateFilter,
     fromVal: string = customFrom,
@@ -380,10 +534,10 @@ export default function CustomerOrders({
     return {
       all: orders.length,
       pending: orders.filter(
-        (o) => normalizeStatus(o.status) === "pending"
+        (o) => isPendingOrder(o.status)
       ).length,
       confirmed: orders.filter((o) =>
-        ["confirmed", "assigned"].includes(normalizeStatus(o.status))
+        ["confirmed", "assigned", "preparing"].includes(normalizeStatus(o.status))
       ).length,
       out_for_delivery: orders.filter(
         (o) => normalizeStatus(o.status) === "out_for_delivery"
@@ -397,13 +551,8 @@ export default function CustomerOrders({
     };
   }, [orders]);
 
-  // Handle checkout from navbar
   const handleCheckout = () => {
-    if (cart.length === 0) {
-      // toast.error("السلة فارغة");
-      return;
-    }
-
+    if (cart.length === 0) return;
     onCheckout();
   };
 
@@ -450,14 +599,10 @@ export default function CustomerOrders({
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* ===== DATE FILTER (DEFAULT: TODAY) ===== */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow-sm backdrop-blur-sm">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-bold text-slate-700">الفترة:</span>
+          {/* Date Filter Bar */}
+          <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
+            <span className="text-xs font-black text-slate-500">تصفية التاريخ:</span>
             <div className="relative">
               <select
                 value={dateFilter}
@@ -470,7 +615,7 @@ export default function CustomerOrders({
                 }}
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-800 shadow-sm outline-none transition hover:border-[#17656b] focus:border-[#17656b] focus:ring-2 focus:ring-[#17656b]/20"
               >
-                <option value="today">اليوم (افتراضي)</option>
+                <option value="today">اليوم</option>
                 <option value="yesterday">أمس</option>
                 <option value="two_days_ago">أول أمس</option>
                 <option value="last_7_days">آخر 7 أيام</option>
@@ -487,7 +632,7 @@ export default function CustomerOrders({
                     type="date"
                     value={customFrom}
                     onChange={(e) => setCustomFrom(e.target.value)}
-                    className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-[#17656b]"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-[#17656b]"
                   />
                 </div>
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
@@ -496,230 +641,176 @@ export default function CustomerOrders({
                     type="date"
                     value={customTo}
                     onChange={(e) => setCustomTo(e.target.value)}
-                    className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-[#17656b]"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-[#17656b]"
                   />
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (customFrom && customTo && customFrom > customTo) {
-                      toast.error("تاريخ البداية لا يمكن أن يكون بعد تاريخ النهاية");
-                      return;
-                    }
-                    void loadOrders("custom", customFrom, customTo);
-                  }}
-                  className="rounded-xl bg-[#17656b] px-4 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#0f4a4f]"
+                  onClick={() => void loadOrders("custom", customFrom, customTo)}
+                  className="rounded-xl bg-[#17656b] px-3.5 py-1.5 text-xs font-black text-white shadow-sm transition hover:bg-[#0e4347]"
                 >
-                  بحث
+                  تطبيق
                 </button>
               </div>
             )}
           </div>
 
-          <div className="text-xs font-bold text-[#17656b]">
-            {orders.length > 0 ? `${orders.length} طلب في هذه الفترة` : "لا توجد طلبات في هذه الفترة"}
-          </div>
-        </div>
-
-        {/* ===== FILTERS ===== */}
-        <div className="mb-6 overflow-x-auto">
-          <div className="flex min-w-max gap-1.5 rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-sm backdrop-blur-sm">
+          {/* Filter Tabs */}
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-2 scrollbar-none">
             {[
-              ["all", "كل الطلبات", counts.all],
-              ["pending", "في الانتظار", counts.pending],
-              ["confirmed", "مؤكدة", counts.confirmed],
-              ["out_for_delivery", "قيد التوصيل", counts.out_for_delivery],
-              ["delivered", "تم التوصيل", counts.delivered],
-              ["cancelled", "ملغاة", counts.cancelled],
-            ].map(([key, label, count]) => (
+              { id: "all", label: "الكل", count: counts.all },
+              { id: "pending", label: "في الانتظار", count: counts.pending },
+              { id: "confirmed", label: "تم التأكيد", count: counts.confirmed },
+              { id: "out_for_delivery", label: "قيد التوصيل", count: counts.out_for_delivery },
+              { id: "delivered", label: "تم التوصيل", count: counts.delivered },
+              { id: "cancelled", label: "ملغي", count: counts.cancelled },
+            ].map((tab) => (
               <button
-                key={key}
+                key={tab.id}
                 type="button"
-                onClick={() => setFilter(key as Filter)}
-                className={`rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 ${
-                  filter === key
-                    ? "bg-[#17656b] text-white shadow-md shadow-[#17656b]/20 scale-[1.02]"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                onClick={() => setFilter(tab.id as Filter)}
+                className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-bold whitespace-nowrap transition ${
+                  filter === tab.id
+                    ? "bg-[#17656b] text-white shadow-lg shadow-[#17656b]/20"
+                    : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200/80"
                 }`}
               >
-                {label}
+                <span>{tab.label}</span>
                 <span
-                  className={`mr-2 rounded-full px-2 py-0.5 text-xs ${
-                    filter === key
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
+                    filter === tab.id
                       ? "bg-white/20 text-white"
-                      : "bg-slate-100 text-slate-500"
+                      : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {count}
+                  {tab.count}
                 </span>
               </button>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* ===== LOADING ===== */}
-        {loading && (
-          <div className="flex min-h-[400px] items-center justify-center rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-sm">
-            <div className="text-center">
-              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-[#17656b]" />
-              <p className="mt-4 text-sm font-bold text-slate-500">
-                جاري تحميل طلباتك...
-              </p>
-            </div>
+      {/* ===== MAIN CONTENT ===== */}
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#17656b] border-t-transparent" />
+            <p className="mt-4 text-sm font-bold text-slate-500">جاري تحميل الطلبات...</p>
           </div>
-        )}
-
-        {/* ===== ERROR ===== */}
-        {!loading && error && (
-          <div className="rounded-3xl border border-red-200/80 bg-red-50/80 p-10 text-center backdrop-blur-sm">
-            <div className="text-5xl">⚠️</div>
-            <h2 className="mt-4 text-xl font-black text-red-800">
-              حصلت مشكلة
-            </h2>
-            <p className="mt-2 text-sm font-medium text-red-600">
-              {error}
-            </p>
-
+        ) : error ? (
+          <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-8 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-2xl text-rose-600">
+              ⚠️
+            </div>
+            <h3 className="mt-4 text-lg font-black text-rose-900">تعذر تحميل الطلبات</h3>
+            <p className="mt-1 text-sm text-rose-600">{error}</p>
             <button
               type="button"
               onClick={() => void loadOrders()}
-              className="mt-6 rounded-xl bg-red-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500"
+              className="mt-4 rounded-2xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-rose-700"
             >
-              حاول مرة أخرى
+              إعادة المحاولة
             </button>
           </div>
-        )}
-
-        {/* ===== EMPTY ===== */}
-        {!loading && !error && filteredOrders.length === 0 && (
-          <div className="rounded-3xl border border-slate-200/80 bg-white/80 px-6 py-16 text-center shadow-sm backdrop-blur-sm">
-            <div className="text-7xl">📦</div>
-
-            <h2 className="mt-5 text-2xl font-black text-slate-800">
-              لا توجد طلبات في هذه الفترة.
-            </h2>
-
-            <p className="mt-2 text-sm font-medium text-slate-500">
+        ) : filteredOrders.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-3xl">
+              📦
+            </div>
+            <h3 className="mt-4 text-lg font-black text-slate-900">لا توجد طلبات</h3>
+            <p className="mt-1 text-sm text-slate-500">
               {filter === "all"
-                ? "ابدأ التسوق واعمل أول طلب ليك."
-                : "جرب اختيار حالة طلب مختلفة."}
+                ? "لم تقم بأي طلبات بعد، تصفح منتجاتنا وابدأ بالتسوق الآن!"
+                : "لا توجد طلبات مطابقة لهذا الفلتر"}
             </p>
-
-            {filter === "all" && (
-              <Link
-                to="/products"
-                className="mt-6 inline-flex rounded-xl bg-[#17656b] px-8 py-3.5 text-sm font-black text-white shadow-lg shadow-[#17656b]/30 transition hover:bg-[#0f4a4f] hover:scale-[1.02]"
-              >
-                تصفح المنتجات
-              </Link>
-            )}
+            <Link
+              to="/"
+              className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#17656b] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#17656b]/20 transition hover:bg-[#0e4347]"
+            >
+              <span>🛍️</span> ابدأ التسوق الآن
+            </Link>
           </div>
-        )}
-
-        {/* ===== ORDERS GRID ===== */}
-        {!loading && !error && filteredOrders.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        ) : (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredOrders.map((order) => {
               const status = normalizeStatus(order.status);
-              const config =
-                statusConfig[status] || statusConfig.pending;
+              const badge = statusConfig[status] || statusConfig.pending;
               const items = getItems(order);
+              const isOrderPending = isPendingOrder(order.status);
 
               return (
                 <article
                   key={order.id}
-                  className="group overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                  className="flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm transition hover:shadow-xl hover:border-[#17656b]/30"
                 >
-                  <div className="border-b border-slate-100/80 p-5">
-                    <div className="flex items-start justify-between gap-3">
+                  <div className="p-6">
+                    {/* Header: ID + Status */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                       <div>
-                        <p className="text-xs font-bold text-slate-400">
-                          رقم الطلب
-                        </p>
-                        <h2 className="mt-1 text-lg font-black text-slate-900">
-                          #{order.id}
-                        </h2>
+                        <span className="text-xs font-bold text-slate-400">رقم الطلب</span>
+                        <h2 className="text-lg font-black text-slate-900">#{order.id}</h2>
                       </div>
 
                       <span
-                        className={`rounded-full border px-3 py-1.5 text-xs font-black ${config.className}`}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black ${badge.className}`}
                       >
-                        {config.icon} {config.label}
+                        <span>{badge.icon}</span>
+                        <span>{badge.label}</span>
                       </span>
                     </div>
 
-                    <p className="mt-3 text-xs font-medium text-slate-400">
-                      {formatDate(order.created_at)}
-                    </p>
-                  </div>
-
-                  <div className="space-y-3 p-5">
-                    {items.slice(0, 3).map((item, index) => (
-                      <div
-                        key={item.id ?? `${order.id}-${index}`}
-                        className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50/80 px-4 py-3 transition group-hover:bg-slate-100/80"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-slate-800">
-                            {item.product_name || item.name || "منتج"}
-                          </p>
-                          <p className="mt-1 text-xs font-semibold text-slate-400">
-                            الكمية: {item.quantity || 1}
-                          </p>
-                        </div>
-
-                        <span className="shrink-0 text-sm font-black text-[#17656b]">
-                          {(Number(item.price || 0) * Number(item.quantity || 1)).toFixed(2)}{" "}
-                          ج.م
-                        </span>
-                      </div>
-                    ))}
-
-                    {items.length > 3 && (
-                      <p className="text-center text-xs font-bold text-slate-400">
-                        + {items.length - 3} منتجات أخرى
-                      </p>
-                    )}
-
-                    <div className="border-t border-slate-100/80 pt-3 space-y-1.5 text-xs">
-                      {order.subtotal !== null && order.subtotal !== undefined && (
-                        <div className="flex items-center justify-between text-slate-500 font-bold">
-                          <span>المجموع الفرعي:</span>
-                          <span>{Number(order.subtotal).toFixed(2)} ج.م</span>
-                        </div>
-                      )}
-                      {Number(order.tax || 0) > 0 && (
-                        <div className="flex items-center justify-between text-slate-500 font-bold">
-                          <span>الضريبة:</span>
-                          <span>{Number(order.tax).toFixed(2)} ج.م</span>
-                        </div>
-                      )}
+                    {/* Meta info */}
+                    <div className="mt-4 space-y-2 text-xs font-semibold text-slate-500">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-500">التوصيل:</span>
-                        {order.delivery_status === "calculated" && order.delivery_fee != null ? (
-                          <span className="font-black text-emerald-700">
-                            {Number(order.delivery_fee).toFixed(2)} ج.م
-                          </span>
-                        ) : (
-                          <span className="font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 text-[11px]">
-                            ⏳ جاري تحديد مصاريف التوصيل
-                          </span>
-                        )}
+                        <span>📅 تاريخ الطلب</span>
+                        <span className="font-bold text-slate-700">{formatDate(order.created_at)}</span>
                       </div>
-
-                      <div className="flex items-center justify-between border-t border-slate-100/80 pt-2">
-                        <span className="text-sm font-bold text-slate-600">
-                          {order.delivery_status === "calculated" && order.delivery_fee != null
-                            ? "الإجمالي النهائي"
-                            : "الإجمالي قبل التوصيل"}
-                        </span>
-                        <span className="text-xl font-black text-[#17656b]">
-                          {getTotal(order).toFixed(2)} ج.م
+                      <div className="flex items-center justify-between">
+                        <span>💳 طريقة الدفع</span>
+                        <span className="font-bold text-slate-700">
+                          {order.payment_method === "electronic" || order.payment_method === "bank_transfer"
+                            ? "تحويل بنكي / إلكتروني"
+                            : "دفع عند الاستلام"}
                         </span>
                       </div>
                     </div>
+
+                    {/* Order Items Preview */}
+                    <div className="mt-4 border-t border-slate-100 pt-4">
+                      <h3 className="mb-2 text-xs font-bold text-slate-400">
+                        المنتجات ({items.length})
+                      </h3>
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                        {items.slice(0, 3).map((item, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between text-xs font-bold text-slate-700"
+                          >
+                            <span className="truncate max-w-[160px]">
+                              {item.product_name || item.name || "منتج"}
+                            </span>
+                            <span className="text-slate-400">×{item.quantity || 1}</span>
+                          </div>
+                        ))}
+                        {items.length > 3 && (
+                          <p className="text-[11px] font-bold text-[#17656b]">
+                            +{items.length - 3} منتجات أخرى...
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Total */}
+                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+                      <span className="text-sm font-black text-slate-900">الإجمالي:</span>
+                      <span className="text-lg font-black text-[#17656b]">
+                        {getTotal(order).toFixed(2)} ج
+                      </span>
+                    </div>
                   </div>
 
+                  {/* Actions */}
                   <div className="border-t border-slate-100/80 p-5 space-y-2">
                     <button
                       type="button"
@@ -729,7 +820,7 @@ export default function CustomerOrders({
                       عرض تفاصيل الطلب
                     </button>
 
-                    {status === "pending" || status === "pending_approval" ? (
+                    {isOrderPending ? (
                       <div className="flex items-center gap-2 pt-1">
                         <button
                           type="button"
@@ -764,184 +855,116 @@ export default function CustomerOrders({
         )}
       </main>
 
-      {/* ===== DETAILS MODAL ===== */}
+      {/* ==================================================== */}
+      {/* ===== ORDER DETAILS MODAL ===== */}
+      {/* ==================================================== */}
       {selectedOrder && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-md"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setSelectedOrder(null);
-          }}
-        >
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl animate-in fade-in zoom-in duration-200">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100/80 bg-white/95 px-6 py-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
-                <p className="text-xs font-bold text-slate-400">
-                  تفاصيل الطلب
-                </p>
-                <h2 className="mt-1 text-xl font-black text-slate-900">
-                  #{selectedOrder.id}
-                </h2>
+                <span className="text-xs font-bold text-slate-400">تفاصيل الطلب</span>
+                <h2 className="text-xl font-black text-slate-900">#{selectedOrder.id}</h2>
               </div>
-
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xl text-slate-600 transition hover:bg-slate-200 hover:scale-105"
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200"
               >
-                ×
+                ✕
               </button>
             </div>
 
-            <div className="space-y-6 p-6">
-              {/* status + meta */}
-              <div className="rounded-2xl border border-slate-100/80 bg-slate-50/80 p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-bold text-slate-500">
-                    حالة الطلب
+            <div className="mt-6 space-y-6">
+              {/* Order Status Badge */}
+              <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+                <span className="text-sm font-bold text-slate-500">حالة الطلب:</span>
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black ${
+                    (statusConfig[normalizeStatus(selectedOrder.status)] || statusConfig.pending).className
+                  }`}
+                >
+                  <span>
+                    {(statusConfig[normalizeStatus(selectedOrder.status)] || statusConfig.pending).icon}
                   </span>
-
-                  {(() => {
-                    const status = normalizeStatus(selectedOrder.status);
-                    const config =
-                      statusConfig[status] || statusConfig.pending;
-
-                    return (
-                      <span
-                        className={`rounded-full border px-3 py-1.5 text-xs font-black ${config.className}`}
-                      >
-                        {config.icon} {config.label}
-                      </span>
-                    );
-                  })()}
-                </div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-white p-4 shadow-sm">
-                    <p className="text-xs font-bold text-slate-400">
-                      تاريخ الطلب
-                    </p>
-                    <p className="mt-1 text-sm font-black text-slate-700">
-                      {formatDate(selectedOrder.created_at)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-white p-4 shadow-sm">
-                    <p className="text-xs font-bold text-slate-400">
-                      طريقة الدفع
-                    </p>
-                    <p className="mt-1 text-sm font-black text-slate-700">
-                      {selectedOrder.payment_method || "غير محددة"}
-                    </p>
-                  </div>
-                </div>
+                  <span>
+                    {(statusConfig[normalizeStatus(selectedOrder.status)] || statusConfig.pending).label}
+                  </span>
+                </span>
               </div>
 
-              {/* products */}
+              {/* Products List */}
               <div>
-                <h3 className="mb-3 text-base font-black text-slate-800">
-                  🛍️ المنتجات
-                </h3>
-
-                <div className="space-y-2">
+                <h3 className="mb-3 text-base font-black text-slate-800">📦 المنتجات المطلوبة</h3>
+                <div className="space-y-3">
                   {getItems(selectedOrder).map((item, index) => (
                     <div
-                      key={item.id ?? index}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100/80 px-4 py-3 transition hover:bg-slate-50/80"
+                      key={index}
+                      className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-3"
                     >
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">
-                          {item.product_name || item.name || "منتج"}
-                        </p>
-                        <p className="mt-1 text-xs font-semibold text-slate-400">
-                          {Number(item.price || 0).toFixed(2)} ج.م ×{" "}
-                          {item.quantity || 1}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-slate-200 text-base">
+                          🛍️
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800">
+                            {item.product_name || item.name || "منتج"}
+                          </h4>
+                          <span className="text-xs text-slate-400">
+                            الكمية: {item.quantity || 1}
+                          </span>
+                        </div>
                       </div>
-
-                      <p className="text-sm font-black text-[#17656b]">
-                        {(
-                          Number(item.price || 0) *
-                          Number(item.quantity || 1)
-                        ).toFixed(2)}{" "}
-                        ج.م
-                      </p>
+                      <span className="text-sm font-black text-[#17656b]">
+                        {Number(item.price || 0) * Number(item.quantity || 1)} ج
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Financial Breakdown */}
-              <div className="rounded-2xl border border-[#17656b]/15 bg-[#17656b]/5 p-5 space-y-2.5 text-sm">
-                <h4 className="font-black text-slate-800 mb-2 border-b border-[#17656b]/10 pb-2">
-                  💵 ملخص الحساب
-                </h4>
-
-                <div className="flex items-center justify-between font-bold text-slate-600">
-                  <span>المجموع الفرعي (المنتجات):</span>
-                  <span className="text-slate-900 font-black">
-                    {(selectedOrder.subtotal !== null && selectedOrder.subtotal !== undefined
-                      ? Number(selectedOrder.subtotal)
-                      : getTotal(selectedOrder) - Number(selectedOrder.tax || 0)
-                    ).toFixed(2)} ج.م
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between font-bold text-slate-600">
-                  <span>ضريبة القيمة المضافة (Tax):</span>
-                  <span className="text-slate-900 font-black">
-                    {Number(selectedOrder.tax || 0).toFixed(2)} ج.م
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between font-bold">
-                  <span className="text-slate-600">مصاريف التوصيل:</span>
-                  {selectedOrder.delivery_status === "calculated" && selectedOrder.delivery_fee != null ? (
-                    <span className="font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg">
-                      {Number(selectedOrder.delivery_fee).toFixed(2)} ج.م
-                    </span>
-                  ) : (
-                    <span className="font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg text-xs">
-                      ⏳ جاري تحديد مصاريف التوصيل بواسطة الإدارة
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-[#17656b]/15">
-                  <span className="text-base font-black text-slate-800">
-                    {selectedOrder.delivery_status === "calculated" && selectedOrder.delivery_fee != null
-                      ? "الإجمالي النهائي"
-                      : "المجموع قبل مصاريف التوصيل"}
-                  </span>
-                  <span className="text-2xl font-black text-[#17656b]">
-                    {getTotal(selectedOrder).toFixed(2)} ج.م
-                  </span>
-                </div>
-
-                {!(selectedOrder.delivery_status === "calculated" && selectedOrder.delivery_fee != null) && (
-                  <p className="text-[11px] font-semibold text-amber-700 bg-amber-50/80 p-2.5 rounded-xl border border-amber-100">
-                    ℹ️ يتم تحديد مصاريف التوصيل بواسطة إدارة المتجر بناءً على عنوانك ومسافة التوصيل، وسيتم تحديث الإجمالي النهائي فور تحديدها.
-                  </p>
+              {/* Price Breakdown */}
+              <div className="rounded-2xl border border-slate-200/60 bg-slate-50/80 p-4 space-y-2 text-xs font-bold">
+                {selectedOrder.subtotal != null && (
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>المجموع الفرعي:</span>
+                    <span>{Number(selectedOrder.subtotal).toFixed(2)} ج</span>
+                  </div>
                 )}
+                {selectedOrder.tax != null && (
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>الضريبة:</span>
+                    <span>{Number(selectedOrder.tax).toFixed(2)} ج</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>رسوم التوصيل:</span>
+                  <span>
+                    {selectedOrder.delivery_status === "calculated" && selectedOrder.delivery_fee != null
+                      ? `${selectedOrder.delivery_fee} ج`
+                      : "يتم تحديدها من الإدارة"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-black text-[#17656b]">
+                  <span>الإجمالي الكلي:</span>
+                  <span>{getTotal(selectedOrder).toFixed(2)} ج</span>
+                </div>
               </div>
 
-              {/* address */}
+              {/* Address info */}
               {selectedOrder.address && (
                 <div>
-                  <h3 className="mb-2 text-base font-black text-slate-800">
-                    📍 عنوان التوصيل
-                  </h3>
+                  <h3 className="mb-2 text-base font-black text-slate-800">📍 عنوان التوصيل</h3>
                   <div className="rounded-2xl border border-slate-100/80 bg-slate-50/80 p-4 text-sm font-semibold text-slate-600">
                     {selectedOrder.address}
                   </div>
                 </div>
               )}
 
-              {/* notes */}
+              {/* Notes */}
               {selectedOrder.notes && (
                 <div>
-                  <h3 className="mb-2 text-base font-black text-slate-800">
-                    📝 ملاحظات
-                  </h3>
+                  <h3 className="mb-2 text-base font-black text-slate-800">📝 ملاحظات</h3>
                   <div className="rounded-2xl border border-slate-100/80 bg-slate-50/80 p-4 text-sm font-semibold text-slate-600">
                     {selectedOrder.notes}
                   </div>
@@ -950,7 +973,7 @@ export default function CustomerOrders({
 
               {/* Order Actions / Lifecycle Notices in Details Modal */}
               <div className="border-t border-slate-100 pt-4">
-                {normalizeStatus(selectedOrder.status) === "pending" || normalizeStatus(selectedOrder.status) === "pending_approval" ? (
+                {isPendingOrder(selectedOrder.status) ? (
                   <div className="flex flex-col sm:flex-row items-center gap-3">
                     <button
                       type="button"
@@ -979,6 +1002,255 @@ export default function CustomerOrders({
                     لا يمكن تعديل الطلب بعد تأكيد الطلب.
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* ===== EDIT ORDER MODAL (تعديل الطلب) ===== */}
+      {/* ==================================================== */}
+      {editingOrder && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl transition-all my-8 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-5">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                  <span>✏️</span> تعديل الطلب
+                </h2>
+                <p className="text-xs font-bold text-slate-500 mt-0.5">
+                  طلب رقم #{editingOrder.id} • قم بتعديل الكميات أو إضافة وحذف المنتجات
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingOrder(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm border border-slate-200 hover:text-slate-700 hover:border-slate-300 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Order Items List */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
+                    <span>📦</span> محتويات الطلب ({editItems.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddProductSection((prev) => !prev)}
+                    className="inline-flex items-center gap-1 text-xs font-black text-[#17656b] hover:text-[#0e4347] bg-[#17656b]/10 hover:bg-[#17656b]/20 px-3 py-1.5 rounded-xl transition"
+                  >
+                    <span>{showAddProductSection ? "✕ إخفاء القائمة" : "+ إضافة منتجات"}</span>
+                  </button>
+                </div>
+
+                {editItems.length === 0 ? (
+                  <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center">
+                    <p className="text-sm font-bold text-slate-500">تم حذف جميع المنتجات من الطلب</p>
+                    <p className="text-xs text-slate-400 mt-1">أضف منتجات جديدة أو قم بحفظ التعديلات لإلغاء الطلب</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {editItems.map((item) => (
+                      <div
+                        key={item.product_id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 transition hover:bg-slate-50"
+                      >
+                        {/* Product Info */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <img
+                            src={item.image || "/placeholder-image.png"}
+                            alt={item.product_name}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "/placeholder-image.png";
+                            }}
+                            className="h-16 w-16 rounded-xl border border-slate-200 bg-white object-cover flex-shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-black text-slate-900 truncate">
+                              {item.product_name}
+                            </h4>
+                            <p className="text-xs font-bold text-[#17656b] mt-0.5">
+                              السعر: {item.price} ج
+                            </p>
+                            <p className="text-[11px] font-medium text-slate-400">
+                              الإجمالي: {(item.price * item.quantity).toFixed(2)} ج
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Controls: [-] quantity [+] & [حذف] */}
+                        <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60">
+                          {/* Quantity Controls */}
+                          <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 py-1 shadow-sm">
+                            <button
+                              type="button"
+                              onClick={() => void handleQuantityChange(item.product_id, -1)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-700 hover:bg-slate-200 active:scale-95 transition"
+                            >
+                              -
+                            </button>
+                            <span className="w-8 text-center text-sm font-black text-slate-900">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void handleQuantityChange(item.product_id, 1)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-700 hover:bg-slate-200 active:scale-95 transition"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {/* Remove Button */}
+                          <button
+                            type="button"
+                            onClick={() => void handleRemoveItem(item.product_id)}
+                            className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600 hover:bg-rose-100 active:scale-95 transition shadow-sm"
+                          >
+                            حذف
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Add Product Section (Inline catalog browse & search) */}
+              {showAddProductSection && (
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-black text-indigo-950 flex items-center gap-1.5">
+                      <span>🛍️</span> إضافة منتجات من المتجر
+                    </h4>
+                    <span className="text-[11px] font-bold text-indigo-700">
+                      اختر المنتج لإضافته مباشرةً
+                    </span>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      placeholder="ابحث عن منتج بالاسم..."
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none focus:border-[#17656b] focus:ring-2 focus:ring-[#17656b]/20"
+                    />
+                  </div>
+
+                  {/* Filtered Catalog List */}
+                  <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                    {catalogProducts
+                      .filter((p) =>
+                        !productSearchQuery
+                          ? true
+                          : String(p.name || "")
+                              .toLowerCase()
+                              .includes(productSearchQuery.toLowerCase())
+                      )
+                      .slice(0, 15)
+                      .map((prod) => {
+                        const inOrder = editItems.some((it) => it.product_id === Number(prod.id));
+                        return (
+                          <div
+                            key={prod.id}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-sm transition hover:border-indigo-300"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <img
+                                src={prod.image || "/placeholder-image.png"}
+                                alt={prod.name}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "/placeholder-image.png";
+                                }}
+                                className="h-10 w-10 rounded-lg border border-slate-100 object-cover flex-shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-slate-900 truncate">
+                                  {prod.name}
+                                </p>
+                                <p className="text-[11px] font-bold text-[#17656b]">
+                                  {prod.price || prod.piece_price || prod.weight_price || 0} ج
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAddProduct(prod)}
+                              className={`rounded-xl px-3 py-1.5 text-xs font-black transition active:scale-95 shadow-sm ${
+                                inOrder
+                                  ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                                  : "bg-[#17656b] text-white hover:bg-[#0e4347]"
+                              }`}
+                            >
+                              {inOrder ? "+ زيادة الكمية" : "+ إضافة للطلب"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer (Summary & Action Buttons) */}
+            <div className="border-t border-slate-200/80 bg-slate-50/90 p-5">
+              {/* Summary Totals */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 rounded-2xl bg-white p-3 border border-slate-200/60 shadow-sm text-center">
+                <div>
+                  <p className="text-[11px] font-bold text-slate-400">المجموع الفرعي</p>
+                  <p className="text-sm font-black text-slate-800">{editSubtotal.toFixed(2)} ج</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-slate-400">الضريبة التقديرية</p>
+                  <p className="text-sm font-black text-slate-800">{editTax.toFixed(2)} ج</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-slate-400">رسوم التوصيل</p>
+                  <p className="text-sm font-black text-slate-800">
+                    {editDeliveryFee != null ? `${editDeliveryFee} ج` : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-slate-400">الإجمالي التقديري</p>
+                  <p className="text-base font-black text-[#17656b]">{editTotal.toFixed(2)} ج</p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col-reverse sm:flex-row items-center gap-3">
+                <button
+                  type="button"
+                  disabled={savingEdit}
+                  onClick={() => setEditingOrder(null)}
+                  className="w-full sm:flex-1 rounded-2xl border-2 border-slate-200 bg-white py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  disabled={savingEdit || editItems.length === 0}
+                  onClick={() => void handleSaveEdit()}
+                  className="w-full sm:flex-1 rounded-2xl bg-[#17656b] py-3 text-sm font-black text-white shadow-lg shadow-[#17656b]/20 transition hover:bg-[#0e4347] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {savingEdit ? (
+                    <>
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      جاري حفظ التعديلات...
+                    </>
+                  ) : (
+                    "✓ حفظ التعديلات"
+                  )}
+                </button>
               </div>
             </div>
           </div>

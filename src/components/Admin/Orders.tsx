@@ -3,7 +3,7 @@ import toast from "react-hot-toast"
 import { apiFetch } from "../../services/api"
 import { supabase } from "../../lib/supabase"
 import { OrderCard, OrderDetailsModal } from "../UI"
-import { confirmDelete } from "../../utils/alerts"
+import { confirmDelete, confirmAction, showSuccess, showError, showWarning } from "../../utils/alerts"
 
 import type {
   Order as OrderCardOrder,
@@ -604,13 +604,15 @@ const buildDeliveryWhatsAppMessage = (
     const order = orders.find((item) => item.id === orderId)
 
     if (!order) {
-      toast.error("الطلب غير موجود")
+      await showError("الطلب غير موجود")
       return
     }
 
-    if (order.status === "cancelled") {
-      const confirmed = window.confirm(
-        "هل أنت متأكد من حذف الطلب الملغي نهائياً؟ لا يمكن التراجع عن هذا الإجراء."
+    if (order.status === "cancelled" || order.status === "delivered") {
+      const confirmed = await confirmDelete(
+        "هل أنت متأكد؟",
+        "سيتم حذف الطلب نهائياً ولا يمكن التراجع عن هذا الإجراء.",
+        "حذف نهائياً"
       )
       if (!confirmed) return
 
@@ -629,19 +631,22 @@ const buildDeliveryWhatsAppMessage = (
           setOrderModalOpen(false)
         }
 
-        toast.success(`تم حذف الطلب الملغي #${orderId} نهائياً بنجاح`)
+        await showSuccess("تم بنجاح", `تم حذف الطلب #${orderId} نهائياً بنجاح`)
       } catch (error) {
-        console.error("DELETE CANCELLED ORDER ERROR:", error)
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "حدث خطأ أثناء حذف الطلب"
+        console.error("DELETE ORDER ERROR:", error)
+        await showError(
+          "تعذر حذف الطلب",
+          error instanceof Error ? error.message : "حدث خطأ أثناء حذف الطلب"
         )
       } finally {
         setCancellingOrder(null)
       }
     } else if (order.status === "pending" || order.status === "pending_approval") {
-      const confirmed = window.confirm(`هل أنت متأكد من إلغاء الطلب #${order.id}؟`)
+      const confirmed = await confirmAction(
+        "إلغاء الطلب؟",
+        `هل أنت متأكد من إلغاء الطلب #${order.id}؟`,
+        { confirmText: "نعم، إلغاء الطلب", cancelText: "رجوع", icon: "warning", confirmColor: "#ef4444" }
+      )
       if (!confirmed) return
 
       try {
@@ -661,19 +666,18 @@ const buildDeliveryWhatsAppMessage = (
           setSelectedOrder((prev) => (prev ? { ...prev, ...updated, status: "cancelled" } : null))
         }
 
-        toast.success(`تم إلغاء الطلب #${orderId} بنجاح`)
+        await showSuccess("تم بنجاح", `تم إلغاء الطلب #${orderId} بنجاح`)
       } catch (error) {
         console.error("ADMIN CANCEL ORDER ERROR:", error)
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "حدث خطأ أثناء إلغاء الطلب"
+        await showError(
+          "حدث خطأ",
+          error instanceof Error ? error.message : "حدث خطأ أثناء إلغاء الطلب"
         )
       } finally {
         setCancellingOrder(null)
       }
     } else {
-      toast.error("يمكن حذف الطلبات الملغاة فقط نهائياً.")
+      await showError("غير مسموح", "لا يمكن حذف الطلب في حالته الحالية.")
     }
   }
 

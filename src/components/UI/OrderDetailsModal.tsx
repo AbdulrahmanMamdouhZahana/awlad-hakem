@@ -835,8 +835,8 @@ const OrderDetailsModal = ({
             </a>
           </section>
         )}
-        {/* Cancelled Order Deletion Action */}
-        {activeOrder.status === "cancelled" && onCancel && (
+        {/* Cancelled or Delivered Order Deletion Action */}
+        {(activeOrder.status === "cancelled" || activeOrder.status === "delivered") && onCancel && (
           <div className="pt-4 border-t border-slate-100">
             <button
               type="button"
@@ -844,7 +844,7 @@ const OrderDetailsModal = ({
               onClick={() => onCancel(activeOrder.id)}
               className="w-full rounded-2xl bg-red-600 px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500 disabled:opacity-50"
             >
-              {cancelling ? "جاري الحذف..." : "🗑 حذف الطلب الملغي نهائياً"}
+              {cancelling ? "جاري الحذف..." : "🗑 حذف الطلب نهائياً"}
             </button>
           </div>
         )}

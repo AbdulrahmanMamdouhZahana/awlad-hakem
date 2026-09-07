@@ -3,7 +3,7 @@ import toast from "react-hot-toast"
 import { supabase } from "../lib/supabase"
 import { useOutletContext } from "react-router-dom"
 import { apiFetch } from "../services/api"
-import { confirmDelete } from "../utils/alerts"
+import Swal, { confirmDelete, confirmAction, showSuccess, showError } from "../utils/alerts"
 
 // =====================================================
 // Types
@@ -328,19 +328,27 @@ export default function DeliveryDashboard() {
           end_time: "—",
           duration_text: "قيد العمل",
         })
-        toast.success(res.message || "أهلاً بك! تم تسجيل الحضور وأصبحت متاحاً الآن 🟢")
+        await showSuccess(
+          "تم تسجيل الحضور بنجاح",
+          res.message || "أهلاً بك! تم تسجيل الحضور وأصبحت متاحاً الآن 🟢"
+        )
         void loadHistory()
       }
     } catch (err) {
       console.error("CHECK IN ERROR:", err)
-      toast.error(err instanceof Error ? err.message : "فشل تسجيل الحضور")
+      await showError("فشل تسجيل الحضور", err instanceof Error ? err.message : "حدث خطأ أثناء تسجيل الحضور")
     } finally {
       setAttendanceLoading(false)
     }
   }
 
   const handleCheckOut = async () => {
-    if (!window.confirm("هل أنت متأكد من تسجيل الانصراف وإنهاء الوردية؟")) {
+    const confirmed = await confirmAction(
+      "تسجيل الانصراف؟",
+      "هل أنت متأكد من تسجيل الانصراف وإنهاء الوردية؟",
+      { confirmText: "نعم، تسجيل الانصراف", cancelText: "رجوع", icon: "warning", confirmColor: "#e11d48" }
+    )
+    if (!confirmed) {
       return
     }
     try {
@@ -359,14 +367,15 @@ export default function DeliveryDashboard() {
           end_time: res.attendance.ended_time || formatTimeOnly(res.attendance.ended_at),
           duration_text: res.attendance.duration_text || `${res.attendance.duration_minutes || 0} دقيقة`,
         })
-        toast.success(
-          `تم تسجيل الانصراف بنجاح. مدة العمل: ${res.attendance.duration_text || ""}`
+        await showSuccess(
+          "تم تسجيل الانصراف بنجاح",
+          `شكراً لجهودك! مدة العمل المسجلة: ${res.attendance.duration_text || `${res.attendance.duration_minutes || 0} دقيقة`}`
         )
         void loadHistory()
       }
     } catch (err) {
       console.error("CHECK OUT ERROR:", err)
-      toast.error(err instanceof Error ? err.message : "فشل تسجيل الانصراف")
+      await showError("فشل تسجيل الانصراف", err instanceof Error ? err.message : "حدث خطأ أثناء تسجيل الانصراف")
     } finally {
       setAttendanceLoading(false)
     }
