@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import ProductCard from "../components/Products"
+import { HeartIcon } from "@heroicons/react/24/solid"
 
 interface iProducts {
   id: number
@@ -133,8 +134,10 @@ const Favorites = ({
               لا توجد منتجات في المفضلة
             </h2>
 
-            <p className="mt-2 text-sm text-slate-500">
-              اضغط على ❤️ بجانب أي منتج لإضافته هنا
+            <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-slate-500">
+              اضغط على
+              <HeartIcon className="h-4 w-4 text-rose-500 inline" />
+              بجانب أي منتج لإضافته هنا
             </p>
 
             <Link

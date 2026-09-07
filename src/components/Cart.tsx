@@ -1,4 +1,10 @@
 import { Link } from "react-router-dom"
+import {
+  XMarkIcon,
+  PlusIcon,
+  MinusIcon,
+  ChevronLeftIcon,
+} from "@heroicons/react/24/outline"
 
 interface iProducts {
   id: number
@@ -113,7 +119,7 @@ const Cart = ({
             "
             aria-label="إغلاق"
           >
-            ✕
+            <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
@@ -331,7 +337,7 @@ const Cart = ({
             "
             aria-label="إغلاق السلة"
           >
-            ✕
+            <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
@@ -505,7 +511,7 @@ const Cart = ({
                               className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-md bg-white text-xs font-bold text-slate-600 shadow-sm transition hover:bg-slate-100 active:scale-95"
                               aria-label="تقليل الكمية"
                             >
-                              −
+                              <MinusIcon className="h-3 w-3" />
                             </button>
 
                             <span
@@ -528,7 +534,7 @@ const Cart = ({
                               className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-md bg-white text-xs font-bold text-slate-600 shadow-sm transition hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white active:scale-95"
                               aria-label="زيادة الكمية"
                             >
-                              +
+                              <PlusIcon className="h-3 w-3" />
                             </button>
                           </div>
                         ) : (
@@ -539,7 +545,7 @@ const Cart = ({
                               className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-md bg-white text-xs font-bold text-slate-600 shadow-sm transition hover:bg-slate-100 active:scale-95"
                               aria-label="تقليل الكمية"
                             >
-                              −
+                              <MinusIcon className="h-3 w-3" />
                             </button>
 
                             <span className="min-w-[28px] px-1 text-center text-xs font-bold text-slate-800">
@@ -553,7 +559,7 @@ const Cart = ({
                               className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-md bg-white text-xs font-bold text-slate-600 shadow-sm transition hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white active:scale-95"
                               aria-label="زيادة الكمية"
                             >
-                              +
+                              <PlusIcon className="h-3 w-3" />
                             </button>
                           </div>
                         )}
@@ -721,7 +727,7 @@ const Cart = ({
               "
             >
               <span>متابعة التسوق</span>
-              <span>←</span>
+              <ChevronLeftIcon className="h-4 w-4" />
             </Link>
           </div>
 
@@ -920,7 +926,7 @@ const Cart = ({
                                   className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-slate-600 shadow-sm transition hover:bg-slate-100 active:scale-95"
                                   aria-label="تقليل الكمية"
                                 >
-                                  −
+                                  <MinusIcon className="h-3.5 w-3.5" />
                                 </button>
 
                                 <span
@@ -943,7 +949,7 @@ const Cart = ({
                                   className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-slate-600 shadow-sm transition hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white active:scale-95"
                                   aria-label="زيادة الكمية"
                                 >
-                                  +
+                                  <PlusIcon className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             ) : (
@@ -954,7 +960,7 @@ const Cart = ({
                                   className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-slate-600 shadow-sm transition hover:bg-slate-100 active:scale-95"
                                   aria-label="تقليل الكمية"
                                 >
-                                  −
+                                  <MinusIcon className="h-3.5 w-3.5" />
                                 </button>
 
                                 <span className="min-w-[36px] px-1.5 text-center text-xs sm:text-sm font-bold text-slate-800">
@@ -968,7 +974,7 @@ const Cart = ({
                                   className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-slate-600 shadow-sm transition hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white active:scale-95"
                                   aria-label="زيادة الكمية"
                                 >
-                                  +
+                                  <PlusIcon className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             )}

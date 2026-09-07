@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from "react"
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { apiFetch } from "../../services/api"
 import toast from "react-hot-toast"
+import {
+  XMarkIcon,
+  ArrowPathIcon,
+  BellIcon,
+  ShoppingBagIcon,
+  ChevronLeftIcon,
+} from "@heroicons/react/24/outline"
 
 interface AdminOrderNotification {
   id: number
@@ -447,7 +454,7 @@ const AdminLayout = ({
             className="mr-auto flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 lg:hidden"
             aria-label="إغلاق القائمة"
           >
-            ×
+            <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
@@ -557,7 +564,7 @@ const AdminLayout = ({
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50">
               {loggingOut ? (
-                <span className="animate-spin text-base">⏳</span>
+                <ArrowPathIcon className="h-5 w-5 animate-spin text-red-600" />
               ) : (
                 <svg
                   className="h-5 w-5"
@@ -617,7 +624,7 @@ const AdminLayout = ({
               </p>
 
               <h2 className="mt-0.5 text-lg font-black text-slate-950">
-                أهلاً بك في لوحة التحكم 👋
+                أهلاً بك في لوحة التحكم
               </h2>
             </div>
 
@@ -669,8 +676,8 @@ const AdminLayout = ({
                     <div className="max-h-[420px] overflow-y-auto">
                       {notifications.length === 0 ? (
                         <div className="px-5 py-12 text-center">
-                          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-2xl">
-                            🔔
+                          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                            <BellIcon className="h-7 w-7" />
                           </div>
                           <p className="mt-4 text-sm font-black text-slate-700">
                             لا توجد إشعارات
@@ -687,8 +694,8 @@ const AdminLayout = ({
                             onClick={() => openNotification(notification)}
                             className="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-4 text-right transition hover:bg-indigo-50"
                           >
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-lg">
-                              🛒
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                              <ShoppingBagIcon className="h-5 w-5" />
                             </span>
 
                             <span className="min-w-0 flex-1">
@@ -708,7 +715,7 @@ const AdminLayout = ({
                               )}
                             </span>
 
-                            <span className="mt-1 text-slate-300">←</span>
+                            <ChevronLeftIcon className="mt-1 h-4 w-4 text-slate-300" />
                           </button>
                         ))
                       )}
@@ -760,7 +767,7 @@ const AdminLayout = ({
                 title="تسجيل الخروج"
               >
                 {loggingOut ? (
-                  <span className="animate-spin text-base">⏳</span>
+                  <ArrowPathIcon className="h-5 w-5 animate-spin text-red-600" />
                 ) : (
                   <svg
                     className="h-5 w-5"

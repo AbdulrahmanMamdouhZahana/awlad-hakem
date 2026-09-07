@@ -1,4 +1,20 @@
 import Card from "./Card"
+import {
+  CheckCircleIcon,
+  ClockIcon,
+  XCircleIcon,
+  UserIcon,
+  TruckIcon,
+  MapPinIcon,
+  BuildingLibraryIcon,
+  PhotoIcon,
+  PhoneIcon,
+  BoltIcon,
+  CheckIcon,
+  TrashIcon,
+  XMarkIcon,
+  CreditCardIcon,
+} from "@heroicons/react/24/outline"
 
 export interface Delivery {
   id: number
@@ -224,24 +240,24 @@ const OrderCard = ({
     }
   }
 
-  const getStatusEmoji = (status: string) => {
+  const getStatusIcon = (status: string) => {
     const normalizedStatus = status === "pending_approval" ? "pending" : status
 
     switch (normalizedStatus) {
       case "confirmed":
-        return "🟢"
+        return <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
       case "pending":
-        return "🟡"
+        return <ClockIcon className="h-3.5 w-3.5 text-amber-600 shrink-0" />
       case "cancelled":
-        return "🔴"
+        return <XCircleIcon className="h-3.5 w-3.5 text-red-600 shrink-0" />
       case "delivered":
-        return "🔵"
+        return <CheckCircleIcon className="h-3.5 w-3.5 text-blue-600 shrink-0" />
       case "assigned":
-        return "🟣"
+        return <UserIcon className="h-3.5 w-3.5 text-violet-600 shrink-0" />
       case "out_for_delivery":
-        return "🚚"
+        return <TruckIcon className="h-3.5 w-3.5 text-blue-600 shrink-0" />
       default:
-        return "⚪"
+        return <ClockIcon className="h-3.5 w-3.5 text-slate-500 shrink-0" />
     }
   }
 
@@ -285,11 +301,12 @@ const OrderCard = ({
                 </h3>
 
                 <span
-                  className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusClass(
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${getStatusClass(
                     order.status
                   )}`}
                 >
-                  {getStatusEmoji(order.status)} {getStatusLabel(order.status)}
+                  {getStatusIcon(order.status)}
+                  <span>{getStatusLabel(order.status)}</span>
                 </span>
               </div>
 
@@ -309,8 +326,9 @@ const OrderCard = ({
                   شامل {Number(order.delivery_fee)} ج.م توصيل
                 </span>
               ) : (
-                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md inline-block mt-0.5">
-                  التوصيل: قيد التحديد ⏳
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1 mt-0.5">
+                  <ClockIcon className="h-3 w-3" />
+                  <span>التوصيل: قيد التحديد</span>
                 </span>
               )}
             </div>
@@ -340,10 +358,11 @@ const OrderCard = ({
                 href={`https://www.google.com/maps?q=${order.latitude},${order.longitude}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 flex w-fit items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
+                className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
                 onClick={(e) => e.stopPropagation()}
               >
-                📍 فتح الموقع
+                <MapPinIcon className="h-4 w-4" />
+                <span>فتح الموقع</span>
               </a>
             )}
 
@@ -360,8 +379,9 @@ const OrderCard = ({
               <div className="mt-3 space-y-3 rounded-xl border border-blue-100 bg-blue-50 p-3">
                 {order.bank_account && (
                   <div className="rounded-xl bg-white p-3">
-                    <p className="text-xs font-black text-blue-700">
-                      🏦 الحساب المحول إليه
+                    <p className="text-xs font-black text-blue-700 flex items-center gap-1.5">
+                      <BuildingLibraryIcon className="h-4 w-4" />
+                      <span>الحساب المحول إليه</span>
                     </p>
 
                     <p className="mt-1 font-black text-blue-900">
@@ -397,8 +417,9 @@ const OrderCard = ({
 
                 {order.transfer_image && (
                   <div className="rounded-xl border border-blue-100 bg-white p-3">
-                    <p className="mb-2 text-xs font-black text-blue-700">
-                      🖼️ صورة التحويل
+                    <p className="mb-2 text-xs font-black text-blue-700 flex items-center gap-1.5">
+                      <PhotoIcon className="h-4 w-4" />
+                      <span>صورة التحويل</span>
                     </p>
 
                     <a
@@ -428,7 +449,7 @@ const OrderCard = ({
               <div className="mt-3 overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-b from-indigo-50/70 to-slate-50 p-3.5 shadow-sm">
                 <div className="flex items-center justify-between border-b border-indigo-100/70 pb-2">
                   <div className="flex items-center gap-1.5 text-xs font-black text-indigo-900">
-                    <span className="text-base">⏱️</span>
+                    <ClockIcon className="h-4 w-4 text-indigo-700" />
                     <span>تتبع مواعيد التوصيل</span>
                   </div>
                   {order.delivery && (
@@ -438,10 +459,11 @@ const OrderCard = ({
                       </span>
                       <a
                         href={`tel:${order.delivery.phone}`}
-                        className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:underline"
+                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        📞 اتصال
+                        <PhoneIcon className="h-3 w-3" />
+                        <span>اتصال</span>
                       </a>
                     </div>
                   )}
@@ -456,7 +478,10 @@ const OrderCard = ({
                         : "bg-slate-100/70 border-slate-200/50 opacity-60"
                     }`}
                   >
-                    <p className="text-[10px] font-extrabold text-indigo-600">👤 تم التعيين</p>
+                    <p className="text-[10px] font-extrabold text-indigo-600 flex items-center justify-center gap-1">
+                      <UserIcon className="h-3 w-3" />
+                      <span>تم التعيين</span>
+                    </p>
                     <p className="mt-1 text-xs font-black text-slate-800">
                       {order.assigned_at ? formatTimeOnly(order.assigned_at) : "لم يُعيَّن"}
                     </p>
@@ -470,7 +495,10 @@ const OrderCard = ({
                         : "bg-slate-100/70 border-slate-200/50 opacity-60"
                     }`}
                   >
-                    <p className="text-[10px] font-extrabold text-blue-600">🚚 خرج للتوصيل</p>
+                    <p className="text-[10px] font-extrabold text-blue-600 flex items-center justify-center gap-1">
+                      <TruckIcon className="h-3 w-3" />
+                      <span>خرج للتوصيل</span>
+                    </p>
                     <p className="mt-1 text-xs font-black text-blue-900">
                       {order.picked_up_at ? formatTimeOnly(order.picked_up_at) : "لم يخرج بعد"}
                     </p>
@@ -484,7 +512,10 @@ const OrderCard = ({
                         : "bg-slate-100/70 border-slate-200/50 opacity-60"
                     }`}
                   >
-                    <p className="text-[10px] font-extrabold text-emerald-600">✅ تم التوصيل</p>
+                    <p className="text-[10px] font-extrabold text-emerald-600 flex items-center justify-center gap-1">
+                      <CheckCircleIcon className="h-3 w-3" />
+                      <span>تم التوصيل</span>
+                    </p>
                     <p className="mt-1 text-xs font-black text-emerald-900">
                       {order.delivered_at ? formatTimeOnly(order.delivered_at) : "قيد الانتظار"}
                     </p>
@@ -493,7 +524,8 @@ const OrderCard = ({
 
                 {order.picked_up_at && order.delivered_at && (
                   <div className="mt-2.5 flex items-center justify-center gap-1 rounded-xl bg-emerald-100/70 px-3 py-1 text-center text-[11px] font-black text-emerald-800">
-                    <span>⚡ مدة التوصيل الفعلية:</span>
+                    <BoltIcon className="h-3.5 w-3.5" />
+                    <span>مدة التوصيل الفعلية:</span>
                     <span>{calculateDuration(order.picked_up_at, order.delivered_at)}</span>
                   </div>
                 )}
@@ -568,7 +600,14 @@ const OrderCard = ({
                   onClick={() => onConfirm(order.id)}
                   className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isConfirming ? "جاري التأكيد..." : "✓ تأكيد الطلب"}
+                  {isConfirming ? (
+                    "جاري التأكيد..."
+                  ) : (
+                    <span className="inline-flex items-center justify-center gap-1.5">
+                      <CheckIcon className="h-4 w-4" />
+                      <span>تأكيد الطلب</span>
+                    </span>
+                  )}
                 </button>
               )}
             </div>
@@ -594,11 +633,12 @@ const OrderCard = ({
               </span>
 
               <span
-                className={`rounded-full px-3 py-1 text-[11px] font-black ring-1 ${getStatusClass(
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-black ring-1 ${getStatusClass(
                   order.status
                 )}`}
               >
-                {getStatusEmoji(order.status)} {getStatusLabel(order.status)}
+                {getStatusIcon(order.status)}
+                <span>{getStatusLabel(order.status)}</span>
               </span>
             </div>
 
@@ -646,7 +686,7 @@ const OrderCard = ({
         <div className="rounded-2xl border border-slate-100 p-4">
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-500">
-              📍
+              <MapPinIcon className="h-5 w-5" />
             </div>
 
             <div className="min-w-0 flex-1">
@@ -700,7 +740,9 @@ const OrderCard = ({
             {order.bank_account && (
               <div className="rounded-2xl border border-blue-100 bg-white p-4">
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="text-xl">🏦</span>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                    <BuildingLibraryIcon className="h-5 w-5" />
+                  </span>
 
                   <div>
                     <p className="text-[11px] font-bold text-blue-500">
@@ -757,8 +799,9 @@ const OrderCard = ({
               <div className="rounded-2xl border border-blue-200 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-black text-blue-600">
-                      💳 الدفع الإلكتروني
+                    <p className="text-[11px] font-black text-blue-600 flex items-center gap-1">
+                      <CreditCardIcon className="h-3.5 w-3.5" />
+                      <span>الدفع الإلكتروني</span>
                     </p>
 
                     <p className="mt-1 text-base font-black text-blue-900">
@@ -801,8 +844,9 @@ const OrderCard = ({
         {/* Delivery */}
         {order.delivery && (
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-            <p className="text-[11px] font-black text-emerald-600">
-              🚚 الدليفري المسؤول
+            <p className="text-[11px] font-black text-emerald-600 flex items-center gap-1.5">
+              <TruckIcon className="h-4 w-4" />
+              <span>الدليفري المسؤول</span>
             </p>
 
             <div className="mt-1 flex items-center justify-between gap-3">
@@ -813,10 +857,11 @@ const OrderCard = ({
 
                 <a
                   href={`tel:${order.delivery.phone}`}
-                  className="text-sm font-bold text-emerald-700 hover:underline"
+                  className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700 hover:underline"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  📞 {order.delivery.phone}
+                  <PhoneIcon className="h-3.5 w-3.5" />
+                  <span>{order.delivery.phone}</span>
                 </a>
               </div>
             </div>
@@ -897,9 +942,16 @@ const OrderCard = ({
                 type="button"
                 disabled={isConfirming || isCancelling}
                 onClick={() => onConfirm(order.id)}
-                className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isConfirming ? "جاري التأكيد..." : "✓ تأكيد الطلب"}
+                {isConfirming ? (
+                  "جاري التأكيد..."
+                ) : (
+                  <>
+                    <CheckIcon className="h-4 w-4" />
+                    <span>تأكيد الطلب</span>
+                  </>
+                )}
               </button>
             )}
 
@@ -908,9 +960,16 @@ const OrderCard = ({
                 type="button"
                 disabled={isConfirming || isCancelling}
                 onClick={() => onCancel(order.id)}
-                className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isCancelling ? "جاري الحذف..." : "🗑 حذف الطلب"}
+                {isCancelling ? (
+                  "جاري الحذف..."
+                ) : (
+                  <>
+                    <TrashIcon className="h-4 w-4" />
+                    <span>حذف الطلب</span>
+                  </>
+                )}
               </button>
             )}
 
@@ -919,9 +978,16 @@ const OrderCard = ({
                 type="button"
                 disabled={isConfirming || isCancelling}
                 onClick={() => onCancel(order.id)}
-                className="flex-1 rounded-xl bg-slate-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isCancelling ? "جاري الإلغاء..." : "✕ إلغاء الطلب"}
+                {isCancelling ? (
+                  "جاري الإلغاء..."
+                ) : (
+                  <>
+                    <XMarkIcon className="h-4 w-4" />
+                    <span>إلغاء الطلب</span>
+                  </>
+                )}
               </button>
             )}
           </div>

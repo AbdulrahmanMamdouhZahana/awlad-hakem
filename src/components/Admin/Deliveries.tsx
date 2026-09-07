@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import { apiFetch } from "../../services/api"
 import Swal from "sweetalert2"
+import { TruckIcon, XMarkIcon } from "@heroicons/react/24/outline"
 
 interface Delivery {
   id: number
@@ -603,8 +604,8 @@ export default function Deliveries() {
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {deliveries.length === 0 ? (
           <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center sm:p-8">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50 text-3xl sm:h-20 sm:w-20 sm:text-4xl">
-              🚚
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 sm:h-20 sm:w-20">
+              <TruckIcon className="h-8 w-8 sm:h-10 sm:w-10" />
             </div>
 
             <h2 className="mt-4 text-lg font-black text-slate-900 sm:mt-5 sm:text-xl">
@@ -668,8 +669,8 @@ export default function Deliveries() {
                     >
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-lg">
-                            🚚
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                            <TruckIcon className="h-5 w-5" />
                           </div>
 
                           <div>
@@ -801,8 +802,8 @@ export default function Deliveries() {
                   {/* Header */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-lg">
-                        🚚
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                        <TruckIcon className="h-5 w-5" />
                       </div>
                       <div>
                         <p className="font-black text-slate-900">
@@ -932,9 +933,10 @@ export default function Deliveries() {
               <button
                 type="button"
                 onClick={closeModal}
+                aria-label="إغلاق"
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 sm:h-9 sm:w-9"
               >
-                ✕
+                <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
 

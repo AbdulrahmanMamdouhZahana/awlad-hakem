@@ -3,6 +3,11 @@ import { useState, useEffect } from "react" // Added missing imports
 import { Link } from "react-router-dom"
 import Cart from "./Cart"
 import { getCurrentCustomer, logoutCustomer } from "../services/authService"
+import {
+  CubeIcon,
+  MagnifyingGlassIcon,
+  HeartIcon,
+} from "@heroicons/react/24/outline"
 
 interface iProducts {
   id: number
@@ -392,8 +397,8 @@ const Navbar = ({
                                   className="h-full w-full object-cover"
                                 />
                               ) : (
-                                <div className="flex h-full w-full items-center justify-center text-xl">
-                                  📦
+                                <div className="flex h-full w-full items-center justify-center">
+                                  <CubeIcon className="h-6 w-6 text-slate-300" />
                                 </div>
                               )}
                             </div>
@@ -438,7 +443,7 @@ const Navbar = ({
                     </>
                   ) : (
                     <div className="px-5 py-6 text-center">
-                      <div className="text-3xl">🔍</div>
+                      <MagnifyingGlassIcon className="mx-auto h-8 w-8 text-slate-300" />
                       <p className="mt-2 text-sm font-bold text-slate-700">
                         مفيش منتجات مطابقة
                       </p>
@@ -944,7 +949,7 @@ const Navbar = ({
                               />
                             ) : (
                               <div className="flex h-full w-full items-center justify-center">
-                                📦
+                                <CubeIcon className="h-6 w-6 text-slate-300" />
                               </div>
                             )}
                           </div>
@@ -975,7 +980,7 @@ const Navbar = ({
                   </div>
                 ) : (
                   <div className="px-4 py-5 text-center">
-                    <div className="text-2xl">🔍</div>
+                    <MagnifyingGlassIcon className="mx-auto h-7 w-7 text-slate-300" />
                     <p className="mt-2 text-sm font-bold text-slate-700">
                       مفيش منتجات مطابقة
                     </p>
@@ -1115,7 +1120,7 @@ const Navbar = ({
               { to: "/", label: "الرئيسية", icon: "" },
               { to: "/products", label: "المنتجات", icon: "" },
               { to: "/categories", label: "الأقسام", icon: "" },
-              { to: "/favorites", label: "♡ المفضلة", icon: "" },
+              { to: "/favorites", label: "المفضلة", icon: "" },
               { to: "/contact", label: "اتصل بنا", icon: "" },
             ].map((item) => (
               <Link

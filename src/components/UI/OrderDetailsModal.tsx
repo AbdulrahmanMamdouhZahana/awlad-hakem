@@ -2,6 +2,27 @@ import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import toast from "react-hot-toast";
 import { apiFetch } from "../../services/api";
+import {
+  CheckCircleIcon,
+  ClockIcon,
+  XCircleIcon,
+  UserIcon,
+  TruckIcon,
+  MapPinIcon,
+  BuildingLibraryIcon,
+  PhotoIcon,
+  CreditCardIcon,
+  ShoppingCartIcon,
+  BanknotesIcon,
+  DocumentTextIcon,
+  CameraIcon,
+  BoltIcon,
+  ArchiveBoxIcon,
+  CheckIcon,
+  TrashIcon,
+  XMarkIcon,
+  ClipboardDocumentListIcon,
+} from "@heroicons/react/24/outline";
 
 interface OrderItem {
   id: number;
@@ -120,12 +141,31 @@ const OrderDetailsModal = ({
   };
 
   const statusLabels: Record<string, string> = {
-    pending: "🟡 قيد الانتظار",
-    confirmed: "🟢 مؤكد",
-    assigned: "🚚 تم التعيين",
-    out_for_delivery: "🚚 قيد التوصيل",
-    cancelled: "🔴 ملغي",
-    delivered: "🔵 تم التوصيل",
+    pending: "قيد الانتظار",
+    confirmed: "مؤكد",
+    assigned: "تم التعيين",
+    out_for_delivery: "قيد التوصيل",
+    cancelled: "ملغي",
+    delivered: "تم التوصيل",
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "confirmed":
+        return <CheckCircleIcon className="w-4 h-4 text-emerald-600 shrink-0" />;
+      case "pending":
+        return <ClockIcon className="w-4 h-4 text-amber-600 shrink-0" />;
+      case "assigned":
+        return <UserIcon className="w-4 h-4 text-indigo-600 shrink-0" />;
+      case "out_for_delivery":
+        return <TruckIcon className="w-4 h-4 text-violet-600 shrink-0" />;
+      case "cancelled":
+        return <XCircleIcon className="w-4 h-4 text-red-600 shrink-0" />;
+      case "delivered":
+        return <CheckCircleIcon className="w-4 h-4 text-blue-600 shrink-0" />;
+      default:
+        return <ClockIcon className="w-4 h-4 text-slate-500 shrink-0" />;
+    }
   };
 
   const isElectronicPayment =
@@ -151,7 +191,7 @@ const OrderDetailsModal = ({
       });
 
       if (res?.success && res.order) {
-        toast.success("تم تحديد مصاريف التوصيل وتحديث إجمالي الطلب بنجاح 🚚");
+        toast.success("تم تحديد مصاريف التوصيل وتحديث إجمالي الطلب بنجاح");
         setLocalOrder(res.order);
         setIsEditingFee(false);
         if (onOrderUpdated) {
@@ -222,7 +262,7 @@ const OrderDetailsModal = ({
       onClose={onClose}
       title={`طلب #${order.id}`}
       subtitle="كل تفاصيل الطلب"
-      icon={<span>📋</span>}
+      icon={<ClipboardDocumentListIcon className="h-6 w-6 text-indigo-600" />}
       size="lg"
       actions={
         normalizedStatus === "pending" ? (
@@ -232,9 +272,16 @@ const OrderDetailsModal = ({
                 type="button"
                 disabled={cancelling || confirming}
                 onClick={() => onCancel(order.id)}
-                className="flex-1 rounded-xl bg-red-600 py-3.5 text-sm font-black text-white shadow-lg transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 py-3.5 text-sm font-black text-white shadow-lg transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {cancelling ? "جاري الإلغاء..." : "✕ إلغاء الطلب"}
+                {cancelling ? (
+                  "جاري الإلغاء..."
+                ) : (
+                  <>
+                    <XMarkIcon className="h-4 w-4" />
+                    <span>إلغاء الطلب</span>
+                  </>
+                )}
               </button>
             )}
 
@@ -243,9 +290,16 @@ const OrderDetailsModal = ({
                 type="button"
                 disabled={confirming || cancelling}
                 onClick={() => onConfirm(order.id)}
-                className="flex-1 rounded-xl bg-emerald-600 py-3.5 text-sm font-black text-white shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-3.5 text-sm font-black text-white shadow-lg transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {confirming ? "جاري التأكيد..." : "✓ تأكيد الطلب"}
+                {confirming ? (
+                  "جاري التأكيد..."
+                ) : (
+                  <>
+                    <CheckIcon className="h-4 w-4" />
+                    <span>تأكيد الطلب</span>
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -254,9 +308,16 @@ const OrderDetailsModal = ({
             type="button"
             disabled={cancelling}
             onClick={() => onCancel(order.id)}
-            className="w-full rounded-xl bg-red-600 py-3.5 text-sm font-black text-white shadow-lg transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 py-3.5 text-sm font-black text-white shadow-lg transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {cancelling ? "جاري الحذف..." : "🗑 حذف الطلب"}
+            {cancelling ? (
+              "جاري الحذف..."
+            ) : (
+              <>
+                <TrashIcon className="h-4 w-4" />
+                <span>حذف الطلب</span>
+              </>
+            )}
           </button>
         ) : undefined
       }
@@ -272,12 +333,13 @@ const OrderDetailsModal = ({
           </div>
 
           <span
-            className={`w-fit rounded-full px-4 py-2 text-xs font-black ${
+            className={`inline-flex items-center gap-1.5 w-fit rounded-full px-4 py-2 text-xs font-black ${
               statusColors[normalizedStatus] ||
               "bg-slate-100 text-slate-700"
             }`}
           >
-            {statusLabels[normalizedStatus] || order.status}
+            {getStatusIcon(normalizedStatus)}
+            <span>{statusLabels[normalizedStatus] || order.status}</span>
           </span>
         </div>
 
@@ -285,8 +347,9 @@ const OrderDetailsModal = ({
           normalizedStatus === "assigned" ||
           normalizedStatus === "out_for_delivery") && (
           <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4 text-center">
-            <p className="text-sm font-black text-indigo-800">
-              🚚 الطلب قيد التوصيل
+            <p className="text-sm font-black text-indigo-800 flex items-center justify-center gap-1.5">
+              <TruckIcon className="h-4 w-4" />
+              <span>الطلب قيد التوصيل</span>
             </p>
             <p className="mt-1 text-xs font-semibold text-indigo-600">
               تم تأكيد الطلب وتعيين الدليفري
@@ -296,16 +359,18 @@ const OrderDetailsModal = ({
 
         {normalizedStatus === "cancelled" && (
           <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-center">
-            <p className="text-sm font-black text-red-800">
-              🔴 هذا الطلب ملغي
+            <p className="text-sm font-black text-red-800 flex items-center justify-center gap-1.5">
+              <XCircleIcon className="h-4 w-4" />
+              <span>هذا الطلب ملغي</span>
             </p>
           </div>
         )}
 
         {/* Customer Info */}
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-          <h3 className="mb-4 text-base font-black text-slate-800">
-            👤 بيانات العميل
+          <h3 className="mb-4 text-base font-black text-slate-800 flex items-center gap-1.5">
+            <UserIcon className="h-5 w-5 text-indigo-600" />
+            <span>بيانات العميل</span>
           </h3>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -325,7 +390,8 @@ const OrderDetailsModal = ({
               rel="noopener noreferrer"
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white transition hover:bg-indigo-500"
             >
-              📍 عرض موقع العميل على الخريطة
+              <MapPinIcon className="h-4 w-4" />
+              <span>عرض موقع العميل على الخريطة</span>
             </a>
           )}
 
@@ -353,8 +419,9 @@ const OrderDetailsModal = ({
 
         {/* Payment */}
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 text-base font-black text-slate-800">
-            💳 بيانات الدفع
+          <h3 className="mb-4 text-base font-black text-slate-800 flex items-center gap-1.5">
+            <CreditCardIcon className="h-5 w-5 text-indigo-600" />
+            <span>بيانات الدفع</span>
           </h3>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -367,8 +434,9 @@ const OrderDetailsModal = ({
 
           {isElectronicPayment && order.bank_account && (
             <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
-              <h4 className="mb-3 font-black text-indigo-800">
-                🏦 الحساب الذي تم التحويل إليه
+              <h4 className="mb-3 font-black text-indigo-800 flex items-center gap-1.5">
+                <BuildingLibraryIcon className="h-4 w-4" />
+                <span>الحساب الذي تم التحويل إليه</span>
               </h4>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -394,8 +462,9 @@ const OrderDetailsModal = ({
 
           {isElectronicPayment && order.transfer_image && (
             <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-              <h4 className="mb-3 font-black text-emerald-800">
-                🧾 صورة التحويل
+              <h4 className="mb-3 font-black text-emerald-800 flex items-center gap-1.5">
+                <PhotoIcon className="h-4 w-4" />
+                <span>صورة التحويل</span>
               </h4>
 
               <a
@@ -421,8 +490,9 @@ const OrderDetailsModal = ({
         {/* Products */}
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-base font-black text-slate-800">
-              🛒 المنتجات
+            <h3 className="text-base font-black text-slate-800 flex items-center gap-1.5">
+              <ShoppingCartIcon className="h-5 w-5 text-indigo-600" />
+              <span>المنتجات</span>
             </h3>
 
             <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">
@@ -495,8 +565,9 @@ const OrderDetailsModal = ({
 
         {/* Financial Breakdown (Subtotal, Tax, Delivery Fee, Total) */}
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="mb-4 text-base font-black text-slate-800">
-            💵 تفاصيل الحساب والإجمالي
+          <h3 className="mb-4 text-base font-black text-slate-800 flex items-center gap-1.5">
+            <BanknotesIcon className="h-5 w-5 text-indigo-600" />
+            <span>تفاصيل الحساب والإجمالي</span>
           </h3>
 
           <div className="space-y-3">
@@ -522,19 +593,29 @@ const OrderDetailsModal = ({
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200/60 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">🚚</span>
+                  <TruckIcon className="h-5 w-5 text-indigo-600" />
                   <span className="text-sm font-black text-slate-800">مصاريف التوصيل (Delivery Fee)</span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-black ${
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black ${
                       isDeliveryCalculated
                         ? "bg-emerald-100 text-emerald-800"
                         : "bg-amber-100 text-amber-800"
                     }`}
                   >
-                    {isDeliveryCalculated ? "✓ تم التحديد (Calculated)" : "⏳ قيد التحديد (Pending)"}
+                    {isDeliveryCalculated ? (
+                      <>
+                        <CheckIcon className="h-3 w-3" />
+                        <span>تم التحديد (Calculated)</span>
+                      </>
+                    ) : (
+                      <>
+                        <ClockIcon className="h-3 w-3" />
+                        <span>قيد التحديد (Pending)</span>
+                      </>
+                    )}
                   </span>
                   {isDeliveryCalculated && !isEditingFee && (
                     <button
@@ -608,7 +689,7 @@ const OrderDetailsModal = ({
             {activeOrder.latitude !== null && activeOrder.longitude !== null && (
               <div className="flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-xs">
                 <div className="flex items-center gap-2">
-                  <span>📍</span>
+                  <MapPinIcon className="h-4 w-4 text-indigo-600" />
                   <span className="font-bold text-indigo-900">
                     موقع العميل: {activeOrder.latitude?.toFixed(5)}, {activeOrder.longitude?.toFixed(5)}
                   </span>
@@ -652,7 +733,10 @@ const OrderDetailsModal = ({
         {/* Notes */}
         {order.notes && (
           <section className="rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
-            <h3 className="font-black text-indigo-700">📝 ملاحظات العميل</h3>
+            <h3 className="font-black text-indigo-700 flex items-center gap-1.5">
+              <DocumentTextIcon className="h-5 w-5" />
+              <span>ملاحظات العميل</span>
+            </h3>
             <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-7 text-indigo-950">
               {order.notes}
             </p>
@@ -661,8 +745,9 @@ const OrderDetailsModal = ({
 
         {/* Delivery */}
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 text-base font-black text-slate-800">
-            🚚 بيانات التوصيل
+          <h3 className="mb-4 text-base font-black text-slate-800 flex items-center gap-1.5">
+            <TruckIcon className="h-5 w-5 text-indigo-600" />
+            <span>بيانات التوصيل</span>
           </h3>
 
           {order.delivery ? (
@@ -687,13 +772,14 @@ const OrderDetailsModal = ({
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <h3 className="flex items-center gap-2 text-base font-black text-slate-800">
-              <span>⏱️</span>
+              <ClockIcon className="h-5 w-5 text-indigo-600" />
               <span>مسار تتبع الطلب ومواعيد التوصيل الدقيقة</span>
             </h3>
 
             {order.picked_up_at && order.delivered_at && (
-              <span className="rounded-xl bg-emerald-100/80 px-3 py-1 text-xs font-black text-emerald-800">
-                ⚡ مدة رحلة التوصيل: {calculateDuration(order.picked_up_at, order.delivered_at)}
+              <span className="inline-flex items-center gap-1 rounded-xl bg-emerald-100/80 px-3 py-1 text-xs font-black text-emerald-800">
+                <BoltIcon className="h-3.5 w-3.5" />
+                <span>مدة رحلة التوصيل: {calculateDuration(order.picked_up_at, order.delivered_at)}</span>
               </span>
             )}
           </div>
@@ -706,7 +792,10 @@ const OrderDetailsModal = ({
               </div>
               <div className="flex-1 rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-black text-slate-800">📦 إنشاء الطلب</p>
+                  <p className="text-sm font-black text-slate-800 flex items-center gap-1.5">
+                    <ArchiveBoxIcon className="h-4 w-4 text-slate-600" />
+                    <span>إنشاء الطلب</span>
+                  </p>
                   <span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-600">
                     {formatDate(order.created_at)}
                   </span>
@@ -728,8 +817,9 @@ const OrderDetailsModal = ({
               }`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-sm font-black text-indigo-900">
-                      👤 تعيين الدليفري
+                    <p className="text-sm font-black text-indigo-900 flex items-center gap-1.5">
+                      <UserIcon className="h-4 w-4 text-indigo-600" />
+                      <span>تعيين الدليفري</span>
                     </p>
                     {order.delivery && (
                       <p className="mt-0.5 text-xs font-bold text-indigo-700">
@@ -762,8 +852,9 @@ const OrderDetailsModal = ({
               }`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-sm font-black text-blue-900">
-                      🚚 خروج الدليفري للتوصيل
+                    <p className="text-sm font-black text-blue-900 flex items-center gap-1.5">
+                      <TruckIcon className="h-4 w-4 text-blue-600" />
+                      <span>خروج الدليفري للتوصيل</span>
                     </p>
                     <p className="mt-0.5 text-xs font-semibold text-blue-700">
                       {order.picked_up_at ? "المندوب استلم الطلب وهو في الطريق الآن للعميل" : "في انتظار بدء التحرك والتوصيل"}
@@ -794,8 +885,9 @@ const OrderDetailsModal = ({
               }`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-sm font-black text-emerald-900">
-                      ✅ وصول وتسليم الطلب للعميل
+                    <p className="text-sm font-black text-emerald-900 flex items-center gap-1.5">
+                      <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
+                      <span>وصول وتسليم الطلب للعميل</span>
                     </p>
                     <p className="mt-0.5 text-xs font-semibold text-emerald-700">
                       {order.delivered_at ? "تم استلام العميل للطلب بنجاح" : "الطلب قيد الانتظار / التوصيل"}
@@ -817,8 +909,9 @@ const OrderDetailsModal = ({
         {/* Delivery Proof */}
         {order.delivery_proof_image && (
           <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
-            <h3 className="mb-3 font-black text-blue-800">
-              🧾 إثبات التوصيل
+            <h3 className="mb-3 font-black text-blue-800 flex items-center gap-1.5">
+              <CameraIcon className="h-5 w-5" />
+              <span>إثبات التوصيل</span>
             </h3>
 
             <a
@@ -842,9 +935,16 @@ const OrderDetailsModal = ({
               type="button"
               disabled={cancelling}
               onClick={() => onCancel(activeOrder.id)}
-              className="w-full rounded-2xl bg-red-600 px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500 disabled:opacity-50"
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-2xl bg-red-600 px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-500 disabled:opacity-50"
             >
-              {cancelling ? "جاري الحذف..." : "🗑 حذف الطلب نهائياً"}
+              {cancelling ? (
+                "جاري الحذف..."
+              ) : (
+                <>
+                  <TrashIcon className="h-4 w-4" />
+                  <span>حذف الطلب نهائياً</span>
+                </>
+              )}
             </button>
           </div>
         )}

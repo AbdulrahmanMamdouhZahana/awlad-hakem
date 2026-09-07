@@ -3,6 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar"; // Adjust path as needed
 import type { CartItem } from "../App"; // Adjust import path as needed
 import { getCurrentCustomer, logoutCustomer, type CustomerUser } from "../services/authService";
+import {
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  XCircleIcon,
+  EnvelopeIcon,
+  ChevronRightIcon,
+  CheckIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -225,7 +234,7 @@ export default function CustomerProfile({
           localStorage.setItem("customer_user", JSON.stringify(updatedUser));
         } catch {}
         window.dispatchEvent(new Event("customer-auth-changed"));
-        setProfileMessage("تم تحديث بيانات حسابك بنجاح ✓");
+        setProfileMessage("تم تحديث بيانات حسابك بنجاح");
       } catch (error) {
         setError(error instanceof Error ? error.message : "حدث خطأ أثناء تحديث الحساب");
       } finally {
@@ -298,7 +307,7 @@ export default function CustomerProfile({
         } catch {}
         window.dispatchEvent(new Event("customer-auth-changed"));
         setVerificationSuccess(true);
-        setProfileMessage("تم تأكيد البريد الإلكتروني وتحديث بيانات الحساب بنجاح ✓");
+        setProfileMessage("تم تأكيد البريد الإلكتروني وتحديث بيانات الحساب بنجاح");
         setTimeout(() => {
           setShowVerificationModal(false);
           setVerificationSuccess(false);
@@ -421,7 +430,7 @@ export default function CustomerProfile({
         setShowCurrentPassword(false);
         setShowPassword(false);
         setShowPasswordConfirmation(false);
-        setPasswordMessage("تم تغيير كلمة المرور بنجاح ✓");
+        setPasswordMessage("تم تغيير كلمة المرور بنجاح");
         window.dispatchEvent(new Event("customer-auth-changed"));
       } catch (error) {
         setPasswordMessage(error instanceof Error ? error.message : "حدث خطأ أثناء تغيير كلمة المرور");
@@ -517,7 +526,7 @@ export default function CustomerProfile({
                 to="/"
                 className="inline-flex items-center gap-1.5 text-sm font-bold text-[#17656b] hover:underline"
               >
-                <span>←</span> العودة للمتجر
+                <ChevronRightIcon className="h-4 w-4" /> العودة للمتجر
               </Link>
 
               <h1 className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">
@@ -532,8 +541,8 @@ export default function CustomerProfile({
             <div className="flex items-center gap-3">
               {customer?.email_verified === true && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-700">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
-                  موثق ✓
+                  <CheckCircleIcon className="h-4 w-4 text-green-600" />
+                  موثق
                 </span>
               )}
               {customer?.email_verified === false && (
@@ -551,15 +560,15 @@ export default function CustomerProfile({
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* ERROR */}
         {error && (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50/90 px-5 py-4 text-sm font-bold text-red-600 shadow-sm">
-            <span className="inline-block ml-2">⚠️</span> {error}
+          <div className="mb-6 inline-flex w-full items-center gap-2 rounded-2xl border border-red-200 bg-red-50/90 px-5 py-4 text-sm font-bold text-red-600 shadow-sm">
+            <ExclamationTriangleIcon className="h-5 w-5 shrink-0" /> {error}
           </div>
         )}
 
         {/* PROFILE MESSAGE */}
         {profileMessage && (
-          <div className="mb-6 rounded-2xl border border-green-200 bg-green-50/90 px-5 py-4 text-sm font-bold text-green-600 shadow-sm">
-            <span className="inline-block ml-2">✓</span> {profileMessage}
+          <div className="mb-6 inline-flex w-full items-center gap-2 rounded-2xl border border-green-200 bg-green-50/90 px-5 py-4 text-sm font-bold text-green-600 shadow-sm">
+            <CheckCircleIcon className="h-5 w-5 shrink-0" /> {profileMessage}
           </div>
         )}
 
@@ -598,8 +607,9 @@ export default function CustomerProfile({
               <h2 className="text-xl font-black text-slate-900">البيانات الشخصية</h2>
               <p className="mt-1.5 text-sm text-slate-500">عدّل بياناتك الشخصية واحفظ التغييرات.</p>
               {email.trim().toLowerCase() !== originalEmail.trim().toLowerCase() && (
-                <div className="mt-3 rounded-xl bg-amber-50/80 px-4 py-3 text-sm font-bold text-amber-700 border border-amber-200">
-                  ⚠️ سيتم إرسال رمز تحقق إلى البريد الإلكتروني الجديد قبل حفظه
+                <div className="mt-3 inline-flex w-full items-center gap-2 rounded-xl bg-amber-50/80 px-4 py-3 text-sm font-bold text-amber-700 border border-amber-200">
+                  <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-amber-600" />
+                  سيتم إرسال رمز تحقق إلى البريد الإلكتروني الجديد قبل حفظه
                 </div>
               )}
             </div>
@@ -643,8 +653,8 @@ export default function CustomerProfile({
                   placeholder="أدخل بريدك الإلكتروني"
                 />
                 {email.trim().toLowerCase() !== originalEmail.trim().toLowerCase() && (
-                  <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
-                    <span>📧</span> سيتم إرسال رمز تحقق إلى هذا البريد الإلكتروني
+                  <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1.5">
+                    <EnvelopeIcon className="h-3.5 w-3.5" /> سيتم إرسال رمز تحقق إلى هذا البريد الإلكتروني
                   </p>
                 )}
               </div>
@@ -678,14 +688,18 @@ export default function CustomerProfile({
                   dir="ltr"
                 />
                 {phoneError && (
-                  <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">❌ {phoneError}</p>
+                  <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                    <XCircleIcon className="h-3.5 w-3.5" /> {phoneError}
+                  </p>
                 )}
                 {phone.length === 11 && !phoneError && phone.length > 0 && (
-                  <p className="mt-1.5 text-xs text-green-600 flex items-center gap-1">✓ رقم هاتف صحيح</p>
+                  <p className="mt-1.5 text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircleIcon className="h-3.5 w-3.5" /> رقم هاتف صحيح
+                  </p>
                 )}
                 {phone.length > 0 && phone.length < 11 && (
                   <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
-                    ⚠️ يجب إدخال {11 - phone.length} أرقام إضافية
+                    <ExclamationTriangleIcon className="h-3.5 w-3.5" /> يجب إدخال {11 - phone.length} أرقام إضافية
                   </p>
                 )}
               </div>
@@ -720,13 +734,18 @@ export default function CustomerProfile({
 
           {passwordMessage && (
             <div
-              className={`mb-5 rounded-2xl border px-5 py-4 text-sm font-bold shadow-sm ${
+              className={`mb-5 inline-flex w-full items-center gap-2 rounded-2xl border px-5 py-4 text-sm font-bold shadow-sm ${
                 passwordMessage.includes("بنجاح")
                   ? "border-green-200 bg-green-50/90 text-green-600"
                   : "border-red-200 bg-red-50/90 text-red-600"
               }`}
             >
-              {passwordMessage.includes("بنجاح") ? "✓" : "⚠️"} {passwordMessage}
+              {passwordMessage.includes("بنجاح") ? (
+                <CheckCircleIcon className="h-5 w-5 shrink-0 text-green-600" />
+              ) : (
+                <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-red-600" />
+              )}
+              {passwordMessage}
             </div>
           )}
 
@@ -843,7 +862,7 @@ export default function CustomerProfile({
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 001.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-green-600">تم التحقق بنجاح! 🎉</h3>
+                  <h3 className="text-xl font-bold text-green-600">تم التحقق بنجاح!</h3>
                   <p className="mt-1.5 text-sm text-slate-500">تم تحديث بريدك الإلكتروني</p>
                 </div>
               ) : (
@@ -853,8 +872,9 @@ export default function CustomerProfile({
                   </p>
 
                   {verificationError && (
-                    <div className="mb-4 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm font-bold text-red-600">
-                      ⚠️ {verificationError}
+                    <div className="mb-4 inline-flex w-full items-center gap-2 rounded-2xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm font-bold text-red-600">
+                      <ExclamationTriangleIcon className="h-5 w-5 shrink-0" />
+                      {verificationError}
                     </div>
                   )}
 
@@ -893,7 +913,10 @@ export default function CustomerProfile({
                             جاري التحقق...
                           </>
                         ) : (
-                          "✓ تحقق"
+                          <span className="inline-flex items-center gap-1.5">
+                            <CheckIcon className="h-4 w-4" />
+                            تحقق
+                          </span>
                         )}
                       </button>
 
@@ -924,7 +947,10 @@ export default function CustomerProfile({
                           جاري الإرسال...
                         </span>
                       ) : (
-                        "🔄 إعادة إرسال رمز التحقق"
+                        <span className="inline-flex items-center gap-1.5">
+                          <ArrowPathIcon className="h-4 w-4" />
+                          إعادة إرسال رمز التحقق
+                        </span>
                       )}
                     </button>
                   </div>

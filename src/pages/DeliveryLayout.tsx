@@ -2,6 +2,12 @@ import { useEffect, useState } from "react"
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import toast from "react-hot-toast"
 import { apiFetch } from "../services/api"
+import {
+  ClipboardDocumentListIcon,
+  UserIcon,
+  ArrowRightOnRectangleIcon,
+  Bars3Icon,
+} from "@heroicons/react/24/outline"
 
 interface DeliveryUser {
   id: number
@@ -49,8 +55,8 @@ export default function DeliveryLayout() {
   }
 
   const navItems = [
-    { path: "/delivery", label: " الطلبات", icon: "📋" },
-    { path: "/delivery/profile", label: " البروفايل", icon: "👤" },
+    { path: "/delivery", label: "الطلبات", icon: ClipboardDocumentListIcon },
+    { path: "/delivery/profile", label: "البروفايل", icon: UserIcon },
   ]
 
   if (loading) {
@@ -116,6 +122,7 @@ export default function DeliveryLayout() {
           <nav className="flex-1 space-y-1.5 p-4">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path
+              const Icon = item.icon
               return (
                 <Link
                   key={item.path}
@@ -130,8 +137,8 @@ export default function DeliveryLayout() {
                     }
                   `}
                 >
-                  <span className="text-xl">{item.icon}</span>
-                  {item.label}
+                  <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span>{item.label}</span>
                   {isActive && (
                     <span className="mr-auto h-1.5 w-1.5 rounded-full bg-white/70" />
                   )}
@@ -146,8 +153,8 @@ export default function DeliveryLayout() {
               onClick={() => void logout()}
               className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-bold text-red-600 transition hover:bg-red-50"
             >
-              <span className="text-xl">🚪</span>
-              تسجيل الخروج
+              <ArrowRightOnRectangleIcon className="w-5 h-5 shrink-0 text-red-600" aria-hidden="true" />
+              <span>تسجيل الخروج</span>
             </button>
           </div>
         </div>

@@ -11,3 +11,6 @@ export { default as OrderDetailsModal } from "./OrderDetailsModal";
 // Export types
 export type { IProduct } from "./Cards/ProductCard";
 export type { Order } from "./Cards/OrderCard";
+
+// Navigation & UX
+export { BackToTop, default as BackToTopButton } from "./BackToTop";

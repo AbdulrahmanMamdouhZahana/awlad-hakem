@@ -2,6 +2,18 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import Products from "../components/Products"
 import { getAllCustomerProducts } from "../services/productService"
+import { BackToTop } from "../components/UI/BackToTop"
+import {
+  ShoppingBagIcon,
+  ShoppingCartIcon,
+  SparklesIcon,
+  Squares2X2Icon,
+  TagIcon,
+  MagnifyingGlassIcon,
+  ArrowPathIcon,
+  ChevronUpIcon,
+  BookOpenIcon,
+} from "@heroicons/react/24/outline"
 
 interface iProducts {
   id: number
@@ -52,7 +64,6 @@ const ProductsPage = ({
   const [displayedProducts, setDisplayedProducts] = useState<iProducts[]>([])
   const [totalProducts, setTotalProducts] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [showBackToTop, setShowBackToTop] = useState(false)
 
   // =========================
   // Refs
@@ -96,13 +107,17 @@ const ProductsPage = ({
     return categoryGroups[mainCategory] || []
   }
 
-  const getCategoryIcon = (category: string) => {
-    const icons: Record<string, string> = {
-      "السوبر ماركت": "🛒",
-      "المكتبة": "📚",
-      "المحمصة": "☕"
+  const renderCategoryIcon = (category: string) => {
+    switch (category) {
+      case "السوبر ماركت":
+        return <ShoppingCartIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+      case "المكتبة":
+        return <BookOpenIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+      case "المحمصة":
+        return <SparklesIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+      default:
+        return <TagIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
     }
-    return icons[category] || "📦"
   }
 
   // =========================
@@ -164,25 +179,6 @@ const ProductsPage = ({
       const y = ref.current.getBoundingClientRect().top + window.pageYOffset + yOffset
       window.scrollTo({ top: y, behavior: "smooth" })
     }
-  }
-
-  // =========================
-  // Back to Top Button Scroll Listener
-  // =========================
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowBackToTop(window.scrollY > 300)
-    }
-
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    })
   }
 
   // =========================
@@ -378,8 +374,9 @@ const ProductsPage = ({
                 الرئيسية
               </Link>
 
-              <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">
-                🛍️ كل المنتجات
+              <h1 className="flex items-center gap-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
+                <ShoppingBagIcon className="h-10 w-10 text-amber-300 sm:h-12 sm:w-12 shrink-0" aria-hidden="true" />
+                <span>كل المنتجات</span>
               </h1>
               <p className="mt-2 text-lg text-white/80">
                 تصفح كل منتجات أولاد الحكيم واختر اللي يناسبك
@@ -397,19 +394,10 @@ const ProductsPage = ({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               {/* Search */}
               <div className="relative flex-1">
-                <svg
+                <MagnifyingGlassIcon
                   className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="m21 21-4.35-4.35m1.35-5.15a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z"
-                  />
-                </svg>
+                  aria-hidden="true"
+                />
 
                 <input
                   type="search"
@@ -456,24 +444,25 @@ const ProductsPage = ({
               <button
                 type="button"
                 onClick={() => handleMainCategoryChange("الكل")}
-                className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${selectedMainCategory === "الكل" && selectedSubCategory === "الكل"
+                className={`shrink-0 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${selectedMainCategory === "الكل" && selectedSubCategory === "الكل"
                     ? "bg-[#17656b] text-white shadow-lg shadow-[#17656b]/30"
                     : "border-2 border-slate-200 bg-white text-slate-600 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b] hover:shadow-md"
                   }`}
               >
-                🎯 كل المنتجات
+                <Squares2X2Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>كل المنتجات</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleMainCategoryChange("العروض")}
-                className={`shrink-0 flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${
+                className={`shrink-0 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${
                   selectedMainCategory === "العروض"
                     ? "bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-lg shadow-red-500/30"
                     : "border-2 border-red-200 bg-white text-red-600 hover:border-red-400 hover:bg-red-50 hover:shadow-md"
                 }`}
               >
-                <span>🔥</span>
+                <SparklesIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>العروض والتخفيضات</span>
               </button>
 
@@ -484,12 +473,13 @@ const ProductsPage = ({
                     key={mainCategory}
                     type="button"
                     onClick={() => handleMainCategoryChange(mainCategory)}
-                    className={`shrink-0 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${active
+                    className={`shrink-0 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-300 ${active
                         ? "bg-[#17656b] text-white shadow-lg shadow-[#17656b]/30"
                         : "border-2 border-slate-200 bg-white text-slate-600 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b] hover:shadow-md"
                       }`}
                   >
-                    {getCategoryIcon(mainCategory)} {mainCategory}
+                    {renderCategoryIcon(mainCategory)}
+                    <span>{mainCategory}</span>
                   </button>
                 )
               })}
@@ -501,12 +491,13 @@ const ProductsPage = ({
                 <button
                   type="button"
                   onClick={() => handleSubCategoryChange("الكل")}
-                  className={`shrink-0 rounded-lg px-4 py-1.5 text-xs font-bold transition-all duration-300 ${selectedSubCategory === "الكل"
+                  className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-bold transition-all duration-300 ${selectedSubCategory === "الكل"
                       ? "bg-[#17656b] text-white shadow-md"
                       : "border-2 border-slate-200 bg-slate-50 text-slate-600 hover:border-[#17656b] hover:bg-[#eef7f7] hover:text-[#17656b]"
                     }`}
                 >
-                  📋 كل الأقسام
+                  <Squares2X2Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  <span>كل الأقسام</span>
                 </button>
 
                 {getSubCategories(selectedMainCategory).map((subCategory) => {
@@ -543,8 +534,8 @@ const ProductsPage = ({
           ) : displayedProducts.length === 0 ? (
             /* Empty State */
             <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-white px-6 py-24 text-center shadow-lg">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#17656b]/10 to-[#17656b]/20 text-4xl">
-                🔍
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#17656b]/10 to-[#17656b]/20 text-slate-600">
+                <MagnifyingGlassIcon className="h-10 w-10 text-[#17656b]" aria-hidden="true" />
               </div>
 
               <h2 className="mt-5 text-2xl font-black text-slate-800">
@@ -559,7 +550,8 @@ const ProductsPage = ({
                 onClick={resetFilters}
                 className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#17656b] px-8 py-3 text-sm font-bold text-white shadow-lg shadow-[#17656b]/30 transition hover:scale-105 hover:shadow-xl"
               >
-                <span>🔄 عرض كل المنتجات</span>
+                <ArrowPathIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>عرض كل المنتجات</span>
               </button>
             </div>
           ) : (
@@ -578,9 +570,10 @@ const ProductsPage = ({
                   <button
                     type="button"
                     onClick={() => scrollToSection(categoriesRef)}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-[#17656b] hover:underline"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-[#17656b] hover:underline"
                   >
-                    ↑ العودة للأقسام
+                    <ChevronUpIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span>العودة للأقسام</span>
                   </button>
                 )}
               </div>
@@ -600,18 +593,8 @@ const ProductsPage = ({
         </div>
       </section>
 
-      {/* Floating Back to Top Button */}
-      {showBackToTop && (
-        <button
-          type="button"
-          onClick={scrollToTop}
-          aria-label="العودة إلى أعلى الصفحة"
-          title="العودة للأعلى"
-          className="fixed bottom-6 left-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[#17656b] text-white shadow-xl shadow-[#17656b]/30 ring-2 ring-white/80 transition-all duration-300 hover:scale-110 hover:bg-[#12555a] active:scale-95 focus:outline-none focus:ring-4 focus:ring-[#17656b]/30"
-        >
-          <span className="text-xl" aria-hidden="true">⬆️</span>
-        </button>
-      )}
+      {/* Floating Back to Top Button with SVG Circular Progress Ring */}
+      <BackToTop />
     </main>
   )
 }

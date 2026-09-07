@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import toast, { Toaster } from "react-hot-toast"
 import { Navigate, Outlet, Routes, Route, useLocation, useNavigate } from "react-router-dom"
 import CustomerOrders from "./pages/CustomerOrders"
+import { BellIcon } from "@heroicons/react/24/outline"
 
 import Navbar from "./components/Navbar"
 import Hero from "./components/Hero"
@@ -1115,13 +1116,13 @@ function AdminOrderNotifier() {
           className="w-[min(92vw,420px)] rounded-2xl border border-indigo-200 bg-white p-4 text-right shadow-2xl ring-1 ring-black/5"
         >
           <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-2xl">
-              🔔
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+              <BellIcon className="h-6 w-6" />
             </div>
 
             <div className="min-w-0 flex-1">
               <p className="text-sm font-black text-indigo-700">
-                طلب جديد 🎉
+                طلب جديد
               </p>
 
               <p className="mt-1 text-sm font-black text-slate-900">

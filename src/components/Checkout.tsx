@@ -2,6 +2,17 @@ import { useState, useEffect } from "react"
 import toast from "react-hot-toast"
 import { supabase } from "../lib/supabase"
 import { apiFetch } from "../services/api" // ✅ إضافة apiFetch
+import {
+  XMarkIcon,
+  MapPinIcon,
+  CheckIcon,
+  CheckCircleIcon,
+  DocumentDuplicateIcon,
+  InformationCircleIcon,
+  PhotoIcon,
+  TruckIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline"
 
 import {
   createOrder,
@@ -436,9 +447,10 @@ const Checkout = ({
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-xl text-slate-500 hover:bg-slate-100"
+            aria-label="إغلاق"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
           >
-            ×
+            <XMarkIcon className="h-5 w-5" />
           </button>
 
         </div>
@@ -547,12 +559,22 @@ const Checkout = ({
               }`}
             >
 
-              {locationLoading
-                ? "📍 جاري تحديد موقعك..."
-                : latitude !== null &&
-                  longitude !== null
-                ? "✓ تم تحديد موقع التوصيل"
-                : "📍 تحديد موقعي الحالي"}
+              {locationLoading ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                  جاري تحديد موقعك...
+                </span>
+              ) : latitude !== null && longitude !== null ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <CheckIcon className="h-4 w-4" />
+                  تم تحديد موقع التوصيل
+                </span>
+              ) : (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <MapPinIcon className="h-4 w-4" />
+                  تحديد موقعي الحالي
+                </span>
+              )}
 
             </button>
 
@@ -743,7 +765,9 @@ const Checkout = ({
               {/* ✅ عرض الحساب المحدد */}
               {selectedAccount && (
                 <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3">
-                  <p className="text-sm font-bold text-emerald-700">✓ ستحول إلى:</p>
+                  <p className="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700">
+                    <CheckCircleIcon className="h-4 w-4" /> ستحول إلى:
+                  </p>
                   <div className="flex items-center justify-between mt-1">
                     <div>
                       <p className="font-bold text-slate-900">{selectedAccount.bank_name}</p>
@@ -753,17 +777,18 @@ const Checkout = ({
                     <button
                       type="button"
                       onClick={() => copyToClipboard(selectedAccount.account_number, `رقم ${selectedAccount.bank_name}`)}
-                      className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-200 transition"
+                      className="inline-flex items-center gap-1 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-200 transition"
                     >
-                      📋 نسخ
+                      <DocumentDuplicateIcon className="h-3.5 w-3.5" /> نسخ
                     </button>
                   </div>
                 </div>
               )}
 
               {/* Payment Notice */}
-              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs font-bold text-amber-800">
-                ℹ️ تنبيه: المبلغ المحول الآن ({total.toFixed(2)} ج.م) يغطي المنتجات والضريبة. سيتم تحديد مصاريف التوصيل بواسطة الإدارة لاحقاً بناءً على المسافة.
+              <div className="inline-flex items-start gap-2 w-full rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs font-bold text-amber-800">
+                <InformationCircleIcon className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                <span>تنبيه: المبلغ المحول الآن ({total.toFixed(2)} ج.م) يغطي المنتجات والضريبة. سيتم تحديد مصاريف التوصيل بواسطة الإدارة لاحقاً بناءً على المسافة.</span>
               </div>
 
               {/* Upload Image */}
@@ -779,11 +804,13 @@ const Checkout = ({
                         alt="صورة التحويل"
                         className="mx-auto max-h-48 rounded-lg object-cover"
                       />
-                      <p className="mt-2 text-sm font-bold text-green-600">✓ تم اختيار الصورة</p>
+                      <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-green-600">
+                        <CheckCircleIcon className="h-4 w-4" /> تم اختيار الصورة
+                      </p>
                     </div>
                   ) : (
                     <>
-                      <span className="text-4xl">📸</span>
+                      <PhotoIcon className="h-10 w-10 text-slate-400" />
                       <span className="mt-2 text-sm font-bold text-slate-700">
                         اختر صورة التحويل
                       </span>
@@ -853,7 +880,10 @@ const Checkout = ({
             </div>
 
             <div className="flex items-center justify-between text-xs rounded-xl bg-amber-50 border border-amber-200 p-2.5">
-              <span className="font-bold text-amber-800">🚚 مصاريف التوصيل:</span>
+              <span className="inline-flex items-center gap-1.5 font-bold text-amber-800">
+                <TruckIcon className="h-4 w-4 text-amber-600" />
+                مصاريف التوصيل:
+              </span>
               <span className="font-black text-amber-700">جاري تحديدها بواسطة الإدارة</span>
             </div>
 

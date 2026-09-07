@@ -3,6 +3,15 @@ import toast from "react-hot-toast"
 import { useOutletContext, useNavigate } from "react-router-dom"
 import { apiFetch } from "../services/api"
 import { confirmAction } from "../utils/alerts"
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  ExclamationTriangleIcon,
+  LockClosedIcon,
+  ArrowRightOnRectangleIcon,
+  CheckIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline"
 
 interface DeliveryUser {
   id: number
@@ -58,7 +67,7 @@ export default function DeliveryProfile() {
       setName(data.name ?? "")
       setEmail(data.email ?? "")
       setPhone(data.phone ?? "")
-      toast.success("تم تحديث بياناتك بنجاح ✅")
+      toast.success("تم تحديث بياناتك بنجاح")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء تحديث البيانات")
     } finally {
@@ -84,7 +93,7 @@ export default function DeliveryProfile() {
       setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
-      toast.success("تم تغيير كلمة المرور بنجاح 🔒")
+      toast.success("تم تغيير كلمة المرور بنجاح")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء تغيير كلمة المرور")
     } finally {
@@ -146,13 +155,23 @@ export default function DeliveryProfile() {
             <p className="text-xl font-black text-slate-900">{name || "دليفري"}</p>
             <p className="text-sm text-slate-500">{email || ""}</p>
             <span
-              className={`mt-1 inline-block rounded-full px-3 py-1 text-xs font-bold ${
+              className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
                 user?.is_active === false
                   ? "bg-red-100 text-red-700"
                   : "bg-emerald-100 text-emerald-700"
               }`}
             >
-              {user?.is_active === false ? "🔴 الحساب معطل" : "🟢 الحساب مفعل"}
+              {user?.is_active === false ? (
+                <>
+                  <XCircleIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  <span>الحساب معطل</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircleIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  <span>الحساب مفعل</span>
+                </>
+              )}
             </span>
           </div>
         </div>
@@ -196,12 +215,16 @@ export default function DeliveryProfile() {
               dir="ltr"
             />
             {phone.length > 0 && phone.length < 11 && (
-              <p className="mt-1 text-xs text-amber-600">
-                ⚠️ يجب إدخال {11 - phone.length} أرقام إضافية
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600">
+                <ExclamationTriangleIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                <span>يجب إدخال {11 - phone.length} أرقام إضافية</span>
               </p>
             )}
             {phone.length === 11 && (
-              <p className="mt-1 text-xs text-green-600">✓ رقم هاتف صحيح</p>
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-green-600">
+                <CheckCircleIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                <span>رقم هاتف صحيح</span>
+              </p>
             )}
           </div>
 
@@ -223,13 +246,26 @@ export default function DeliveryProfile() {
           disabled={saving}
           className="mt-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-8 py-3.5 font-bold text-white shadow-lg shadow-indigo-600/20 transition hover:scale-[1.02] hover:shadow-indigo-600/30 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "⏳ جاري الحفظ..." : "💾 حفظ البيانات"}
+          {saving ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <ArrowPathIcon className="h-5 w-5 animate-spin" />
+              جاري الحفظ...
+            </span>
+          ) : (
+            <span className="inline-flex items-center justify-center gap-2">
+              <CheckIcon className="h-5 w-5" />
+              حفظ البيانات
+            </span>
+          )}
         </button>
       </form>
 
       {/* Change Password */}
       <form onSubmit={changePassword} className="rounded-3xl bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-black text-slate-900">🔒 تغيير كلمة المرور</h2>
+        <h2 className="inline-flex items-center gap-2 text-lg font-black text-slate-900">
+          <LockClosedIcon className="h-5 w-5 text-indigo-600" />
+          تغيير كلمة المرور
+        </h2>
         <p className="mt-1 text-sm text-slate-500">غير كلمة المرور الخاصة بحسابك</p>
 
         <div className="mt-5 space-y-4">
@@ -266,7 +302,17 @@ export default function DeliveryProfile() {
           disabled={changingPassword}
           className="mt-6 rounded-2xl bg-gradient-to-r from-slate-800 to-slate-900 px-8 py-3.5 font-bold text-white shadow-lg shadow-slate-900/20 transition hover:scale-[1.02] hover:shadow-slate-900/30 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {changingPassword ? "⏳ جاري التغيير..." : "🔑 تغيير كلمة المرور"}
+          {changingPassword ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <ArrowPathIcon className="h-5 w-5 animate-spin" />
+              جاري التغيير...
+            </span>
+          ) : (
+            <span className="inline-flex items-center justify-center gap-2">
+              <LockClosedIcon className="h-5 w-5" />
+              تغيير كلمة المرور
+            </span>
+          )}
         </button>
       </form>
 
@@ -274,7 +320,10 @@ export default function DeliveryProfile() {
           Logout Button
       ===================================== */}
       <div className="rounded-3xl bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-black text-red-600">🚪 تسجيل الخروج</h2>
+        <h2 className="inline-flex items-center gap-2 text-lg font-black text-red-600">
+          <ArrowRightOnRectangleIcon className="h-5 w-5" />
+          تسجيل الخروج
+        </h2>
         <p className="mt-1 text-sm text-slate-500">قم بتسجيل الخروج من حساب الدليفري</p>
         
         <button
@@ -307,7 +356,10 @@ export default function DeliveryProfile() {
               جاري تسجيل الخروج...
             </span>
           ) : (
-            "🚪 تسجيل الخروج"
+            <span className="inline-flex items-center justify-center gap-2">
+              <ArrowRightOnRectangleIcon className="h-5 w-5" />
+              تسجيل الخروج
+            </span>
           )}
         </button>
       </div>

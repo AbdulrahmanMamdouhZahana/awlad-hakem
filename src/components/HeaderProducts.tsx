@@ -2,6 +2,14 @@ import { useMemo, useRef, useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import Products from "./Products"
 import { isOfferActive } from "../services/offerService"
+import {
+  ShoppingBagIcon,
+  SparklesIcon,
+  ShoppingCartIcon,
+  BookOpenIcon,
+  BuildingStorefrontIcon,
+  TagIcon,
+} from "@heroicons/react/24/outline"
 
 // =====================================
 // Customer Categories
@@ -28,10 +36,10 @@ const CATEGORY_GROUPS: Record<string, string[]> = {
 
 const MAIN_CATEGORIES = Object.keys(CATEGORY_GROUPS)
 
-const MAIN_CATEGORY_META: Record<string, { icon: string; description: string }> = {
-  "السوبر ماركت": { icon: "🛒", description: "كل احتياجات البيت اليومية" },
-  "المكتبة": { icon: "📚", description: "مستلزمات الدراسة والمكتبة" },
-  "المحمصة": { icon: "☕", description: "البن والمكسرات ومستلزمات المحمصة" },
+const MAIN_CATEGORY_META: Record<string, { Icon: typeof ShoppingCartIcon; description: string }> = {
+  "السوبر ماركت": { Icon: ShoppingCartIcon, description: "كل احتياجات البيت اليومية" },
+  "المكتبة": { Icon: BookOpenIcon, description: "مستلزمات الدراسة والمكتبة" },
+  "المحمصة": { Icon: BuildingStorefrontIcon, description: "البن والمكسرات ومستلزمات المحمصة" },
 }
 
 interface iProducts {
@@ -103,7 +111,8 @@ const HeaderProducts = ({
   // =====================================
 
   const getMainCategoryIcon = (category: string) => {
-    return MAIN_CATEGORY_META[category]?.icon ?? "🛍️"
+    const IconComp = MAIN_CATEGORY_META[category]?.Icon ?? TagIcon
+    return <IconComp className="h-6 w-6" />
   }
 
   return (
@@ -142,9 +151,9 @@ const HeaderProducts = ({
                 }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl ${selectedMainCategory === "الكل" ? "bg-white/15" : "bg-slate-100"
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${selectedMainCategory === "الكل" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"
                   }`}>
-                  🛍️
+                  <ShoppingBagIcon className="h-6 w-6" />
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-black sm:text-base">كل المنتجات</div>
@@ -168,9 +177,9 @@ const HeaderProducts = ({
                 }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl ${selectedMainCategory === "العروض" ? "bg-white/20" : "bg-red-50"
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${selectedMainCategory === "العروض" ? "bg-white/20 text-white" : "bg-red-50 text-red-500"
                   }`}>
-                  🔥
+                  <SparklesIcon className="h-6 w-6" />
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-black sm:text-base">عروض وتخفيضات</div>

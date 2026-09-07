@@ -2,6 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import Modal from "./Modal";
 import toast from "react-hot-toast";
 import { promptText } from "../../utils/alerts";
+import {
+  CubeIcon,
+  ScaleIcon,
+  ArrowsRightLeftIcon,
+  BanknotesIcon,
+  ExclamationTriangleIcon,
+  LightBulbIcon,
+  PhotoIcon,
+  SparklesIcon,
+} from "@heroicons/react/24/outline";
 
 interface Product {
   id: number;
@@ -460,7 +470,7 @@ const ProductModal = ({
       }}
       title={editingProduct ? "تعديل المنتج" : "إضافة منتج جديد"}
       subtitle="إدارة المنتجات"
-      icon={<span>📦</span>}
+      icon={<CubeIcon className="h-6 w-6 text-indigo-600" />}
       loading={loading}
       actions={
         <div className="flex flex-col-reverse gap-3 sm:flex-row">
@@ -573,9 +583,9 @@ const ProductModal = ({
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {[
-              { value: "piece", label: "بالقطعة", icon: "📦" },
-              { value: "weight", label: "بالوزن", icon: "⚖️" },
-              { value: "both", label: "قطعة + وزن", icon: "🔄" },
+              { value: "piece", label: "بالقطعة", Icon: CubeIcon },
+              { value: "weight", label: "بالوزن", Icon: ScaleIcon },
+              { value: "both", label: "قطعة + وزن", Icon: ArrowsRightLeftIcon },
             ].map((option) => (
               <button
                 key={option.value}
@@ -595,12 +605,12 @@ const ProductModal = ({
                         : prev.unit,
                   }))
                 }
-                className={`rounded-xl border px-4 py-3 text-sm font-black transition ${form.saleType === option.value
+                className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black transition ${form.saleType === option.value
                   ? "border-indigo-600 bg-indigo-600 text-white shadow-md"
                   : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50"
                   }`}
               >
-                <span className="ml-2">{option.icon}</span>
+                <option.Icon className="h-4 w-4" />
                 {option.label}
               </button>
             ))}
@@ -698,12 +708,23 @@ const ProductModal = ({
           </div>
         </div>
 
-        <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-bold leading-6 text-emerald-700">
-          {form.saleType === "piece"
-            ? "📦 العميل يشتري بالقطعة، ويتم حساب السعر = عدد القطع × سعر القطعة."
-            : form.saleType === "weight"
-              ? "⚖️ العميل يحدد الوزن الذي يريده، ويتم حساب السعر = الوزن × سعر الكيلو."
-              : "🔄 العميل يختار بين القطعة والوزن، ولكل طريقة سعرها الخاص."}
+        <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-bold leading-6 text-emerald-700">
+          {form.saleType === "piece" ? (
+            <>
+              <CubeIcon className="h-5 w-5 shrink-0 text-emerald-600" />
+              <span>العميل يشتري بالقطعة، ويتم حساب السعر = عدد القطع × سعر القطعة.</span>
+            </>
+          ) : form.saleType === "weight" ? (
+            <>
+              <ScaleIcon className="h-5 w-5 shrink-0 text-emerald-600" />
+              <span>العميل يحدد الوزن الذي يريده، ويتم حساب السعر = الوزن × سعر الكيلو.</span>
+            </>
+          ) : (
+            <>
+              <ArrowsRightLeftIcon className="h-5 w-5 shrink-0 text-emerald-600" />
+              <span>العميل يختار بين القطعة والوزن، ولكل طريقة سعرها الخاص.</span>
+            </>
+          )}
         </div>
 
         {/* =======================================================
@@ -712,8 +733,9 @@ const ProductModal = ({
         <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <label className="block text-sm font-black text-slate-800">
-                💰 نظام الضريبة على المنتج
+              <label className="flex items-center gap-1.5 text-sm font-black text-slate-800">
+                <BanknotesIcon className="h-4 w-4 text-blue-600" />
+                نظام الضريبة على المنتج
               </label>
               <p className="mt-0.5 text-xs font-semibold text-slate-500">
                 اختر نوع الضريبة (نسبة مئوية % من سعر المنتج أو مبلغ ثابت بالجنيه للوحدة)
@@ -803,8 +825,8 @@ const ProductModal = ({
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-lg">
-                🔥
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600">
+                <SparklesIcon className="h-5 w-5" />
               </span>
               <div>
                 <h4 className="text-sm font-black text-slate-900">
@@ -1031,20 +1053,26 @@ const ProductModal = ({
               </button>
 
               {form.image.includes("google.com/search") && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-800">
-                  ⚠️ <strong>تنبيه:</strong> هذا رابط صفحة بحث جوجل وليس رابط الصورة المباشر.
-                  <br />
-                  💡 <strong>طريقة نسخ رابط الصورة الصحيح:</strong> في جوجل، اضغط مطولاً على الصورة (أو كليك يمين) واختر <u>"نسخ عنوان الصورة / Copy image address"</u> ثم الصقه هنا، أو قم بحفظ الصورة على جهازك واختيارها من تبويب <strong>"من الجهاز"</strong>.
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-800 space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <ExclamationTriangleIcon className="h-4 w-4 shrink-0 text-amber-600" />
+                    <strong>تنبيه:</strong> هذا رابط صفحة بحث جوجل وليس رابط الصورة المباشر.
+                  </div>
+                  <div className="flex items-start gap-1.5 mt-1">
+                    <LightBulbIcon className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                    <span><strong>طريقة نسخ رابط الصورة الصحيح:</strong> في جوجل، اضغط مطولاً على الصورة (أو كليك يمين) واختر <u>"نسخ عنوان الصورة / Copy image address"</u> ثم الصقه هنا، أو قم بحفظ الصورة على جهازك واختيارها من تبويب <strong>"من الجهاز"</strong>.</span>
+                  </div>
                 </div>
               )}
 
-              <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-5 text-slate-600">
-                📷 الصق رابط الصورة المباشر ثم اضغط على "معاينة الصورة" للتأكد من ظهورها
+              <div className="flex items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-5 text-slate-600">
+                <PhotoIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                <span>الصق رابط الصورة المباشر ثم اضغط على "معاينة الصورة" للتأكد من ظهورها</span>
               </div>
             </div>
           ) : (
             <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-8 text-center transition hover:border-indigo-300 hover:bg-indigo-50">
-              <span className="text-3xl">📷</span>
+              <PhotoIcon className="h-10 w-10 text-slate-400" />
               <span className="mt-2 text-sm font-black text-slate-700">
                 اختر صورة من الجهاز
               </span>

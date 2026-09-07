@@ -4,6 +4,13 @@ import { apiFetch } from "../../services/api"
 import { supabase } from "../../lib/supabase"
 import { OrderCard, OrderDetailsModal } from "../UI"
 import { confirmDelete, confirmAction, showSuccess, showError, showWarning } from "../../utils/alerts"
+import {
+  BellIcon,
+  XMarkIcon,
+  TruckIcon,
+  PhoneIcon,
+  CheckIcon,
+} from "@heroicons/react/24/outline"
 
 import type {
   Order as OrderCardOrder,
@@ -152,13 +159,13 @@ const Orders = () => {
           "
         >
           <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-2xl">
-              🔔
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+              <BellIcon className="h-6 w-6" />
             </div>
 
             <div className="min-w-0 flex-1">
               <p className="text-sm font-black text-indigo-700">
-                طلب جديد 🎉
+                طلب جديد
               </p>
 
               <p className="mt-1 text-sm font-black text-slate-900">
@@ -1168,9 +1175,10 @@ const buildDeliveryWhatsAppMessage = (
                   setDeliverySelectionOrder(null)
                   setSelectedDeliveryId(null)
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-xl text-slate-500 hover:bg-slate-100"
+                aria-label="إغلاق"
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
               >
-                ×
+                <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
 
@@ -1226,11 +1234,13 @@ const buildDeliveryWhatsAppMessage = (
 
                   return (
                     <>
-                      <p className="font-black text-emerald-800">
-                        🚚 {delivery.name}
+                      <p className="inline-flex items-center gap-1.5 font-black text-emerald-800">
+                        <TruckIcon className="h-5 w-5 text-emerald-600" />
+                        {delivery.name}
                       </p>
-                      <p className="mt-1 text-sm text-emerald-700">
-                        📞 {delivery.phone}
+                      <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-emerald-700">
+                        <PhoneIcon className="h-4 w-4 text-emerald-600" />
+                        {delivery.phone}
                       </p>
                     </>
                   )
@@ -1260,9 +1270,14 @@ const buildDeliveryWhatsAppMessage = (
                 onClick={() => void handleConfirmWithDelivery()}
                 className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {assigningDelivery
-                  ? "جاري التأكيد..."
-                  : "✓ تأكيد وإرسال WhatsApp"}
+                {assigningDelivery ? (
+                  "جاري التأكيد..."
+                ) : (
+                  <span className="inline-flex items-center justify-center gap-1.5">
+                    <CheckIcon className="h-4 w-4" />
+                    تأكيد وإرسال WhatsApp
+                  </span>
+                )}
               </button>
             </div>
           </div>

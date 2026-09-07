@@ -1,6 +1,7 @@
 import { useState, useMemo, memo } from "react"
 import { createPortal } from "react-dom"
 import { getActiveOffer } from "../services/offerService"
+import { XMarkIcon } from "@heroicons/react/24/outline"
 
 export interface iProducts {
   id: number
@@ -41,7 +42,7 @@ export interface IProps {
 }
 
 const CATEGORY_GROUPS: Record<string, string[]> = {
-  "🛒 السوبر ماركت": [
+  "السوبر ماركت": [
     "فيبا", "تايجر", "غسيل اطباق", "مخلل", "الضحى", "جهينه", "نسله",
     "مستورد", "ونستون", "مستود", "جلاش", "لببتون", "رجب", "بسبوسه",
     "مصر كافيه", "زيت وسمنه", "ايزيس", "مجموعه مقاات", "ثوث", "بيض شكلاته",
@@ -55,10 +56,10 @@ const CATEGORY_GROUPS: Record<string, string[]> = {
     "كلوركس", "ايس كريم", "اريال", "كيك", "سنبله الفرات", "جبه سايبه", "سديم",
     "كاتل كهراء", "مولتو", "العروسة", "حوا", "بسكويت شاي",
   ],
-  "📚 المكتبة": [
+  "المكتبة": [
     "كرسات وكشكيل", "لزق", "وصلات وشوحن", "اعياد ميلاد", "العاب اطفال كبيره",
   ],
-  "☕ المحمصة": [
+  "المحمصة": [
     "المقلاة", "بن العروبه", "المناخلي", "هيلس", "فاخر", "ريحانه",
     "ايمن افندى", "حبوبه", "فحم", "بن شاهين",
   ],
@@ -90,7 +91,7 @@ const getCategoryInfo = (
   }
 
   return {
-    mainCategory: "🛒 السوبر ماركت",
+    mainCategory: "السوبر ماركت",
     subCategory: category || "عام",
   }
 }
@@ -434,7 +435,7 @@ const ProductCard = ({
               gap-1
             "
           >
-            <span>{offer.offerBadge || "عرض خاص 🔥"}</span>
+            <span>{offer.offerBadge || "عرض خاص"}</span>
             {offer.discountPercentage != null && offer.discountPercentage > 0 && (
               <span className="bg-black/20 rounded px-1 text-[7px] sm:text-[9px]">
                 -{offer.discountPercentage}%
@@ -733,9 +734,10 @@ const ProductCard = ({
               <button
                 type="button"
                 onClick={() => setShowSaleOptions(false)}
-                className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100"
+                aria-label="إغلاق"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"
               >
-                ✕
+                <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
 

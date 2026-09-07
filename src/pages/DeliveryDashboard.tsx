@@ -4,6 +4,29 @@ import { supabase } from "../lib/supabase"
 import { useOutletContext } from "react-router-dom"
 import { apiFetch } from "../services/api"
 import Swal, { confirmDelete, confirmAction, showSuccess, showError } from "../utils/alerts"
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  TruckIcon,
+  ClockIcon,
+  CheckIcon,
+  CameraIcon,
+  TrashIcon,
+  ArrowRightOnRectangleIcon,
+  ArrowLeftOnRectangleIcon,
+  UserIcon,
+  PhoneIcon,
+  MapPinIcon,
+  DocumentTextIcon,
+  ChatBubbleLeftEllipsisIcon,
+  PhotoIcon,
+  BellIcon,
+  ShoppingBagIcon,
+  ArrowPathIcon,
+  ClipboardDocumentListIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+} from "@heroicons/react/24/outline"
 
 // =====================================================
 // Types
@@ -109,14 +132,14 @@ const ORDER_STATUSES = {
 
 type OrderStatus = typeof ORDER_STATUSES[keyof typeof ORDER_STATUSES]
 
-const STATUS_CONFIG: Record<OrderStatus, { label: string; className: string }> = {
-  assigned: { label: "جاهز للتوصيل", className: "bg-violet-100 text-violet-700" },
-  out_for_delivery: { label: "🚚 خارج للتوصيل", className: "bg-blue-100 text-blue-700" },
-  delivered: { label: "✅ تم التوصيل", className: "bg-emerald-100 text-emerald-700" },
-  confirmed: { label: "تم التأكيد", className: "bg-amber-100 text-amber-700" },
+const STATUS_CONFIG: Record<OrderStatus, { label: string; className: string; icon: React.ComponentType<{ className?: string }> }> = {
+  assigned: { label: "جاهز للتوصيل", className: "bg-violet-100 text-violet-700", icon: ClockIcon },
+  out_for_delivery: { label: "خارج للتوصيل", className: "bg-blue-100 text-blue-700", icon: TruckIcon },
+  delivered: { label: "تم التوصيل", className: "bg-emerald-100 text-emerald-700", icon: CheckCircleIcon },
+  confirmed: { label: "تم التأكيد", className: "bg-amber-100 text-amber-700", icon: CheckIcon },
 }
 
-const DEFAULT_STATUS_CONFIG = { label: "غير محدد", className: "bg-amber-100 text-amber-700" }
+const DEFAULT_STATUS_CONFIG = { label: "غير محدد", className: "bg-amber-100 text-amber-700", icon: ClockIcon }
 
 const getStatusConfig = (status: string) => {
   return STATUS_CONFIG[status as OrderStatus] ?? DEFAULT_STATUS_CONFIG
@@ -330,7 +353,7 @@ export default function DeliveryDashboard() {
         })
         await showSuccess(
           "تم تسجيل الحضور بنجاح",
-          res.message || "أهلاً بك! تم تسجيل الحضور وأصبحت متاحاً الآن 🟢"
+          res.message || "أهلاً بك! تم تسجيل الحضور وأصبحت متاحاً الآن"
         )
         void loadHistory()
       }
@@ -415,11 +438,11 @@ export default function DeliveryDashboard() {
       (toastInstance) => (
         <div className="w-[min(92vw,420px)] rounded-2xl border border-indigo-200 bg-white p-4 text-right shadow-2xl ring-1 ring-black/5 animate-slideUp">
           <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-2xl">
-              🚚
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+              <TruckIcon className="w-6 h-6" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-black text-indigo-700">طلب جديد مسند إليك 🎉</p>
+              <p className="text-sm font-black text-indigo-700">طلب جديد مسند إليك</p>
               <p className="mt-1 text-sm font-black text-slate-900">الطلب #{order.id}</p>
               <p className="mt-1 truncate text-xs font-semibold text-slate-500">
                 العميل: {order.customer_name}
@@ -763,8 +786,8 @@ export default function DeliveryDashboard() {
 
       toast.success(
         action === "out"
-          ? "تم تسجيل خروجك للتوصيل 🚚"
-          : "تم تسجيل وصول الطلب بنجاح ✅"
+          ? "تم تسجيل خروجك للتوصيل"
+          : "تم تسجيل وصول الطلب بنجاح"
       )
     } catch (error) {
       console.error("UPDATE DELIVERY STATUS ERROR:", error)
@@ -891,7 +914,10 @@ export default function DeliveryDashboard() {
 
     return (
       <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-        <p className="text-xs font-bold text-emerald-700">📸 صورة التأكيد</p>
+        <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+          <CameraIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span>صورة التأكيد</span>
+        </p>
         <img
           src={imageUrl}
           alt="تأكيد التوصيل"
@@ -917,18 +943,26 @@ export default function DeliveryDashboard() {
         <button
           type="button"
           onClick={() => openWhatsApp(order)}
-          className="w-full rounded-2xl bg-[#25D366] px-5 py-3 font-bold text-white transition hover:brightness-95"
+          className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-5 py-3 font-bold text-white transition hover:brightness-95"
         >
-          💬 إرسال تفاصيل الطلب على واتساب
+          <ChatBubbleLeftEllipsisIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
+          <span>إرسال تفاصيل الطلب على واتساب</span>
         </button>
 
         {isAssignedOrConfirmed && (
           <button
             onClick={() => void updateOrderStatus(order.id, "out")}
             disabled={isWorking}
-            className="flex-1 rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-500 disabled:opacity-50"
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-500 disabled:opacity-50"
           >
-            {isWorking ? "جاري التحديث..." : "🚚 أنا خارج للتوصيل"}
+            {isWorking ? (
+              <span>جاري التحديث...</span>
+            ) : (
+              <>
+                <TruckIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <span>أنا خارج للتوصيل</span>
+              </>
+            )}
           </button>
         )}
 
@@ -936,30 +970,40 @@ export default function DeliveryDashboard() {
           <button
             onClick={() => openConfirmModal(order.id)}
             disabled={isWorking}
-            className="flex-1 rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            📸 تأكيد التوصيل بالصورة
+            <CameraIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
+            <span>تأكيد التوصيل بالصورة</span>
           </button>
         )}
 
         {isDelivered && (
           <div className="w-full space-y-2">
-            <div className="rounded-2xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">
-              ✅ تم توصيل الطلب
-              {order.delivered_at && ` في ${formatDate(order.delivered_at)}`}
-              {order.delivery_proof_image && " 📸 مع صورة تأكيد"}
+            <div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">
+              <CheckCircleIcon className="w-4 h-4 shrink-0 text-emerald-600" aria-hidden="true" />
+              <span>تم توصيل الطلب</span>
+              {order.delivered_at && <span>في {formatDate(order.delivered_at)}</span>}
+              {order.delivery_proof_image && (
+                <span className="inline-flex items-center gap-1 text-xs text-emerald-800">
+                  <CameraIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  <span>مع صورة تأكيد</span>
+                </span>
+              )}
             </div>
             <button
               onClick={() => deleteOrder(order.id)}
               disabled={isDeleting}
-              className="w-full rounded-2xl border-2 border-red-200 bg-red-50 px-5 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-red-200 bg-red-50 px-5 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isDeleting ? (
                 <span className="flex items-center justify-center gap-2">
                   <SpinnerIcon /> جاري الحذف...
                 </span>
               ) : (
-                "🗑 حذف الطلب"
+                <>
+                  <TrashIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span>حذف الطلب</span>
+                </>
               )}
             </button>
           </div>
@@ -984,16 +1028,17 @@ export default function DeliveryDashboard() {
         <div>
           <p className="text-sm font-bold text-indigo-600">لوحة الدليفري</p>
           <h1 className="mt-1 text-2xl font-black text-slate-900">
-            أهلاً يا {user?.name || "دليفري"} 👋
+            أهلاً يا {user?.name || "دليفري"}
           </h1>
           <p className="mt-1 text-sm text-slate-500">الطلبات المسندة إليك</p>
         </div>
         <button
           onClick={() => void loadOrders(true, false)}
           disabled={loading}
-          className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
         >
-          ↻ تحديث الطلبات
+          <ArrowPathIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span>تحديث الطلبات</span>
         </button>
       </div>
 
@@ -1015,7 +1060,8 @@ export default function DeliveryDashboard() {
                 </span>
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-700">
-                    🟢 متواجد الآن (قيد العمل)
+                    <CheckCircleIcon className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
+                    <span>متواجد الآن (قيد العمل)</span>
                   </span>
                   <p className="mt-1 text-xs font-semibold text-slate-500">
                     أنت مسجل كحاضر ومتاح لاستلام وتوصيل الطلبات
@@ -1028,7 +1074,8 @@ export default function DeliveryDashboard() {
                 disabled={attendanceLoading}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-600 px-6 py-3 text-base font-black text-white shadow-lg shadow-rose-200 transition hover:bg-rose-500 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
               >
-                🚪 أنا مشيت (تسجيل الانصراف)
+                <ArrowRightOnRectangleIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <span>أنا مشيت (تسجيل الانصراف)</span>
               </button>
             </div>
 
@@ -1042,8 +1089,9 @@ export default function DeliveryDashboard() {
 
               <div className="rounded-2xl bg-emerald-50 p-4">
                 <p className="text-xs font-bold text-emerald-600">مدة العمل الحالية</p>
-                <p className="mt-1 text-lg font-black text-emerald-700">
-                  ⏱️ {liveDuration}
+                <p className="mt-1 inline-flex items-center gap-1.5 text-lg font-black text-emerald-700">
+                  <ClockIcon className="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true" />
+                  <span>{liveDuration}</span>
                 </p>
               </div>
 
@@ -1060,12 +1108,13 @@ export default function DeliveryDashboard() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 text-xl font-bold">
-                  🔴
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
+                  <XCircleIcon className="w-6 h-6" aria-hidden="true" />
                 </div>
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-1 text-sm font-black text-rose-700">
-                    تم تسجيل الانصراف
+                    <XCircleIcon className="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true" />
+                    <span>تم تسجيل الانصراف</span>
                   </span>
                   <p className="mt-1 text-xs font-semibold text-slate-500">
                     تم إنهاء الوردية وحساب مدة العمل رسميًا في الخادم
@@ -1078,7 +1127,8 @@ export default function DeliveryDashboard() {
                 disabled={attendanceLoading}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-base font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-500 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
               >
-                🟢 أنا وصلت (تسجيل وردية جديدة)
+                <ArrowLeftOnRectangleIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <span>أنا وصلت (تسجيل وردية جديدة)</span>
               </button>
             </div>
 
@@ -1109,8 +1159,8 @@ export default function DeliveryDashboard() {
           /* State 1: Before Arrival */
           <div className="flex flex-wrap items-center justify-between gap-6 py-2">
             <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-3xl">
-                ⏳
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+                <ClockIcon className="w-7 h-7" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-xs font-black uppercase tracking-wider text-slate-400">
@@ -1130,7 +1180,8 @@ export default function DeliveryDashboard() {
               disabled={attendanceLoading}
               className="inline-flex items-center justify-center gap-3 rounded-2xl bg-emerald-600 px-8 py-4 text-lg font-black text-white shadow-xl shadow-emerald-200 transition hover:bg-emerald-500 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             >
-              📍 أنا وصلت
+              <ArrowLeftOnRectangleIcon className="w-6 h-6 shrink-0" aria-hidden="true" />
+              <span>أنا وصلت (تسجيل حضور)</span>
             </button>
           </div>
         )}
@@ -1141,13 +1192,28 @@ export default function DeliveryDashboard() {
             onClick={() => setShowHistory(!showHistory)}
             className="flex items-center gap-2 text-xs font-bold text-indigo-600 transition hover:text-indigo-800"
           >
-            <span>📋 سجل الحضور السابق</span>
+            <span className="inline-flex items-center gap-1.5">
+              <ClipboardDocumentListIcon className="w-4 h-4 text-indigo-600 shrink-0" aria-hidden="true" />
+              <span>سجل الحضور السابق</span>
+            </span>
             {attendanceHistory.length > 0 && (
               <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-black text-indigo-700">
                 {attendanceHistory.length}
               </span>
             )}
-            <span className="text-[10px]">{showHistory ? "▲ إخفاء" : "▼ عرض"}</span>
+            <span className="inline-flex items-center gap-0.5 text-[10px]">
+              {showHistory ? (
+                <>
+                  <ChevronUpIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>إخفاء</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDownIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>عرض</span>
+                </>
+              )}
+            </span>
           </button>
 
           {showHistory && (
@@ -1253,7 +1319,9 @@ const NewOrdersAlert = ({ count, onDismiss }: { count: number; onDismiss: () => 
   <div className="mb-4 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 animate-pulse">
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-3">
-        <span className="text-2xl">🔔</span>
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+          <BellIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
+        </div>
         <div>
           <p className="font-black text-indigo-700">
             لديك {count} طلب{count > 1 ? "ات" : ""} جديد{count > 1 ? "ة" : ""}
@@ -1296,7 +1364,7 @@ const LoadingState = () => (
 // Empty State
 const EmptyState = () => (
   <div className="rounded-3xl bg-white py-20 text-center shadow-sm">
-    <div className="text-6xl">📦</div>
+    <ShoppingBagIcon className="w-16 h-16 text-slate-300 mx-auto" aria-hidden="true" />
     <h2 className="mt-5 text-xl font-black text-slate-800">مفيش طلبات مسندة ليك</h2>
     <p className="mt-2 text-sm text-slate-400">لما الأدمن يعين لك طلب هيظهر هنا.</p>
   </div>
@@ -1315,6 +1383,7 @@ const OrderCard = ({
   renderOrderActions: (order: Order) => React.ReactNode
 }) => {
   const statusConfig = getStatusConfig(order.status)
+  const StatusIcon = statusConfig.icon || ClockIcon
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
@@ -1323,16 +1392,31 @@ const OrderCard = ({
           <p className="text-xs font-bold text-slate-400">رقم الطلب</p>
           <h2 className="text-xl font-black text-slate-900">#{order.id}</h2>
         </div>
-        <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${statusConfig.className}`}>
-          {statusConfig.label}
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${statusConfig.className}`}>
+          <StatusIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span>{statusConfig.label}</span>
         </span>
       </div>
 
       <div className="mt-5 space-y-3 rounded-2xl bg-slate-50 p-4">
-        <p className="font-bold text-slate-800">👤 {order.customer_name}</p>
-        <p className="text-sm text-slate-600">📞 {order.phone}</p>
-        <p className="text-sm leading-6 text-slate-600">📍 {order.address}</p>
-        {order.notes && <p className="text-sm text-slate-500">📝 {order.notes}</p>}
+        <p className="flex items-center gap-2 font-bold text-slate-800">
+          <UserIcon className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+          <span>{order.customer_name}</span>
+        </p>
+        <p className="flex items-center gap-2 text-sm text-slate-600">
+          <PhoneIcon className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+          <span>{order.phone}</span>
+        </p>
+        <p className="flex items-center gap-2 text-sm leading-6 text-slate-600">
+          <MapPinIcon className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+          <span>{order.address}</span>
+        </p>
+        {order.notes && (
+          <p className="flex items-center gap-2 text-sm text-slate-500">
+            <DocumentTextIcon className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+            <span>{order.notes}</span>
+          </p>
+        )}
         <div className="flex items-center justify-between border-t border-slate-200 pt-3">
           <span className="text-sm font-bold text-slate-500">الإجمالي</span>
           <span className="text-lg font-black text-indigo-600">{formatMoney(order.total)} جنيه</span>
@@ -1342,7 +1426,10 @@ const OrderCard = ({
       {/* مواعيد التوصيل */}
       {(order.assigned_at || order.picked_up_at || order.delivered_at) && (
         <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-3 text-center">
-          <p className="mb-2 text-xs font-black text-indigo-900">⏱️ توقيت مراحل الطلب</p>
+          <p className="mb-2 flex items-center justify-center gap-1.5 text-xs font-black text-indigo-900">
+            <ClockIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" aria-hidden="true" />
+            <span>توقيت مراحل الطلب</span>
+          </p>
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-indigo-100 bg-white p-2">
               <p className="text-[10px] font-bold text-indigo-600">تم التعيين</p>
@@ -1400,7 +1487,7 @@ const ConfirmDeliveryModal = ({
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,_white_1px,_transparent_1px)] bg-[length:20px_20px] opacity-10" />
         <div className="relative z-10">
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
-            <span className="text-3xl">📸</span>
+            <CameraIcon className="w-8 h-8 text-white" aria-hidden="true" />
           </div>
           <h2 className="text-xl font-black">تأكيد التوصيل</h2>
           <p className="mt-1 text-sm text-white/80">ارفع صورة تأكيد وصول الطلب #{orderId}</p>
@@ -1415,11 +1502,14 @@ const ConfirmDeliveryModal = ({
             {deliveryImagePreview ? (
               <div className="w-full">
                 <img src={deliveryImagePreview} alt="معاينة الصورة" className="mx-auto max-h-48 rounded-lg object-cover" />
-                <p className="mt-2 text-sm font-bold text-emerald-600">✓ تم اختيار الصورة</p>
+                <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600">
+                  <CheckCircleIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span>تم اختيار الصورة</span>
+                </p>
               </div>
             ) : (
               <>
-                <span className="text-4xl">🖼️</span>
+                <PhotoIcon className="w-10 h-10 text-slate-400" aria-hidden="true" />
                 <span className="mt-2 text-sm font-bold text-slate-700">اختر صورة التأكيد</span>
                 <span className="mt-1 text-xs text-slate-400">JPG, PNG, WEBP - حتى 5MB</span>
               </>
@@ -1454,7 +1544,10 @@ const ConfirmDeliveryModal = ({
                 <SpinnerIcon /> جاري التأكيد...
               </span>
             ) : (
-              "✅ تأكيد التوصيل"
+              <span className="inline-flex items-center justify-center gap-1.5">
+                <CheckIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>تأكيد التوصيل</span>
+              </span>
             )}
           </button>
         </div>
@@ -1462,6 +1555,7 @@ const ConfirmDeliveryModal = ({
     </div>
   </div>
 )
+
 
 // Modal Styles
 const ModalStyles = () => (

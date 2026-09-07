@@ -4,7 +4,31 @@ import Navbar from "../components/Navbar";
 import type { CartItem } from "../App"; 
 import { logoutCustomer } from "../services/authService";
 import Swal from "sweetalert2";
+import { BackToTop } from "../components/UI";
 import { apiFetch } from "../services/api"; 
+import {
+  ClockIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  TruckIcon,
+  SparklesIcon,
+  ClipboardDocumentListIcon,
+  ShoppingBagIcon,
+  CalendarDaysIcon,
+  CreditCardIcon,
+  PencilSquareIcon,
+  XMarkIcon,
+  PlusIcon,
+  MinusIcon,
+  TrashIcon,
+  MagnifyingGlassIcon,
+  MapPinIcon,
+  DocumentTextIcon,
+  CheckIcon,
+  ArrowRightIcon,
+  ExclamationTriangleIcon,
+  EyeIcon,
+} from "@heroicons/react/24/outline";
 
 const API_URL = import.meta.env.VITE_API_URL || "";
 
@@ -44,47 +68,47 @@ type Filter = "all" | "pending" | "confirmed" | "out_for_delivery" | "delivered"
 
 const statusConfig: Record<
   string,
-  { label: string; className: string; icon: string }
+  { label: string; className: string; icon: React.ComponentType<{ className?: string }> }
 > = {
   pending: {
     label: "في انتظار التأكيد",
     className: "bg-amber-50 text-amber-700 border-amber-200",
-    icon: "⏳",
+    icon: ClockIcon,
   },
   pending_approval: {
     label: "في انتظار التأكيد",
     className: "bg-amber-50 text-amber-700 border-amber-200",
-    icon: "⏳",
+    icon: ClockIcon,
   },
   confirmed: {
     label: "تم تأكيد الطلب",
     className: "bg-blue-50 text-blue-700 border-blue-200",
-    icon: "✓",
+    icon: CheckCircleIcon,
   },
   assigned: {
     label: "تم تعيين الدليفري",
     className: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    icon: "🚚",
+    icon: TruckIcon,
   },
   preparing: {
     label: "جاري التجهيز",
     className: "bg-cyan-50 text-cyan-700 border-cyan-200",
-    icon: "🍳",
+    icon: SparklesIcon,
   },
   out_for_delivery: {
     label: "قيد التوصيل",
     className: "bg-violet-50 text-violet-700 border-violet-200",
-    icon: "🚚",
+    icon: TruckIcon,
   },
   delivered: {
     label: "تم التوصيل",
     className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    icon: "✓",
+    icon: CheckCircleIcon,
   },
   cancelled: {
     label: "ملغي",
     className: "bg-red-50 text-red-700 border-red-200",
-    icon: "✕",
+    icon: XCircleIcon,
   },
 };
 
@@ -632,11 +656,13 @@ export default function CustomerOrders({
                 to="/"
                 className="inline-flex items-center gap-1.5 text-sm font-bold text-[#17656b] hover:underline"
               >
-                <span>←</span> العودة للمتجر
+                <ArrowRightIcon className="w-4 h-4 rtl:rotate-0" aria-hidden="true" />
+                <span>العودة للمتجر</span>
               </Link>
 
-              <h1 className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">
-                📋 طلباتي
+              <h1 className="mt-2 flex items-center gap-2 text-2xl font-black text-slate-900 sm:text-3xl">
+                <ClipboardDocumentListIcon className="w-7 h-7 text-[#17656b]" aria-hidden="true" />
+                <span>طلباتي</span>
               </h1>
 
               <p className="mt-1 text-sm font-medium text-slate-500">
@@ -645,8 +671,8 @@ export default function CustomerOrders({
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="hidden items-center gap-1 rounded-full bg-[#17656b]/10 px-4 py-2 text-sm font-bold text-[#17656b] sm:flex">
-                <span className="text-lg">📦</span>
+              <div className="hidden items-center gap-1.5 rounded-full bg-[#17656b]/10 px-4 py-2 text-sm font-bold text-[#17656b] sm:flex">
+                <ShoppingBagIcon className="w-5 h-5 text-[#17656b]" aria-hidden="true" />
                 <span>{orders.length}</span>
                 <span className="font-normal text-slate-500">طلب</span>
               </div>
@@ -655,7 +681,10 @@ export default function CustomerOrders({
 
           {/* Date Filter Bar */}
           <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-            <span className="text-xs font-black text-slate-500">تصفية التاريخ:</span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-black text-slate-500">
+              <CalendarDaysIcon className="w-4 h-4 text-slate-400" aria-hidden="true" />
+              <span>تصفية التاريخ:</span>
+            </span>
             <div className="relative">
               <select
                 value={dateFilter}
@@ -753,8 +782,8 @@ export default function CustomerOrders({
           </div>
         ) : error ? (
           <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-8 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-2xl text-rose-600">
-              ⚠️
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
+              <ExclamationTriangleIcon className="w-8 h-8" aria-hidden="true" />
             </div>
             <h3 className="mt-4 text-lg font-black text-rose-900">تعذر تحميل الطلبات</h3>
             <p className="mt-1 text-sm text-rose-600">{error}</p>
@@ -768,8 +797,8 @@ export default function CustomerOrders({
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-3xl">
-              📦
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-400">
+              <ShoppingBagIcon className="w-8 h-8" aria-hidden="true" />
             </div>
             <h3 className="mt-4 text-lg font-black text-slate-900">لا توجد طلبات</h3>
             <p className="mt-1 text-sm text-slate-500">
@@ -781,7 +810,8 @@ export default function CustomerOrders({
               to="/"
               className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#17656b] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#17656b]/20 transition hover:bg-[#0e4347]"
             >
-              <span>🛍️</span> ابدأ التسوق الآن
+              <ShoppingBagIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>ابدأ التسوق الآن</span>
             </Link>
           </div>
         ) : (
@@ -789,6 +819,7 @@ export default function CustomerOrders({
             {filteredOrders.map((order) => {
               const status = normalizeStatus(order.status);
               const badge = statusConfig[status] || statusConfig.pending;
+              const StatusIcon = badge.icon;
               const items = getItems(order);
               const isOrderPending = isPendingOrder(order.status);
 
@@ -808,7 +839,7 @@ export default function CustomerOrders({
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black ${badge.className}`}
                       >
-                        <span>{badge.icon}</span>
+                        <StatusIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                         <span>{badge.label}</span>
                       </span>
                     </div>
@@ -816,11 +847,17 @@ export default function CustomerOrders({
                     {/* Meta info */}
                     <div className="mt-4 space-y-2 text-xs font-semibold text-slate-500">
                       <div className="flex items-center justify-between">
-                        <span>📅 تاريخ الطلب</span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <CalendarDaysIcon className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                          <span>تاريخ الطلب</span>
+                        </span>
                         <span className="font-bold text-slate-700">{formatDate(order.created_at)}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span>💳 طريقة الدفع</span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <CreditCardIcon className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                          <span>طريقة الدفع</span>
+                        </span>
                         <span className="font-bold text-slate-700">
                           {order.payment_method === "electronic" || order.payment_method === "bank_transfer"
                             ? "تحويل بنكي / إلكتروني"
@@ -868,9 +905,10 @@ export default function CustomerOrders({
                     <button
                       type="button"
                       onClick={() => setSelectedOrder(order)}
-                      className="w-full rounded-2xl border border-[#17656b]/20 bg-[#17656b]/5 px-5 py-3 text-sm font-black text-[#17656b] transition hover:bg-[#17656b]/10 hover:shadow-md"
+                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-2xl border border-[#17656b]/20 bg-[#17656b]/5 px-5 py-3 text-sm font-black text-[#17656b] transition hover:bg-[#17656b]/10 hover:shadow-md"
                     >
-                      عرض تفاصيل الطلب
+                      <EyeIcon className="w-4 h-4" aria-hidden="true" />
+                      <span>عرض تفاصيل الطلب</span>
                     </button>
 
                     {isOrderPending ? (
@@ -878,17 +916,25 @@ export default function CustomerOrders({
                         <button
                           type="button"
                           onClick={() => openEditModal(order)}
-                          className="flex-1 rounded-xl bg-amber-500 px-3 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-amber-600 hover:scale-[1.01]"
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-amber-600 hover:scale-[1.01]"
                         >
-                          ✏️ تعديل الطلب
+                          <PencilSquareIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                          <span>تعديل الطلب</span>
                         </button>
                         <button
                           type="button"
                           disabled={cancellingId === order.id}
                           onClick={() => void handleCancelOrder(order)}
-                          className="flex-1 rounded-xl bg-rose-600 px-3 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-rose-700 hover:scale-[1.01] disabled:opacity-50"
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-rose-700 hover:scale-[1.01] disabled:opacity-50"
                         >
-                          {cancellingId === order.id ? "جاري الإلغاء..." : "✕ إلغاء الطلب"}
+                          {cancellingId === order.id ? (
+                            <span>جاري الإلغاء...</span>
+                          ) : (
+                            <>
+                              <XMarkIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                              <span>إلغاء الطلب</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     ) : status === "cancelled" ? (
@@ -922,9 +968,10 @@ export default function CustomerOrders({
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200"
+                aria-label="إغلاق"
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 transition"
               >
-                ✕
+                <XMarkIcon className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
 
@@ -932,23 +979,26 @@ export default function CustomerOrders({
               {/* Order Status Badge */}
               <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
                 <span className="text-sm font-bold text-slate-500">حالة الطلب:</span>
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black ${
-                    (statusConfig[normalizeStatus(selectedOrder.status)] || statusConfig.pending).className
-                  }`}
-                >
-                  <span>
-                    {(statusConfig[normalizeStatus(selectedOrder.status)] || statusConfig.pending).icon}
-                  </span>
-                  <span>
-                    {(statusConfig[normalizeStatus(selectedOrder.status)] || statusConfig.pending).label}
-                  </span>
-                </span>
+                {(() => {
+                  const badge = statusConfig[normalizeStatus(selectedOrder.status)] || statusConfig.pending;
+                  const StatusIcon = badge.icon;
+                  return (
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black ${badge.className}`}
+                    >
+                      <StatusIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                      <span>{badge.label}</span>
+                    </span>
+                  );
+                })()}
               </div>
 
               {/* Products List */}
               <div>
-                <h3 className="mb-3 text-base font-black text-slate-800">📦 المنتجات المطلوبة</h3>
+                <h3 className="mb-3 flex items-center gap-2 text-base font-black text-slate-800">
+                  <ShoppingBagIcon className="w-5 h-5 text-[#17656b] shrink-0" aria-hidden="true" />
+                  <span>المنتجات المطلوبة</span>
+                </h3>
                 <div className="space-y-3">
                   {getItems(selectedOrder).map((item, index) => (
                     <div
@@ -956,8 +1006,8 @@ export default function CustomerOrders({
                       className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-3"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-slate-200 text-base">
-                          🛍️
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400">
+                          <ShoppingBagIcon className="w-5 h-5 text-slate-400" aria-hidden="true" />
                         </div>
                         <div>
                           <h4 className="text-sm font-bold text-slate-800">
@@ -1007,7 +1057,10 @@ export default function CustomerOrders({
               {/* Address info */}
               {selectedOrder.address && (
                 <div>
-                  <h3 className="mb-2 text-base font-black text-slate-800">📍 عنوان التوصيل</h3>
+                  <h3 className="mb-2 flex items-center gap-2 text-base font-black text-slate-800">
+                    <MapPinIcon className="w-4 h-4 text-[#17656b] shrink-0" aria-hidden="true" />
+                    <span>عنوان التوصيل</span>
+                  </h3>
                   <div className="rounded-2xl border border-slate-100/80 bg-slate-50/80 p-4 text-sm font-semibold text-slate-600">
                     {selectedOrder.address}
                   </div>
@@ -1017,7 +1070,10 @@ export default function CustomerOrders({
               {/* Notes */}
               {selectedOrder.notes && (
                 <div>
-                  <h3 className="mb-2 text-base font-black text-slate-800">📝 ملاحظات</h3>
+                  <h3 className="mb-2 flex items-center gap-2 text-base font-black text-slate-800">
+                    <DocumentTextIcon className="w-4 h-4 text-[#17656b] shrink-0" aria-hidden="true" />
+                    <span>ملاحظات</span>
+                  </h3>
                   <div className="rounded-2xl border border-slate-100/80 bg-slate-50/80 p-4 text-sm font-semibold text-slate-600">
                     {selectedOrder.notes}
                   </div>
@@ -1033,17 +1089,25 @@ export default function CustomerOrders({
                       onClick={() => {
                         openEditModal(selectedOrder);
                       }}
-                      className="w-full sm:flex-1 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-amber-600"
+                      className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-amber-600"
                     >
-                      ✏️ تعديل محتويات الطلب
+                      <PencilSquareIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      <span>تعديل محتويات الطلب</span>
                     </button>
                     <button
                       type="button"
                       disabled={cancellingId === selectedOrder.id}
                       onClick={() => void handleCancelOrder(selectedOrder)}
-                      className="w-full sm:flex-1 rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-rose-700 disabled:opacity-50"
+                      className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white shadow-md transition hover:bg-rose-700 disabled:opacity-50"
                     >
-                      {cancellingId === selectedOrder.id ? "جاري الإلغاء..." : "✕ إلغاء الطلب"}
+                      {cancellingId === selectedOrder.id ? (
+                        <span>جاري الإلغاء...</span>
+                      ) : (
+                        <>
+                          <XMarkIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                          <span>إلغاء الطلب</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 ) : normalizeStatus(selectedOrder.status) === "cancelled" ? (
@@ -1071,7 +1135,8 @@ export default function CustomerOrders({
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-5">
               <div>
                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                  <span>✏️</span> تعديل الطلب
+                  <PencilSquareIcon className="w-5 h-5 text-amber-600 shrink-0" aria-hidden="true" />
+                  <span>تعديل الطلب</span>
                 </h2>
                 <p className="text-xs font-bold text-slate-500 mt-0.5">
                   طلب رقم #{editingOrder.id} • قم بتعديل الكميات أو إضافة وحذف المنتجات
@@ -1080,9 +1145,10 @@ export default function CustomerOrders({
               <button
                 type="button"
                 onClick={() => setEditingOrder(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm border border-slate-200 hover:text-slate-700 hover:border-slate-300 transition"
+                aria-label="إغلاق"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm border border-slate-200 hover:text-slate-700 hover:border-slate-300 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >
-                ✕
+                <XMarkIcon className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
 
@@ -1092,14 +1158,25 @@ export default function CustomerOrders({
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-black text-slate-800 flex items-center gap-1.5">
-                    <span>📦</span> محتويات الطلب ({editItems.length})
+                    <ShoppingBagIcon className="w-4 h-4 text-[#17656b] shrink-0" aria-hidden="true" />
+                    <span>محتويات الطلب ({editItems.length})</span>
                   </h3>
                   <button
                     type="button"
                     onClick={() => setShowAddProductSection((prev) => !prev)}
                     className="inline-flex items-center gap-1 text-xs font-black text-[#17656b] hover:text-[#0e4347] bg-[#17656b]/10 hover:bg-[#17656b]/20 px-3 py-1.5 rounded-xl transition"
                   >
-                    <span>{showAddProductSection ? "✕ إخفاء القائمة" : "+ إضافة منتجات"}</span>
+                    {showAddProductSection ? (
+                      <span className="inline-flex items-center gap-1">
+                        <XMarkIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        <span>إخفاء القائمة</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        <PlusIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        <span>إضافة منتجات</span>
+                      </span>
+                    )}
                   </button>
                 </div>
 
@@ -1150,10 +1227,10 @@ export default function CustomerOrders({
                             <button
                               type="button"
                               onClick={() => void handleQuantityChange(item.product_id, -1)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-700 hover:bg-slate-200 active:scale-95 transition"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 transition"
                               aria-label="تقليل الكمية"
                             >
-                              -
+                              <MinusIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                             </button>
                             <span className="w-8 text-center text-sm font-black text-slate-900">
                               {item.quantity}
@@ -1162,10 +1239,10 @@ export default function CustomerOrders({
                               type="button"
                               disabled={item.quantity >= getMaxAllowedStock(item.product_id)}
                               onClick={() => void handleQuantityChange(item.product_id, 1)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-700 hover:bg-slate-200 active:scale-95 transition disabled:opacity-35 disabled:cursor-not-allowed"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 transition disabled:opacity-35 disabled:cursor-not-allowed"
                               aria-label="زيادة الكمية"
                             >
-                              +
+                              <PlusIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                             </button>
                           </div>
 
@@ -1173,10 +1250,11 @@ export default function CustomerOrders({
                           <button
                             type="button"
                             onClick={() => void handleRemoveItem(item.product_id)}
-                            className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600 hover:bg-rose-100 active:scale-95 transition shadow-sm"
+                            className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600 hover:bg-rose-100 active:scale-95 transition shadow-sm"
                             aria-label="حذف المنتج من الطلب"
                           >
-                            حذف
+                            <TrashIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                            <span>حذف</span>
                           </button>
                         </div>
                       </div>
@@ -1190,7 +1268,8 @@ export default function CustomerOrders({
                 <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3 animate-fadeIn">
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-black text-indigo-950 flex items-center gap-1.5">
-                      <span>🛍️</span> إضافة منتجات من المتجر
+                      <ShoppingBagIcon className="w-4 h-4 text-indigo-600 shrink-0" aria-hidden="true" />
+                      <span>إضافة منتجات من المتجر</span>
                     </h4>
                     <span className="text-[11px] font-bold text-indigo-700">
                       اختر المنتج لإضافته مباشرةً
@@ -1199,12 +1278,16 @@ export default function CustomerOrders({
 
                   {/* Search Bar */}
                   <div className="relative">
+                    <MagnifyingGlassIcon
+                      className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                      aria-hidden="true"
+                    />
                     <input
                       type="text"
                       value={productSearchQuery}
                       onChange={(e) => setProductSearchQuery(e.target.value)}
                       placeholder="ابحث عن منتج بالاسم..."
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none focus:border-[#17656b] focus:ring-2 focus:ring-[#17656b]/20"
+                      className="w-full rounded-xl border border-slate-200 bg-white pr-10 pl-4 py-2.5 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none focus:border-[#17656b] focus:ring-2 focus:ring-[#17656b]/20"
                     />
                   </div>
 
@@ -1272,13 +1355,21 @@ export default function CustomerOrders({
                                   : "bg-[#17656b] text-white hover:bg-[#0e4347]"
                               }`}
                             >
-                              {isOutOfStock
-                                ? "غير متوفر"
-                                : isMaxReached
-                                ? "الحد الأقصى"
-                                : currentInOrder > 0
-                                ? "+ زيادة الكمية"
-                                : "+ إضافة للطلب"}
+                              {isOutOfStock ? (
+                                "غير متوفر"
+                              ) : isMaxReached ? (
+                                "الحد الأقصى"
+                              ) : currentInOrder > 0 ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <PlusIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  <span>زيادة الكمية</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1">
+                                  <PlusIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  <span>إضافة للطلب</span>
+                                </span>
+                              )}
                             </button>
                           </div>
                         );
@@ -1331,10 +1422,13 @@ export default function CustomerOrders({
                   {savingEdit ? (
                     <>
                       <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      جاري حفظ التعديلات...
+                      <span>جاري حفظ التعديلات...</span>
                     </>
                   ) : (
-                    "✓ حفظ التعديلات"
+                    <span className="inline-flex items-center gap-2">
+                      <CheckIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      <span>حفظ التعديلات</span>
+                    </span>
                   )}
                 </button>
               </div>
@@ -1342,6 +1436,9 @@ export default function CustomerOrders({
           </div>
         </div>
       )}
+
+      {/* Floating Back to Top with Scroll Progress */}
+      <BackToTop />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { type FormEvent, useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { apiFetch } from "../services/api"
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline"
 
 export default function Login() {
   const navigate = useNavigate()
@@ -131,7 +132,7 @@ export default function Login() {
               role="alert"
               className="mb-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700 shadow-sm transition-all"
             >
-              <span className="shrink-0 text-base">⚠️</span>
+              <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-red-600" />
               <p className="flex-1 leading-6">{error}</p>
             </div>
           )}

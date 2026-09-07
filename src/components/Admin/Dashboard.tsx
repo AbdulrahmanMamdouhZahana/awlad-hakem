@@ -20,6 +20,21 @@ import { apiFetch } from "../../services/api"
 import { OrderCard, OrderDetailsModal, ProductModal } from "../UI"
 import type { Order as OrderCardOrder } from "../UI/Cards/OrderCard"
 import { confirmDelete } from "../../utils/alerts"
+import {
+  ArrowPathIcon,
+  ChevronLeftIcon,
+  ClipboardDocumentListIcon,
+  PhoneIcon,
+  PlusIcon,
+  TruckIcon,
+  CubeIcon,
+  XMarkIcon,
+  CheckIcon,
+  EnvelopeIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline"
 
 // =====================================================
 // Product
@@ -1661,10 +1676,11 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={loadOrders} disabled={ordersLoading} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-50">
-                        <span className={ordersLoading ? "animate-spin" : ""}>↻</span> تحديث الطلبات
+                        <ArrowPathIcon className={`h-4 w-4 ${ordersLoading ? "animate-spin" : ""}`} /> تحديث الطلبات
                       </button>
-                      <Link to="/admin/orders" className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-500">
-                        عرض الكل ←
+                      <Link to="/admin/orders" className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-500">
+                        <span>عرض الكل</span>
+                        <ChevronLeftIcon className="h-4 w-4" />
                       </Link>
                     </div>
                   </div>
@@ -1678,7 +1694,7 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                     </div>
                   ) : orders.length === 0 ? (
                     <div className="rounded-2xl bg-slate-50 py-14 text-center">
-                      <div className="text-5xl">📋</div>
+                      <ClipboardDocumentListIcon className="mx-auto h-12 w-12 text-slate-300" />
                       <p className="mt-4 font-bold text-slate-700">لا توجد طلبات حالياً</p>
                       <p className="mt-1 text-sm text-slate-400">الطلبات الجديدة ستظهر هنا تلقائياً.</p>
                     </div>
@@ -1842,8 +1858,8 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                               <div>
                                 <h4 className="font-black text-slate-900 text-sm">{staff.name}</h4>
                                 {staff.phone && (
-                                  <a href={`tel:${staff.phone}`} className="text-xs text-indigo-600 font-semibold">
-                                    📞 {staff.phone}
+                                  <a href={`tel:${staff.phone}`} className="inline-flex items-center gap-1 text-xs text-indigo-600 font-semibold">
+                                    <PhoneIcon className="h-3 w-3" /> {staff.phone}
                                   </a>
                                 )}
                               </div>
@@ -1903,14 +1919,14 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                         }}
                         className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-500"
                       >
-                        <span className="text-lg">+</span> إضافة منتج جديد
+                        <PlusIcon className="h-5 w-5" /> إضافة منتج جديد
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowDeliveryModal(true)}
                         className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
                       >
-                        🚚 إدارة الدليفري
+                        <TruckIcon className="h-5 w-5 text-slate-700" /> إدارة الدليفري
                       </button>
                     </div>
                   </div>
@@ -1944,7 +1960,7 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                 <div className="p-5 sm:p-6">
                   {products.length === 0 ? (
                     <div className="rounded-2xl bg-slate-50 py-16 text-center">
-                      <div className="text-5xl">📦</div>
+                      <CubeIcon className="mx-auto h-12 w-12 text-slate-300" />
                       <p className="mt-4 text-lg font-bold text-slate-700">لا توجد منتجات حالياً</p>
                       <button
                         type="button"
@@ -2029,9 +2045,10 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                     setDeliverySelectionOrder(null)
                     setSelectedDeliveryId(null)
                   }}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl text-xl text-slate-500 hover:bg-slate-100"
+                  aria-label="إغلاق"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
                 >
-                  ×
+                  <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
 
@@ -2069,8 +2086,14 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                     if (!delivery) return null
                     return (
                       <>
-                        <p className="font-black text-emerald-800">🚚 {delivery.name}</p>
-                        <p className="mt-1 text-sm text-emerald-700">📞 {delivery.phone}</p>
+                        <p className="inline-flex items-center gap-1.5 font-black text-emerald-800">
+                          <TruckIcon className="h-5 w-5 text-emerald-600" />
+                          {delivery.name}
+                        </p>
+                        <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-emerald-700">
+                          <PhoneIcon className="h-4 w-4 text-emerald-600" />
+                          {delivery.phone}
+                        </p>
                       </>
                     )
                   })()}
@@ -2094,9 +2117,14 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                   onClick={handleConfirmWithDelivery}
                   className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {confirmingOrder === deliverySelectionOrder.id
-                    ? "جاري التأكيد..."
-                    : "✓ تأكيد وإرسال WhatsApp"}
+                  {confirmingOrder === deliverySelectionOrder.id ? (
+                    "جاري التأكيد..."
+                  ) : (
+                    <span className="inline-flex items-center justify-center gap-1.5">
+                      <CheckIcon className="h-4 w-4" />
+                      تأكيد وإرسال WhatsApp
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
@@ -2113,20 +2141,27 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
               
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900">🚚 إدارة الدليفري</h2>
+                  <h2 className="inline-flex items-center gap-2 text-2xl font-bold text-slate-900">
+                    <TruckIcon className="h-7 w-7 text-indigo-600" />
+                    إدارة الدليفري
+                  </h2>
                   <p className="mt-1 text-sm text-slate-500">إضافة وتعديل وحذف مندوبي التوصيل</p>
                 </div>
                 <button
                   onClick={() => setShowDeliveryModal(false)}
-                  className="flex h-10 w-10 items-center justify-center rounded-2xl text-2xl text-slate-400 hover:bg-slate-100"
+                  aria-label="إغلاق"
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl text-slate-400 hover:bg-slate-100"
                 >
-                  ×
+                  <XMarkIcon className="h-6 w-6" />
                 </button>
               </div>
 
               {/* Add Delivery Form */}
               <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <h3 className="mb-3 font-bold text-slate-700">➕ إضافة دليفري جديد</h3>
+                <h3 className="mb-3 inline-flex items-center gap-1.5 font-bold text-slate-700">
+                  <PlusIcon className="h-5 w-5 text-indigo-600" />
+                  إضافة دليفري جديد
+                </h3>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <input
                     type="text"
@@ -2184,13 +2219,26 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                   disabled={savingDelivery}
                   className="mt-3 w-full rounded-xl bg-indigo-600 py-2.5 font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60"
                 >
-                  {savingDelivery ? "⏳ جاري الإضافة..." : "➕ إضافة دليفري"}
+                  {savingDelivery ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <ArrowPathIcon className="h-5 w-5 animate-spin" />
+                      جاري الإضافة...
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center justify-center gap-1.5">
+                      <PlusIcon className="h-5 w-5" />
+                      إضافة دليفري
+                    </span>
+                  )}
                 </button>
               </div>
 
               {/* Deliveries List */}
               <div>
-                <h3 className="mb-3 font-bold text-slate-700">📋 قائمة الدليفري</h3>
+                <h3 className="mb-3 inline-flex items-center gap-1.5 font-bold text-slate-700">
+                  <ClipboardDocumentListIcon className="h-5 w-5 text-slate-600" />
+                  قائمة الدليفري
+                </h3>
                 {deliveries.length === 0 ? (
                   <div className="rounded-2xl bg-slate-50 py-8 text-center">
                     <p className="text-slate-500">لا يوجد مندوبين توصيل حالياً</p>
@@ -2208,21 +2256,37 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                           </div>
                           <div>
                             <p className="font-bold text-slate-900">{delivery.name}</p>
-                            <p className="text-sm text-slate-500">📱 {delivery.phone}</p>
+                            <p className="inline-flex items-center gap-1.5 text-sm text-slate-500">
+                              <PhoneIcon className="h-3.5 w-3.5 text-slate-400" />
+                              {delivery.phone}
+                            </p>
                             {delivery.email && (
-                              <p className="text-xs text-slate-400">📧 {delivery.email}</p>
+                              <p className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+                                <EnvelopeIcon className="h-3.5 w-3.5 text-slate-400" />
+                                {delivery.email}
+                              </p>
                             )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold ${
+                            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
                               delivery.is_active
                                 ? "bg-emerald-100 text-emerald-700"
                                 : "bg-red-100 text-red-700"
                             }`}
                           >
-                            {delivery.is_active ? "🟢 نشط" : "🔴 غير نشط"}
+                            {delivery.is_active ? (
+                              <>
+                                <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600" />
+                                نشط
+                              </>
+                            ) : (
+                              <>
+                                <XCircleIcon className="h-3.5 w-3.5 text-red-600" />
+                                غير نشط
+                              </>
+                            )}
                           </span>
                           <button
                             onClick={() => handleToggleDeliveryStatus(delivery.id)}
@@ -2236,9 +2300,10 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                           </button>
                           <button
                             onClick={() => handleDeleteDelivery(delivery.id)}
-                            className="rounded-xl px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                            className="inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
                           >
-                            🗑️ حذف
+                            <TrashIcon className="h-3.5 w-3.5" />
+                            حذف
                           </button>
                         </div>
                       </div>
