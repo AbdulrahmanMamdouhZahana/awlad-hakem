@@ -405,6 +405,7 @@ const ProductModal = ({
     const taxRate = taxValueNum;
 
     await onSave({
+      id: editingProduct?.id,
       ...form,
       unit: resolvedUnit,
       image: imageMode === "file" ? "" : cleanImageUrl(form.image),

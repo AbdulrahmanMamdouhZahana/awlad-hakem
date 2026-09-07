@@ -269,6 +269,9 @@ export const updateProduct = async (
     >
   >
 ): Promise<iProducts> => {
+  if (!id || isNaN(Number(id))) {
+    throw new Error("معرف المنتج (ID) غير صحيح أو مفقود");
+  }
 
   const response =
     await apiFetch(

@@ -714,11 +714,12 @@ const Products = ({ products, setProducts }: ProductsProps) => {
         // =========================================================
         // 4) Save the product ONLY after image upload succeeds.
         // =========================================================
-        if (editingProduct) {
-          console.log("🚀 STEP 4 - UPDATE PRODUCT:", editingProduct.id);
+        const targetId = editingProduct?.id ?? formData?.id;
+        if (targetId) {
+          console.log("🚀 STEP 4 - UPDATE PRODUCT:", targetId);
 
           const response = await apiFetch(
-            `/products/${editingProduct.id}`,
+            `/products/${targetId}`,
             {
               method: "PUT",
               body: JSON.stringify(productData),
