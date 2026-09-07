@@ -355,6 +355,8 @@ const ProductCard = ({
         <img
           src={imageUrl}
           alt={product.name}
+          width={300}
+          height={300}
           loading="lazy"
           decoding="async"
           className="

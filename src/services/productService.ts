@@ -38,6 +38,43 @@ export interface PaginatedProductsResponse {
 let activeProductsPromise: Promise<iProducts[]> | null = null
 
 // =====================================
+// Get All Customer Products (Non-paginated)
+// =====================================
+export const getAllCustomerProducts = async (params?: {
+  search?: string
+  category?: string
+  categories?: string[]
+  only_offers?: boolean
+  sort_by?: string
+}): Promise<{ data: iProducts[]; total: number }> => {
+  const query = new URLSearchParams()
+  query.append("all", "true")
+  if (params?.search?.trim()) query.append("search", params.search.trim())
+  if (params?.category && params.category !== "الكل" && params.category !== "all") {
+    query.append("category", params.category)
+  }
+  if (params?.categories && params.categories.length > 0) {
+    query.append("categories", params.categories.join(","))
+  }
+  if (params?.only_offers) query.append("only_offers", "true")
+  if (params?.sort_by) query.append("sort_by", params.sort_by)
+
+  const queryString = query.toString()
+  const response = await apiFetch(`/products?${queryString}`)
+
+  const list = Array.isArray(response?.data)
+    ? response.data
+    : Array.isArray(response)
+    ? response
+    : []
+
+  return {
+    data: list,
+    total: typeof response?.total === "number" ? response.total : list.length,
+  }
+}
+
+// =====================================
 // Get Paginated Products (Server-Side)
 // =====================================
 export const getPaginatedProducts = async (params?: {

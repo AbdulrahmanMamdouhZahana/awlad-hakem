@@ -1,0 +1,26 @@
+# Robots.txt for Awlad Hakem (أولاد الحكيم)
+User-agent: *
+Allow: /
+Allow: /products
+Allow: /favorites
+Allow: /about
+Allow: /contact
+
+# Disallow private customer, staff, and admin areas
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /delivery
+Disallow: /delivery/
+Disallow: /customer/
+Disallow: /profile
+Disallow: /profile/
+Disallow: /cart
+Disallow: /cart/
+Disallow: /checkout
+Disallow: /checkout/
+Disallow: /orders
+Disallow: /orders/
+
+Sitemap: https://awlad-hakem.com/sitemap.xml

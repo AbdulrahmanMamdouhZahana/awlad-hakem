@@ -167,6 +167,7 @@ export default function CustomerOrders({
   // Edit Modal State
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [editItems, setEditItems] = useState<EditItem[]>([]);
+  const [originalOrderQtyMap, setOriginalOrderQtyMap] = useState<Record<number, number>>({});
   const [savingEdit, setSavingEdit] = useState(false);
   const [showAddProductSection, setShowAddProductSection] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState("");
@@ -176,12 +177,20 @@ export default function CustomerOrders({
     if (products && products.length > 0) {
       setCatalogProducts(products);
     } else {
-      apiFetch("/products").then((res) => {
+      apiFetch("/products?all=true").then((res) => {
         const prods = res?.products || res?.data || (Array.isArray(res) ? res : []);
         if (Array.isArray(prods) && prods.length > 0) setCatalogProducts(prods);
       }).catch(() => {});
     }
   }, [products]);
+
+  // Calculate maximum allowed stock for a product, accounting for current order reservation
+  const getMaxAllowedStock = (productId: number): number => {
+    const catalogProduct = catalogProducts.find((p) => Number(p.id) === Number(productId));
+    const stock = Number(catalogProduct?.stock) || 0;
+    const reservedInThisOrder = Number(originalOrderQtyMap[productId]) || 0;
+    return Math.max(0, stock + reservedInThisOrder);
+  };
 
   // Open Edit Order Modal
   const openEditModal = (order: Order) => {
@@ -189,7 +198,7 @@ export default function CustomerOrders({
       void Swal.fire({
         icon: "warning",
         title: "تنبيه",
-        text: "تم تأكيد الطلب ولا يمكن تعديله.",
+        text: "تم تأكيد الطلب ولا يمكن تعديل الطلب الآن.",
         confirmButtonText: "حسناً",
         confirmButtonColor: "#17656b",
       });
@@ -200,8 +209,12 @@ export default function CustomerOrders({
     setSelectedOrder(null);
 
     const rawItems = getItems(order);
+    const qtyMap: Record<number, number> = {};
     const initialItems: EditItem[] = rawItems.map((item) => {
       const prodId = Number(item.product_id || item.id);
+      const itemQty = Math.max(1, Number(item.quantity || 1));
+      qtyMap[prodId] = (qtyMap[prodId] || 0) + itemQty;
+
       const catalogProduct = catalogProducts.find((p) => Number(p.id) === prodId);
       const itemImage =
         item.product?.image ||
@@ -212,7 +225,7 @@ export default function CustomerOrders({
         product_id: prodId,
         product_name: item.product_name || item.name || catalogProduct?.name || "منتج",
         price: Number(item.price || catalogProduct?.price || catalogProduct?.piece_price || catalogProduct?.weight_price || 0),
-        quantity: Math.max(1, Number(item.quantity || 1)),
+        quantity: itemQty,
         image: itemImage,
         tax_rate: catalogProduct?.tax_rate,
         tax_type: catalogProduct?.tax_type,
@@ -220,13 +233,14 @@ export default function CustomerOrders({
       };
     });
 
+    setOriginalOrderQtyMap(qtyMap);
     setEditItems(initialItems);
     setEditingOrder(order);
     setShowAddProductSection(false);
     setProductSearchQuery("");
   };
 
-  // Change Quantity (Local State)
+  // Change Quantity (Local State with strict stock enforcement)
   const handleQuantityChange = async (productId: number, delta: number) => {
     const itemIndex = editItems.findIndex((it) => it.product_id === productId);
     if (itemIndex < 0) return;
@@ -237,6 +251,20 @@ export default function CustomerOrders({
     if (nextQty <= 0) {
       await handleRemoveItem(productId);
       return;
+    }
+
+    if (delta > 0) {
+      const maxAllowed = getMaxAllowedStock(productId);
+      if (nextQty > maxAllowed) {
+        await Swal.fire({
+          icon: "warning",
+          title: "الكمية غير متوفرة",
+          text: "الكمية المطلوبة غير متوفرة.",
+          confirmButtonText: "حسناً",
+          confirmButtonColor: "#17656b",
+        });
+        return;
+      }
     }
 
     setEditItems((prev) =>
@@ -294,12 +322,37 @@ export default function CustomerOrders({
     setEditItems((prev) => prev.filter((it) => it.product_id !== productId));
   };
 
-  // Add Product to Edit list
-  const handleAddProduct = (prod: any) => {
+  // Add Product to Edit list with strict stock availability check
+  const handleAddProduct = async (prod: any) => {
     const prodId = Number(prod.id);
+    const maxAllowed = getMaxAllowedStock(prodId);
+
+    if (maxAllowed <= 0) {
+      await Swal.fire({
+        icon: "warning",
+        title: "المنتج غير متوفر",
+        text: "هذا المنتج غير متوفر حالياً.",
+        confirmButtonText: "حسناً",
+        confirmButtonColor: "#17656b",
+      });
+      return;
+    }
+
     const existingIndex = editItems.findIndex((it) => it.product_id === prodId);
 
     if (existingIndex >= 0) {
+      const currentQty = editItems[existingIndex].quantity;
+      if (currentQty + 1 > maxAllowed) {
+        await Swal.fire({
+          icon: "warning",
+          title: "الكمية غير متوفرة",
+          text: "الكمية المطلوبة غير متوفرة.",
+          confirmButtonText: "حسناً",
+          confirmButtonColor: "#17656b",
+        });
+        return;
+      }
+
       setEditItems((prev) =>
         prev.map((it, idx) =>
           idx === existingIndex ? { ...it, quantity: it.quantity + 1 } : it
@@ -367,7 +420,7 @@ export default function CustomerOrders({
         await Swal.fire({
           icon: "error",
           title: "تعذر تعديل الطلب",
-          text: "تم تأكيد الطلب ولا يمكن تعديله.",
+          text: "تم تأكيد الطلب ولا يمكن تعديل الطلب الآن.",
           confirmButtonText: "حسناً",
           confirmButtonColor: "#ef4444",
         });
@@ -402,10 +455,10 @@ export default function CustomerOrders({
     const result = await Swal.fire({
       icon: "warning",
       title: "إلغاء الطلب؟",
-      text: "هل أنت متأكد من إلغاء هذا الطلب؟",
+      text: "هل أنت متأكد من إلغاء الطلب؟",
       showCancelButton: true,
       confirmButtonText: "نعم، إلغاء الطلب",
-      cancelButtonText: "رجوع",
+      cancelButtonText: "إلغاء",
       confirmButtonColor: "#ef4444",
       cancelButtonColor: "#64748b",
       reverseButtons: true,
@@ -1079,9 +1132,14 @@ export default function CustomerOrders({
                             <p className="text-xs font-bold text-[#17656b] mt-0.5">
                               السعر: {item.price} ج
                             </p>
-                            <p className="text-[11px] font-medium text-slate-400">
-                              الإجمالي: {(item.price * item.quantity).toFixed(2)} ج
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-[11px] font-medium text-slate-400">
+                                الإجمالي: {(item.price * item.quantity).toFixed(2)} ج
+                              </p>
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/70 rounded-md px-1.5 py-0.5">
+                                أقصى كمية: {getMaxAllowedStock(item.product_id)}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -1093,6 +1151,7 @@ export default function CustomerOrders({
                               type="button"
                               onClick={() => void handleQuantityChange(item.product_id, -1)}
                               className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-700 hover:bg-slate-200 active:scale-95 transition"
+                              aria-label="تقليل الكمية"
                             >
                               -
                             </button>
@@ -1101,8 +1160,10 @@ export default function CustomerOrders({
                             </span>
                             <button
                               type="button"
+                              disabled={item.quantity >= getMaxAllowedStock(item.product_id)}
                               onClick={() => void handleQuantityChange(item.product_id, 1)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-700 hover:bg-slate-200 active:scale-95 transition"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-700 hover:bg-slate-200 active:scale-95 transition disabled:opacity-35 disabled:cursor-not-allowed"
+                              aria-label="زيادة الكمية"
                             >
                               +
                             </button>
@@ -1113,6 +1174,7 @@ export default function CustomerOrders({
                             type="button"
                             onClick={() => void handleRemoveItem(item.product_id)}
                             className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600 hover:bg-rose-100 active:scale-95 transition shadow-sm"
+                            aria-label="حذف المنتج من الطلب"
                           >
                             حذف
                           </button>
@@ -1156,9 +1218,13 @@ export default function CustomerOrders({
                               .toLowerCase()
                               .includes(productSearchQuery.toLowerCase())
                       )
-                      .slice(0, 15)
+                      .slice(0, 20)
                       .map((prod) => {
-                        const inOrder = editItems.some((it) => it.product_id === Number(prod.id));
+                        const maxStock = getMaxAllowedStock(Number(prod.id));
+                        const currentInOrder = editItems.find((it) => it.product_id === Number(prod.id))?.quantity || 0;
+                        const isOutOfStock = maxStock <= 0;
+                        const isMaxReached = currentInOrder >= maxStock;
+
                         return (
                           <div
                             key={prod.id}
@@ -1177,22 +1243,42 @@ export default function CustomerOrders({
                                 <p className="text-xs font-black text-slate-900 truncate">
                                   {prod.name}
                                 </p>
-                                <p className="text-[11px] font-bold text-[#17656b]">
-                                  {prod.price || prod.piece_price || prod.weight_price || 0} ج
-                                </p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-[11px] font-bold text-[#17656b]">
+                                    {prod.price || prod.piece_price || prod.weight_price || 0} ج
+                                  </p>
+                                  {isOutOfStock ? (
+                                    <span className="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                                      هذا المنتج غير متوفر حالياً.
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                      متوفر: {maxStock} {isMaxReached ? "• أقصى كمية" : ""}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
                             <button
                               type="button"
-                              onClick={() => handleAddProduct(prod)}
+                              disabled={isOutOfStock || isMaxReached}
+                              onClick={() => void handleAddProduct(prod)}
                               className={`rounded-xl px-3 py-1.5 text-xs font-black transition active:scale-95 shadow-sm ${
-                                inOrder
+                                isOutOfStock || isMaxReached
+                                  ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60"
+                                  : currentInOrder > 0
                                   ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
                                   : "bg-[#17656b] text-white hover:bg-[#0e4347]"
                               }`}
                             >
-                              {inOrder ? "+ زيادة الكمية" : "+ إضافة للطلب"}
+                              {isOutOfStock
+                                ? "غير متوفر"
+                                : isMaxReached
+                                ? "الحد الأقصى"
+                                : currentInOrder > 0
+                                ? "+ زيادة الكمية"
+                                : "+ إضافة للطلب"}
                             </button>
                           </div>
                         );
