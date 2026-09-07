@@ -28,7 +28,7 @@ const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([])
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [timeFilter, setTimeFilter] = useState("all")
+  const [timeFilter, setTimeFilter] = useState("today")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [selectedOrder, setSelectedOrder] =
@@ -51,6 +51,12 @@ const Orders = () => {
 
   // Modal state
   const [orderModalOpen, setOrderModalOpen] = useState(false)
+
+  // Keep ref of active filters for interval polling
+  const filtersRef = useRef({ timeFilter: "today", statusFilter: "all", search: "", dateFrom: "", dateTo: "" })
+  useEffect(() => {
+    filtersRef.current = { timeFilter, statusFilter, search, dateFrom, dateTo }
+  }, [timeFilter, statusFilter, search, dateFrom, dateTo])
 
   // =====================================
   // New Order Notification
@@ -186,7 +192,14 @@ const Orders = () => {
   // Load Orders
   // =====================================
 
-  const loadOrders = async (showLoading = true) => {
+  const loadOrders = async (
+    showLoading = true,
+    tf = filtersRef.current.timeFilter,
+    sf = filtersRef.current.statusFilter,
+    s = filtersRef.current.search,
+    df = filtersRef.current.dateFrom,
+    dt = filtersRef.current.dateTo
+  ) => {
     try {
       if (showLoading) {
         setLoading(true)
@@ -194,7 +207,15 @@ const Orders = () => {
         setRefreshing(true)
       }
 
-      const response = await apiFetch("/orders")
+      let url = `/orders?date=${encodeURIComponent(tf)}&status=${encodeURIComponent(sf)}`
+      if (s && s.trim()) {
+        url += `&search=${encodeURIComponent(s.trim())}`
+      }
+      if (tf === "custom" && df) {
+        url += `&from_date=${encodeURIComponent(df)}&to_date=${encodeURIComponent(dt || df)}`
+      }
+
+      const response = await apiFetch(url)
       const list = Array.isArray(response)
         ? response
         : Array.isArray(response?.orders)
@@ -363,7 +384,8 @@ const Orders = () => {
 
     // كل 5 ثواني تحديث في الخلفية بدون شاشة تحميل
     const refreshTimer = window.setInterval(() => {
-      void loadOrders(false)
+      const f = filtersRef.current
+      void loadOrders(false, f.timeFilter, f.statusFilter, f.search, f.dateFrom, f.dateTo)
     }, 5000) // 5 ثواني
 
     return () => {
@@ -637,79 +659,8 @@ const buildDeliveryWhatsAppMessage = (
   // =====================================
 
   const filteredOrders = useMemo(() => {
-    const query = search.trim().toLowerCase()
-
-    const startOfToday = new Date()
-    startOfToday.setHours(0, 0, 0, 0)
-
-    const endOfToday = new Date()
-    endOfToday.setHours(23, 59, 59, 999)
-
-    const startOfYesterday = new Date(startOfToday)
-    startOfYesterday.setDate(startOfYesterday.getDate() - 1)
-
-    const endOfYesterday = new Date(startOfToday)
-    endOfYesterday.setMilliseconds(-1)
-
-    const startOfDaysAgo = (days: number) => {
-      const date = new Date(startOfToday)
-      date.setDate(date.getDate() - (days - 1))
-      return date
-    }
-
-    let rangeStart: Date | null = null
-    let rangeEnd: Date | null = null
-
-    if (timeFilter === "today") {
-      rangeStart = startOfToday
-      rangeEnd = endOfToday
-    } else if (timeFilter === "yesterday") {
-      rangeStart = startOfYesterday
-      rangeEnd = endOfYesterday
-    } else if (timeFilter === "7days") {
-      rangeStart = startOfDaysAgo(7)
-      rangeEnd = endOfToday
-    } else if (timeFilter === "30days") {
-      rangeStart = startOfDaysAgo(30)
-      rangeEnd = endOfToday
-    } else if (timeFilter === "custom") {
-      if (dateFrom) {
-        rangeStart = new Date(`${dateFrom}T00:00:00`)
-      }
-
-      if (dateTo) {
-        rangeEnd = new Date(`${dateTo}T23:59:59.999`)
-      }
-    }
-
-    return orders.filter((order) => {
-      const matchesSearch =
-        !query ||
-        order.customer_name?.toLowerCase().includes(query) ||
-        order.phone?.toLowerCase().includes(query) ||
-        String(order.id).includes(query)
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        order.status === statusFilter
-
-const orderDate = order.created_at
-  ? new Date(order.created_at)
-        : new Date(0)
-      const matchesTime =
-        (!rangeStart || orderDate >= rangeStart) &&
-        (!rangeEnd || orderDate <= rangeEnd)
-
-      return matchesSearch && matchesStatus && matchesTime
-    })
-  }, [
-    orders,
-    search,
-    statusFilter,
-    timeFilter,
-    dateFrom,
-    dateTo,
-  ])
+    return orders
+  }, [orders])
 
   // =====================================
   // Stats
@@ -999,11 +950,11 @@ const orderDate = order.created_at
 
               <input
                 value={search}
-                onChange={(event) =>
-                  setSearch(
-                    event.target.value
-                  )
-                }
+                onChange={(event) => {
+                  const val = event.target.value
+                  setSearch(val)
+                  void loadOrders(false, timeFilter, statusFilter, val, dateFrom, dateTo)
+                }}
                 placeholder="ابحث باسم العميل أو رقم الهاتف أو رقم الطلب..."
                 className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pr-11 pl-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
               />
@@ -1015,11 +966,11 @@ const orderDate = order.created_at
 
             <select
               value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(
-                  event.target.value
-                )
-              }
+              onChange={(event) => {
+                const nextStatus = event.target.value
+                setStatusFilter(nextStatus)
+                void loadOrders(true, timeFilter, nextStatus, search, dateFrom, dateTo)
+              }}
               className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
             >
               <option value="all">
@@ -1043,27 +994,30 @@ const orderDate = order.created_at
             <select
               value={timeFilter}
               onChange={(event) => {
-                setTimeFilter(event.target.value)
-                if (event.target.value !== "custom") {
+                const nextTime = event.target.value
+                setTimeFilter(nextTime)
+                if (nextTime !== "custom") {
                   setDateFrom("")
                   setDateTo("")
+                  void loadOrders(true, nextTime, statusFilter, search, "", "")
                 }
               }}
               className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
             >
-              <option value="all">كل الوقت</option>
-              <option value="today">اليوم</option>
+              <option value="today">اليوم (افتراضي)</option>
               <option value="yesterday">أمس</option>
-              <option value="7days">آخر 7 أيام</option>
-              <option value="30days">آخر 30 يوم</option>
+              <option value="two_days_ago">أول أمس</option>
+              <option value="last_7_days">آخر 7 أيام</option>
+              <option value="this_month">هذا الشهر</option>
               <option value="custom">تاريخ مخصص</option>
+              <option value="all">كل الأوقات</option>
             </select>
 
           </div>
 
           {timeFilter === "custom" && (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="flex flex-col gap-2 text-xs font-bold text-slate-500">
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1.5 text-xs font-bold text-slate-500">
                 من تاريخ
                 <input
                   type="date"
@@ -1073,7 +1027,7 @@ const orderDate = order.created_at
                 />
               </label>
 
-              <label className="flex flex-col gap-2 text-xs font-bold text-slate-500">
+              <label className="flex flex-col gap-1.5 text-xs font-bold text-slate-500">
                 إلى تاريخ
                 <input
                   type="date"
@@ -1082,6 +1036,20 @@ const orderDate = order.created_at
                   className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
                 />
               </label>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (dateFrom && dateTo && dateFrom > dateTo) {
+                    toast.error("تاريخ البداية لا يمكن أن يكون بعد تاريخ النهاية")
+                    return
+                  }
+                  void loadOrders(true, "custom", statusFilter, search, dateFrom, dateTo)
+                }}
+                className="h-11 rounded-2xl bg-indigo-600 px-6 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-500"
+              >
+                تطبيق البحث
+              </button>
             </div>
           )}
 
@@ -1115,7 +1083,7 @@ const orderDate = order.created_at
             </div>
 
             <h3 className="mt-5 text-lg font-black text-slate-800">
-              لا توجد طلبات
+              لا توجد طلبات في هذه الفترة.
             </h3>
 
             <p className="mt-2 text-sm text-slate-400">

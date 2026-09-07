@@ -54,13 +54,38 @@ interface Order {
 }
 
 interface AttendanceSession {
-  id: number
+  id?: number
   staff_id?: number
   staff_name?: string
   started_at: string
   ended_at: string | null
   duration_minutes: number | null
+  duration_text?: string | null
+  started_time?: string
+  ended_time?: string
   status: "active" | "completed"
+}
+
+interface AttendanceHistoryItem {
+  id?: number
+  started_at?: string | null
+  ended_at?: string | null
+  duration_minutes?: number | null
+  duration_text?: string | null
+  status?: string
+  date_formatted?: string | null
+  start_time?: string
+  end_time?: string
+}
+
+interface TodayAttendanceSummary {
+  status: string
+  status_label?: string
+  started_at?: string | null
+  start_time?: string
+  ended_at?: string | null
+  end_time?: string
+  duration_text?: string
 }
 
 interface DeliveryProofImage {
@@ -218,10 +243,13 @@ export default function DeliveryDashboard() {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmOrderId, setConfirmOrderId] = useState<number | null>(null)
 
-  // =====================================
+    // =====================================
   // Attendance State (Feature 2)
   // =====================================
   const [attendance, setAttendance] = useState<AttendanceSession | null>(null)
+  const [todaySummary, setTodaySummary] = useState<TodayAttendanceSummary | null>(null)
+  const [attendanceHistory, setAttendanceHistory] = useState<AttendanceHistoryItem[]>([])
+  const [showHistory, setShowHistory] = useState(false)
   const [attendanceLoading, setAttendanceLoading] = useState(false)
   const [liveDuration, setLiveDuration] = useState<string>("0 دقيقة")
 
@@ -229,8 +257,11 @@ export default function DeliveryDashboard() {
     try {
       setAttendanceLoading(true)
       const res = await apiFetch("/delivery/attendance/current")
-      if (res?.success && res?.attendance) {
-        setAttendance(res.attendance)
+      if (res?.success) {
+        setAttendance(res.attendance ?? null)
+        if (res.today) {
+          setTodaySummary(res.today)
+        }
       } else {
         setAttendance(null)
       }
@@ -240,6 +271,22 @@ export default function DeliveryDashboard() {
       setAttendanceLoading(false)
     }
   }, [])
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await apiFetch("/delivery/attendance/history")
+      if (res?.success && Array.isArray(res.history)) {
+        setAttendanceHistory(res.history)
+      }
+    } catch (err) {
+      console.warn("DELIVERY ATTENDANCE HISTORY LOAD ERROR:", err)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadAttendance()
+    void loadHistory()
+  }, [loadAttendance, loadHistory])
 
   useEffect(() => {
     if (attendance?.status !== "active" || !attendance?.started_at) {
@@ -273,7 +320,16 @@ export default function DeliveryDashboard() {
       })
       if (res?.success && res?.attendance) {
         setAttendance(res.attendance)
+        setTodaySummary({
+          status: "active",
+          status_label: "متواجد الآن",
+          started_at: res.attendance.started_at,
+          start_time: formatTimeOnly(res.attendance.started_at),
+          end_time: "—",
+          duration_text: "قيد العمل",
+        })
         toast.success(res.message || "أهلاً بك! تم تسجيل الحضور وأصبحت متاحاً الآن 🟢")
+        void loadHistory()
       }
     } catch (err) {
       console.error("CHECK IN ERROR:", err)
@@ -284,7 +340,7 @@ export default function DeliveryDashboard() {
   }
 
   const handleCheckOut = async () => {
-    if (!window.confirm("هل أنت متأكد من تسجيل الانصراف وإنهاء يوم العمل؟")) {
+    if (!window.confirm("هل أنت متأكد من تسجيل الانصراف وإنهاء الوردية؟")) {
       return
     }
     try {
@@ -293,10 +349,20 @@ export default function DeliveryDashboard() {
         method: "POST",
       })
       if (res?.success && res?.attendance) {
-        setAttendance(res.attendance)
+        setAttendance(null)
+        setTodaySummary({
+          status: "completed",
+          status_label: "تم تسجيل الانصراف",
+          started_at: res.attendance.started_at,
+          start_time: res.attendance.started_time || formatTimeOnly(res.attendance.started_at),
+          ended_at: res.attendance.ended_at,
+          end_time: res.attendance.ended_time || formatTimeOnly(res.attendance.ended_at),
+          duration_text: res.attendance.duration_text || `${res.attendance.duration_minutes || 0} دقيقة`,
+        })
         toast.success(
-          `تم تسجيل الانصراف بنجاح. مدة العمل: ${res.formatted_duration || ""}`
+          `تم تسجيل الانصراف بنجاح. مدة العمل: ${res.attendance.duration_text || ""}`
         )
+        void loadHistory()
       }
     } catch (err) {
       console.error("CHECK OUT ERROR:", err)
@@ -920,6 +986,198 @@ export default function DeliveryDashboard() {
         >
           ↻ تحديث الطلبات
         </button>
+      </div>
+
+      {/* Attendance / Fingerprint Card (Features 1, 2, 3, 7, 19, 20) */}
+      <div className="mb-8 overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm ring-1 ring-black/5 transition hover:shadow-md">
+        {attendanceLoading ? (
+          <div className="flex items-center justify-center gap-3 py-6 text-slate-500">
+            <SpinnerIcon />
+            <span className="font-bold">جاري تحديث حالة الحضور والانصراف...</span>
+          </div>
+        ) : attendance && attendance.status === "active" ? (
+          /* State 2: Active / On Duty */
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-4 w-4">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex h-4 w-4 rounded-full bg-emerald-500"></span>
+                </span>
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-1 text-sm font-black text-emerald-700">
+                    🟢 متواجد الآن (قيد العمل)
+                  </span>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    أنت مسجل كحاضر ومتاح لاستلام وتوصيل الطلبات
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleCheckOut}
+                disabled={attendanceLoading}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-600 px-6 py-3 text-base font-black text-white shadow-lg shadow-rose-200 transition hover:bg-rose-500 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              >
+                🚪 أنا مشيت (تسجيل الانصراف)
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs font-bold text-slate-400">وقت الوصول الرسمي</p>
+                <p className="mt-1 text-lg font-black text-slate-800">
+                  {formatTimeOnly(attendance.started_at)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-emerald-50 p-4">
+                <p className="text-xs font-bold text-emerald-600">مدة العمل الحالية</p>
+                <p className="mt-1 text-lg font-black text-emerald-700">
+                  ⏱️ {liveDuration}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-indigo-50 p-4 sm:col-span-2 lg:col-span-1">
+                <p className="text-xs font-bold text-indigo-600">تاريخ اليوم</p>
+                <p className="mt-1 text-lg font-black text-indigo-900">
+                  {new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : todaySummary && todaySummary.status === "completed" ? (
+          /* State 3: Completed Shift (allows checking in again for a new shift) */
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 text-xl font-bold">
+                  🔴
+                </div>
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-1 text-sm font-black text-rose-700">
+                    تم تسجيل الانصراف
+                  </span>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    تم إنهاء الوردية وحساب مدة العمل رسميًا في الخادم
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleCheckIn}
+                disabled={attendanceLoading}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-base font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-500 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              >
+                🟢 أنا وصلت (تسجيل وردية جديدة)
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs font-bold text-slate-400">وقت الوصول</p>
+                <p className="mt-1 text-lg font-black text-slate-800">
+                  {todaySummary.start_time || "—"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs font-bold text-slate-400">وقت الانصراف</p>
+                <p className="mt-1 text-lg font-black text-slate-800">
+                  {todaySummary.end_time || "—"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-emerald-50 p-4">
+                <p className="text-xs font-bold text-emerald-600">مدة العمل المحسوبة</p>
+                <p className="mt-1 text-lg font-black text-emerald-800">
+                  {todaySummary.duration_text || "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* State 1: Before Arrival */
+          <div className="flex flex-wrap items-center justify-between gap-6 py-2">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-3xl">
+                ⏳
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  حالة العمل
+                </p>
+                <h3 className="mt-0.5 text-xl font-black text-slate-900">
+                  لم يتم تسجيل الحضور
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  اضغط على زر الوصول لتسجيل حضورك وبدء استقبال الطلبات
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleCheckIn}
+              disabled={attendanceLoading}
+              className="inline-flex items-center justify-center gap-3 rounded-2xl bg-emerald-600 px-8 py-4 text-lg font-black text-white shadow-xl shadow-emerald-200 transition hover:bg-emerald-500 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            >
+              📍 أنا وصلت
+            </button>
+          </div>
+        )}
+
+        {/* History Toggle & List */}
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center gap-2 text-xs font-bold text-indigo-600 transition hover:text-indigo-800"
+          >
+            <span>📋 سجل الحضور السابق</span>
+            {attendanceHistory.length > 0 && (
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-black text-indigo-700">
+                {attendanceHistory.length}
+              </span>
+            )}
+            <span className="text-[10px]">{showHistory ? "▲ إخفاء" : "▼ عرض"}</span>
+          </button>
+
+          {showHistory && (
+            <div className="mt-3 overflow-x-auto">
+              {attendanceHistory.length === 0 ? (
+                <p className="py-4 text-center text-xs text-slate-400">لا يوجد سجل حضور سابق مسجل.</p>
+              ) : (
+                <table className="w-full text-right text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400">
+                      <th className="pb-2 font-bold">التاريخ</th>
+                      <th className="pb-2 font-bold">وقت الوصول</th>
+                      <th className="pb-2 font-bold">وقت الانصراف</th>
+                      <th className="pb-2 font-bold">مدة العمل</th>
+                      <th className="pb-2 font-bold">الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {attendanceHistory.map((item, idx) => (
+                      <tr key={item.id || idx} className="hover:bg-slate-50">
+                        <td className="py-2.5 font-bold text-slate-800">{item.date_formatted || "اليوم"}</td>
+                        <td className="py-2.5 text-slate-600">{item.start_time || "—"}</td>
+                        <td className="py-2.5 text-slate-600">{item.end_time || "—"}</td>
+                        <td className="py-2.5 font-semibold text-emerald-700">{item.duration_text || "—"}</td>
+                        <td className="py-2.5">
+                          <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold ${
+                            item.status === "completed" ? "bg-slate-100 text-slate-700" : "bg-emerald-100 text-emerald-700"
+                          }`}>
+                            {item.status === "completed" ? "منصرف" : "متواجد"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats */}

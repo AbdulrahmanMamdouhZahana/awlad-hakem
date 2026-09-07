@@ -277,54 +277,7 @@ const Dashboard = ({
   // =====================================================
 
   const [orders, setOrders] = useState<Order[]>([])
-  const [deliveryAttendanceList, setDeliveryAttendanceList] = useState<DeliveryAttendanceItem[]>([])
-  const [attendanceLoading, setAttendanceLoading] = useState(false)
 
-  const loadDeliveryAttendance = useCallback(async () => {
-    try {
-      setAttendanceLoading(true)
-      const res = await apiFetch("/admin/delivery/attendance")
-      if (res?.success && Array.isArray(res.deliveries)) {
-        setDeliveryAttendanceList(res.deliveries)
-      }
-    } catch (err) {
-      console.warn("ADMIN DELIVERY ATTENDANCE LOAD ERROR:", err)
-    } finally {
-      setAttendanceLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadDeliveryAttendance()
-    const interval = window.setInterval(() => {
-      void loadDeliveryAttendance()
-    }, 10000)
-    return () => window.clearInterval(interval)
-  }, [loadDeliveryAttendance])
-
-  const formatAttendanceDuration = (startedAt?: string | null, endedAt?: string | null, durationMins?: number | null) => {
-    if (durationMins != null && durationMins > 0) {
-      const hours = Math.floor(durationMins / 60)
-      const mins = durationMins % 60
-      if (hours > 0) return `${hours} ساعات و ${mins} دقيقة`
-      return `${mins} دقيقة`
-    }
-    if (!startedAt) return "—"
-    const start = new Date(startedAt).getTime()
-    const end = endedAt ? new Date(endedAt).getTime() : Date.now()
-    const diffMins = Math.max(0, Math.floor((end - start) / 60000))
-    const hours = Math.floor(diffMins / 60)
-    const mins = diffMins % 60
-    if (hours > 0) return `${hours} ساعات و ${mins} دقيقة`
-    return `${mins} دقيقة`
-  }
-
-  const formatAttendanceTime = (timeStr?: string | null) => {
-    if (!timeStr) return "—"
-    const date = new Date(timeStr)
-    if (isNaN(date.getTime())) return "—"
-    return date.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
-  }
 
   const [ordersLoading, setOrdersLoading] =
     useState(true)
@@ -353,8 +306,48 @@ const Dashboard = ({
 
 
   // =====================================================
-  // Delivery State
+  // Delivery State & Attendance (Features 8, 9, 10)
   // =====================================================
+
+  interface DeliveryAttendanceRow {
+    id: number
+    name: string
+    phone: string
+    status_key: "active" | "completed" | "none"
+    status_label: string
+    is_on_duty: boolean
+    check_in_time: string
+    check_out_time: string
+    duration_text: string
+  }
+
+  const [deliveryAttendance, setDeliveryAttendance] = useState<DeliveryAttendanceRow[]>([])
+  const [attendanceDateFilter, setAttendanceDateFilter] = useState("today")
+  const [attendanceFrom, setAttendanceFrom] = useState("")
+  const [attendanceTo, setAttendanceTo] = useState("")
+  const [attendanceLoading, setAttendanceLoading] = useState(false)
+
+  const loadDeliveryAttendance = useCallback(async (
+    filter = attendanceDateFilter,
+    from = attendanceFrom,
+    to = attendanceTo
+  ) => {
+    try {
+      setAttendanceLoading(true)
+      let url = `/admin/delivery-attendance?date=${encodeURIComponent(filter)}`
+      if (filter === "custom" && from) {
+        url += `&from_date=${encodeURIComponent(from)}&to_date=${encodeURIComponent(to || from)}`
+      }
+      const res = await apiFetch(url)
+      if (res?.success && Array.isArray(res.deliveries)) {
+        setDeliveryAttendance(res.deliveries)
+      }
+    } catch (err) {
+      console.warn("LOAD ATTENDANCE ERROR:", err)
+    } finally {
+      setAttendanceLoading(false)
+    }
+  }, [attendanceDateFilter, attendanceFrom, attendanceTo])
 
   const [deliveries, setDeliveries] = useState<Delivery[]>([])
   const [showDeliveryModal, setShowDeliveryModal] = useState(false)
@@ -1711,6 +1704,130 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
                         عرض جميع الطلبات ({orders.length})
                       </Link>
                     </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Delivery Staff Attendance Section (Features 8, 9, 10) */}
+              <div id="delivery-attendance" className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="border-b border-slate-100 p-5 sm:p-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-black text-slate-900">موظفو التوصيل وحالة الحضور</h2>
+                        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+                          {deliveryAttendance.length} مندوب
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-500">
+                        متابعة تسجيل الحضور والانصراف وساعات العمل لمندوبي التوصيل
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-500">الفترة:</span>
+                        <select
+                          value={attendanceDateFilter}
+                          onChange={(e) => {
+                            const nextFilter = e.target.value
+                            setAttendanceDateFilter(nextFilter)
+                            if (nextFilter !== "custom") {
+                              void loadDeliveryAttendance(nextFilter, "", "")
+                            }
+                          }}
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500"
+                        >
+                          <option value="today">اليوم (افتراضي)</option>
+                          <option value="yesterday">أمس</option>
+                          <option value="last_7_days">آخر 7 أيام</option>
+                          <option value="this_month">هذا الشهر</option>
+                          <option value="custom">تاريخ مخصص</option>
+                        </select>
+                      </div>
+
+                      {attendanceDateFilter === "custom" && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="date"
+                            value={attendanceFrom}
+                            onChange={(e) => setAttendanceFrom(e.target.value)}
+                            className="rounded-xl border border-slate-200 px-2.5 py-1 text-xs outline-none focus:border-indigo-500"
+                          />
+                          <span className="text-xs text-slate-400">إلى</span>
+                          <input
+                            type="date"
+                            value={attendanceTo}
+                            onChange={(e) => setAttendanceTo(e.target.value)}
+                            className="rounded-xl border border-slate-200 px-2.5 py-1 text-xs outline-none focus:border-indigo-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void loadDeliveryAttendance("custom", attendanceFrom, attendanceTo)}
+                            className="rounded-xl bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-500"
+                          >
+                            تطبيق
+                          </button>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => void loadDeliveryAttendance()}
+                        disabled={attendanceLoading}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <span className={attendanceLoading ? "animate-spin" : ""}>↻</span> تحديث
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto p-5 sm:p-6">
+                  {attendanceLoading ? (
+                    <div className="py-12 text-center text-slate-500">
+                      <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-indigo-600" />
+                      <p className="mt-3 text-xs font-semibold">جاري تحميل حالة موظفي التوصيل...</p>
+                    </div>
+                  ) : deliveryAttendance.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-slate-400">لا يوجد موظفو توصيل نشطين مسجلين.</p>
+                  ) : (
+                    <table className="w-full text-right text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-xs font-bold text-slate-400">
+                          <th className="pb-3">الموظف</th>
+                          <th className="pb-3">رقم الهاتف</th>
+                          <th className="pb-3">الحالة</th>
+                          <th className="pb-3">وقت الوصول</th>
+                          <th className="pb-3">وقت الانصراف</th>
+                          <th className="pb-3">مدة العمل</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {deliveryAttendance.map((staff) => (
+                          <tr key={staff.id} className="hover:bg-slate-50/80 transition">
+                            <td className="py-3.5 font-bold text-slate-900">{staff.name}</td>
+                            <td className="py-3.5 text-xs text-slate-500 font-semibold">{staff.phone || "—"}</td>
+                            <td className="py-3.5">
+                              <span
+                                className={`inline-flex items-center rounded-xl px-2.5 py-1 text-xs font-black ${
+                                  staff.status_key === "active"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : staff.status_key === "completed"
+                                    ? "bg-rose-100 text-rose-700"
+                                    : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                {staff.status_label}
+                              </span>
+                            </td>
+                            <td className="py-3.5 font-semibold text-slate-700">{staff.check_in_time}</td>
+                            <td className="py-3.5 font-semibold text-slate-700">{staff.check_out_time}</td>
+                            <td className="py-3.5 font-bold text-indigo-700">{staff.duration_text}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   )}
                 </div>
               </div>

@@ -120,6 +120,11 @@ export default function CustomerOrders({
 }: CustomerOrdersProps) {
   const navigate = useNavigate();
 
+  type DateFilterType = "today" | "yesterday" | "two_days_ago" | "last_7_days" | "this_month" | "custom";
+  const [dateFilter, setDateFilter] = useState<DateFilterType>("today");
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -289,12 +294,21 @@ export default function CustomerOrders({
     : null;
   const editTotal = editSubtotal + editTax + (editDeliveryFee || 0);
 
-  const loadOrders = async () => {
+  const loadOrders = async (
+    targetDate: DateFilterType = dateFilter,
+    fromVal: string = customFrom,
+    toVal: string = customTo
+  ) => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/customer/orders`, {
+      let url = `${API_URL}/customer/orders?date=${encodeURIComponent(targetDate)}`;
+      if (targetDate === "custom" && fromVal) {
+        url += `&from_date=${encodeURIComponent(fromVal)}&to_date=${encodeURIComponent(toVal || fromVal)}`;
+      }
+
+      const response = await fetch(url, {
         method: "GET",
         credentials: "include",
         headers: {
@@ -429,6 +443,73 @@ export default function CustomerOrders({
       </div>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* ===== DATE FILTER (DEFAULT: TODAY) ===== */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow-sm backdrop-blur-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-bold text-slate-700">الفترة:</span>
+            <div className="relative">
+              <select
+                value={dateFilter}
+                onChange={(e) => {
+                  const nextDate = e.target.value as DateFilterType;
+                  setDateFilter(nextDate);
+                  if (nextDate !== "custom") {
+                    void loadOrders(nextDate, customFrom, customTo);
+                  }
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-800 shadow-sm outline-none transition hover:border-[#17656b] focus:border-[#17656b] focus:ring-2 focus:ring-[#17656b]/20"
+              >
+                <option value="today">اليوم (افتراضي)</option>
+                <option value="yesterday">أمس</option>
+                <option value="two_days_ago">أول أمس</option>
+                <option value="last_7_days">آخر 7 أيام</option>
+                <option value="this_month">هذا الشهر</option>
+                <option value="custom">تاريخ مخصص</option>
+              </select>
+            </div>
+
+            {dateFilter === "custom" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                  <span>من:</span>
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-[#17656b]"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                  <span>إلى:</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-[#17656b]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customFrom && customTo && customFrom > customTo) {
+                      toast.error("تاريخ البداية لا يمكن أن يكون بعد تاريخ النهاية");
+                      return;
+                    }
+                    void loadOrders("custom", customFrom, customTo);
+                  }}
+                  className="rounded-xl bg-[#17656b] px-4 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#0f4a4f]"
+                >
+                  بحث
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="text-xs font-bold text-[#17656b]">
+            {orders.length > 0 ? `${orders.length} طلب في هذه الفترة` : "لا توجد طلبات في هذه الفترة"}
+          </div>
+        </div>
+
         {/* ===== FILTERS ===== */}
         <div className="mb-6 overflow-x-auto">
           <div className="flex min-w-max gap-1.5 rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-sm backdrop-blur-sm">
@@ -504,9 +585,7 @@ export default function CustomerOrders({
             <div className="text-7xl">📦</div>
 
             <h2 className="mt-5 text-2xl font-black text-slate-800">
-              {filter === "all"
-                ? "لسه معندكش طلبات"
-                : "مفيش طلبات في الحالة دي"}
+              لا توجد طلبات في هذه الفترة.
             </h2>
 
             <p className="mt-2 text-sm font-medium text-slate-500">
