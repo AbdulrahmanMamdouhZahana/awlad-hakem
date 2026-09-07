@@ -572,7 +572,7 @@ const Products = ({ products, setProducts }: ProductsProps) => {
       const priceNum =
         normalizedSaleType === "weight"
           ? weightPriceNum!
-          : piecePriceNum!;
+          : (piecePriceNum ?? weightPriceNum ?? (formData.price != null ? Number(formData.price) : 0));
 
       setSaving(true);
 

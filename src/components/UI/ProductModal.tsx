@@ -69,14 +69,18 @@ const ProductModal = ({
     category: editingProduct?.category || "",
     price: editingProduct?.price?.toString() || "",
     unit: editingProduct?.unit || (editingProduct?.sale_type === "weight" ? "كيلو" : "قطعة"),
-    saleType: editingProduct?.sale_type || "piece",
+    saleType: (editingProduct?.sale_type || "piece") as "piece" | "weight" | "both",
     piecePrice:
       editingProduct?.piece_price != null
         ? editingProduct.piece_price.toString()
-        : editingProduct?.price?.toString() || "",
+        : (editingProduct?.sale_type || "piece") !== "weight"
+        ? editingProduct?.price?.toString() || ""
+        : "",
     weightPrice:
       editingProduct?.weight_price != null
         ? editingProduct.weight_price.toString()
+        : (editingProduct?.sale_type === "weight" || editingProduct?.sale_type === "both")
+        ? editingProduct?.price?.toString() || ""
         : "",
     image: editingProduct?.image || "",
     stock: editingProduct?.stock?.toString() || "0",
@@ -189,14 +193,18 @@ const ProductModal = ({
         "",
       price: editingProduct?.price?.toString() || "",
       unit: editingProduct?.unit || (editingProduct?.sale_type === "weight" ? "كيلو" : "قطعة"),
-      saleType: editingProduct?.sale_type || "piece",
+      saleType: (editingProduct?.sale_type || "piece") as "piece" | "weight" | "both",
       piecePrice:
         editingProduct?.piece_price != null
           ? editingProduct.piece_price.toString()
-          : editingProduct?.price?.toString() || "",
+          : (editingProduct?.sale_type || "piece") !== "weight"
+          ? editingProduct?.price?.toString() || ""
+          : "",
       weightPrice:
         editingProduct?.weight_price != null
           ? editingProduct.weight_price.toString()
+          : (editingProduct?.sale_type === "weight" || editingProduct?.sale_type === "both")
+          ? editingProduct?.price?.toString() || ""
           : "",
       image: editingProduct?.image || "",
       stock: editingProduct?.stock?.toString() || "0",
@@ -351,7 +359,7 @@ const ProductModal = ({
     const price =
       form.saleType === "weight"
         ? weightPrice!
-        : piecePrice!;
+        : (piecePrice ?? weightPrice ?? Number(form.price) ?? 0);
 
     const stock = Number(form.stock);
 
@@ -591,20 +599,39 @@ const ProductModal = ({
                 key={option.value}
                 type="button"
                 disabled={loading}
-                onClick={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    saleType: option.value as "piece" | "weight" | "both",
-                    unit:
-                      !prev.unit || prev.unit === "قطعة" || prev.unit === "كيلو" || prev.unit === "قطعة / كيلو"
-                        ? option.value === "weight"
-                          ? "كيلو"
-                          : option.value === "both"
-                            ? "قطعة / كيلو"
-                            : "قطعة"
-                        : prev.unit,
-                  }))
-                }
+                onClick={() => {
+                  const targetType = option.value as "piece" | "weight" | "both";
+                  setForm((prev) => {
+                    const fallbackPrice = prev.piecePrice || prev.weightPrice || prev.price || "";
+                    let nextPiecePrice = prev.piecePrice;
+                    let nextWeightPrice = prev.weightPrice;
+
+                    if (targetType === "piece" && !nextPiecePrice) {
+                      nextPiecePrice = fallbackPrice;
+                    } else if (targetType === "weight" && !nextWeightPrice) {
+                      nextWeightPrice = fallbackPrice;
+                    } else if (targetType === "both") {
+                      if (!nextPiecePrice) nextPiecePrice = fallbackPrice;
+                      if (!nextWeightPrice) nextWeightPrice = fallbackPrice;
+                    }
+
+                    return {
+                      ...prev,
+                      saleType: targetType,
+                      piecePrice: nextPiecePrice,
+                      weightPrice: nextWeightPrice,
+                      price: targetType === "weight" ? nextWeightPrice : (nextPiecePrice || fallbackPrice),
+                      unit:
+                        !prev.unit || prev.unit === "قطعة" || prev.unit === "كيلو" || prev.unit === "قطعة / كيلو"
+                          ? targetType === "weight"
+                            ? "كيلو"
+                            : targetType === "both"
+                              ? "قطعة / كيلو"
+                              : "قطعة"
+                          : prev.unit,
+                    };
+                  });
+                }}
                 className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black transition ${form.saleType === option.value
                   ? "border-indigo-600 bg-indigo-600 text-white shadow-md"
                   : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50"
@@ -628,9 +655,14 @@ const ProductModal = ({
                 min="0"
                 step="0.01"
                 value={form.piecePrice}
-                onChange={(e) =>
-                  setForm({ ...form, piecePrice: e.target.value })
-                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm((prev) => ({
+                    ...prev,
+                    piecePrice: val,
+                    price: prev.saleType === "piece" ? val : prev.price,
+                  }));
+                }}
                 placeholder="مثال: 15"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400"
               />
@@ -647,9 +679,14 @@ const ProductModal = ({
                 min="0"
                 step="0.01"
                 value={form.weightPrice}
-                onChange={(e) =>
-                  setForm({ ...form, weightPrice: e.target.value })
-                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm((prev) => ({
+                    ...prev,
+                    weightPrice: val,
+                    price: prev.saleType === "weight" ? val : prev.price,
+                  }));
+                }}
                 placeholder="مثال: 100"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400"
               />
