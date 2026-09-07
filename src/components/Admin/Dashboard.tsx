@@ -1192,8 +1192,10 @@ if (selectedOrder?.id === deliverySelectionOrder.id) {
             : null,
       }
 
-      if (editingProduct) {
-        const updatedProduct = await updateProduct(editingProduct.id, productData)
+      const targetId = editingProduct?.id ?? (data as any)?.id;
+
+      if (targetId) {
+        const updatedProduct = await updateProduct(targetId, productData)
 
         setProducts((prev) =>
           prev.map((product) =>
