@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Modal from "./Modal";
 import toast from "react-hot-toast";
 import { promptText } from "../../utils/alerts";
+import SearchableSelect from "./SearchableSelect";
 import {
   CubeIcon,
   ScaleIcon,
@@ -65,7 +66,7 @@ const ProductModal = ({
     name: editingProduct?.name || "",
     mainCategory: editingProduct
       ? getMainCategoryForProduct(editingProduct.category)
-      : mainCategories[0] || "",
+      : "",
     category: editingProduct?.category || "",
     price: editingProduct?.price?.toString() || "",
     unit: editingProduct?.unit || (editingProduct?.sale_type === "weight" ? "كيلو" : "قطعة"),
@@ -104,7 +105,18 @@ const ProductModal = ({
   const [imageMode, setImageMode] = useState<"url" | "file">("url");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const rawSubCategories = categories[form.mainCategory] ?? [];
+  const allSubCategories = useMemo(() => {
+    const all = new Set<string>();
+    Object.values(categories).forEach((list) => {
+      list?.forEach((item) => all.add(item));
+    });
+    return Array.from(all);
+  }, [categories]);
+
+  const rawSubCategories = form.mainCategory
+    ? categories[form.mainCategory] ?? []
+    : allSubCategories;
+
   const subCategories =
     form.category && !rawSubCategories.includes(form.category)
       ? [form.category, ...rawSubCategories]
@@ -191,10 +203,7 @@ const ProductModal = ({
     setForm({
       name: editingProduct?.name || "",
       mainCategory,
-      category:
-        editingProduct?.category ||
-        categories[mainCategory]?.[0] ||
-        "",
+      category: editingProduct?.category || "",
       price: editingProduct?.price?.toString() || "",
       unit: editingProduct?.unit || (editingProduct?.sale_type === "weight" ? "كيلو" : "قطعة"),
       saleType: (editingProduct?.sale_type || "piece") as "piece" | "weight" | "both",
@@ -240,11 +249,29 @@ const ProductModal = ({
   }, [editingProduct, isOpen]);
 
   const handleMainCategoryChange = (mainCategory: string) => {
-    setForm((prev) => ({
-      ...prev,
-      mainCategory,
-      category: categories[mainCategory]?.[0] || "",
-    }));
+    setForm((prev) => {
+      const validSubCategories = categories[mainCategory] ?? [];
+      const keepCategory = mainCategory && validSubCategories.includes(prev.category);
+      return {
+        ...prev,
+        mainCategory,
+        category: keepCategory ? prev.category : "",
+      };
+    });
+  };
+
+  const handleSubCategoryChange = (category: string) => {
+    setForm((prev) => {
+      const matchedMain =
+        !prev.mainCategory && category
+          ? getMainCategoryForProduct(category)
+          : prev.mainCategory;
+      return {
+        ...prev,
+        mainCategory: matchedMain,
+        category,
+      };
+    });
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -440,12 +467,10 @@ const ProductModal = ({
   };
 
   const resetForm = () => {
-    const mainCategory = mainCategories[0] || "";
-
     setForm({
       name: "",
-      mainCategory,
-      category: categories[mainCategory]?.[0] || "",
+      mainCategory: "",
+      category: "",
       price: "",
       unit: "قطعة",
       saleType: "piece",
@@ -530,20 +555,16 @@ const ProductModal = ({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-2 block text-sm font-black text-slate-700">
-              القسم الرئيسي
-            </label>
-            <select
+            <SearchableSelect
+              id="main-category-select"
+              label="القسم الرئيسي"
               value={form.mainCategory}
-              onChange={(e) => handleMainCategoryChange(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400"
-            >
-              {mainCategories.map((main) => (
-                <option key={main} value={main}>
-                  {main}
-                </option>
-              ))}
-            </select>
+              onChange={handleMainCategoryChange}
+              options={mainCategories}
+              placeholder="ابحث أو اختر القسم الرئيسي... 🔍"
+              disabled={loading}
+              noOptionsMessage="لم يتم العثور على هذا القسم الرئيسي"
+            />
 
             <button
               type="button"
@@ -556,22 +577,20 @@ const ProductModal = ({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-black text-slate-700">
-              القسم الفرعي
-            </label>
-            <select
+            <SearchableSelect
+              id="sub-category-select"
+              label="القسم الفرعي"
               value={form.category}
-              onChange={(e) =>
-                setForm({ ...form, category: e.target.value })
+              onChange={handleSubCategoryChange}
+              options={subCategories}
+              placeholder="ابحث أو اختر القسم الفرعي... 🔍"
+              disabled={loading}
+              noOptionsMessage={
+                form.mainCategory
+                  ? `لا توجد أقسام فرعية مطابقة داخل "${form.mainCategory}"`
+                  : "لا توجد أقسام فرعية مطابقة"
               }
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-indigo-400"
-            >
-              {subCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+            />
 
             <button
               type="button"

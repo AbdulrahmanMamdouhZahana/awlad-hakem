@@ -13,4 +13,6 @@ export type { IProduct } from "./Cards/ProductCard";
 export type { Order } from "./Cards/OrderCard";
 
 // Navigation & UX
-export { BackToTop, default as BackToTopButton } from "./BackToTop";
+export { BackToTop, default as BackToTopButton } from "./BackToTop";
+export { default as SearchableSelect } from "./SearchableSelect";
+
